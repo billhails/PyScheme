@@ -1,0 +1,592 @@
+Created by PLY version 3.11 (http://www.dabeaz.com/ply)
+
+Unused terminals:
+
+    COMMENT
+
+Grammar
+
+Rule 0     S' -> expression
+Rule 1     expression -> symbol
+Rule 2     symbol -> ID
+Rule 3     expression -> number
+Rule 4     number -> NUMBER
+Rule 5     expression -> IF ( expression ) { expression } ELSE { expression }
+Rule 6     expression -> FN ( fargs ) { expression }
+Rule 7     expression -> expression ( aargs )
+Rule 8     expression -> expression + expression
+Rule 9     expression -> ( expression )
+Rule 10    fargs -> <empty>
+Rule 11    fargs -> nfargs
+Rule 12    nfargs -> symbol
+Rule 13    nfargs -> nfargs , symbol
+Rule 14    aargs -> <empty>
+Rule 15    aargs -> naargs
+Rule 16    naargs -> expression
+Rule 17    naargs -> naargs , expression
+
+Terminals, with rules where they appear
+
+(                    : 5 6 7 9
+)                    : 5 6 7 9
++                    : 8
+,                    : 13 17
+COMMENT              : 
+ELSE                 : 5
+FN                   : 6
+ID                   : 2
+IF                   : 5
+NUMBER               : 4
+error                : 
+{                    : 5 5 6
+}                    : 5 5 6
+
+Nonterminals, with rules where they appear
+
+aargs                : 7
+expression           : 5 5 5 6 7 8 8 9 16 17 0
+fargs                : 6
+naargs               : 15 17
+nfargs               : 11 13
+number               : 3
+symbol               : 1 12 13
+
+Parsing method: LALR
+
+state 0
+
+    (0) S' -> . expression
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 1
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 1
+
+    (0) S' -> expression .
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 2
+
+    (1) expression -> symbol .
+
+    (               reduce using rule 1 (expression -> symbol .)
+    +               reduce using rule 1 (expression -> symbol .)
+    $end            reduce using rule 1 (expression -> symbol .)
+    )               reduce using rule 1 (expression -> symbol .)
+    ,               reduce using rule 1 (expression -> symbol .)
+    }               reduce using rule 1 (expression -> symbol .)
+
+
+state 3
+
+    (3) expression -> number .
+
+    (               reduce using rule 3 (expression -> number .)
+    +               reduce using rule 3 (expression -> number .)
+    $end            reduce using rule 3 (expression -> number .)
+    )               reduce using rule 3 (expression -> number .)
+    ,               reduce using rule 3 (expression -> number .)
+    }               reduce using rule 3 (expression -> number .)
+
+
+state 4
+
+    (5) expression -> IF . ( expression ) { expression } ELSE { expression }
+
+    (               shift and go to state 11
+
+
+state 5
+
+    (9) expression -> ( . expression )
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 12
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 6
+
+    (6) expression -> FN . ( fargs ) { expression }
+
+    (               shift and go to state 13
+
+
+state 7
+
+    (2) symbol -> ID .
+
+    (               reduce using rule 2 (symbol -> ID .)
+    +               reduce using rule 2 (symbol -> ID .)
+    $end            reduce using rule 2 (symbol -> ID .)
+    )               reduce using rule 2 (symbol -> ID .)
+    ,               reduce using rule 2 (symbol -> ID .)
+    }               reduce using rule 2 (symbol -> ID .)
+
+
+state 8
+
+    (4) number -> NUMBER .
+
+    (               reduce using rule 4 (number -> NUMBER .)
+    +               reduce using rule 4 (number -> NUMBER .)
+    $end            reduce using rule 4 (number -> NUMBER .)
+    )               reduce using rule 4 (number -> NUMBER .)
+    ,               reduce using rule 4 (number -> NUMBER .)
+    }               reduce using rule 4 (number -> NUMBER .)
+
+
+state 9
+
+    (7) expression -> expression ( . aargs )
+    (14) aargs -> .
+    (15) aargs -> . naargs
+    (16) naargs -> . expression
+    (17) naargs -> . naargs , expression
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    )               reduce using rule 14 (aargs -> .)
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 14
+    aargs                          shift and go to state 15
+    naargs                         shift and go to state 16
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 10
+
+    (8) expression -> expression + . expression
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 17
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 11
+
+    (5) expression -> IF ( . expression ) { expression } ELSE { expression }
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 18
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 12
+
+    (9) expression -> ( expression . )
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    )               shift and go to state 19
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 13
+
+    (6) expression -> FN ( . fargs ) { expression }
+    (10) fargs -> .
+    (11) fargs -> . nfargs
+    (12) nfargs -> . symbol
+    (13) nfargs -> . nfargs , symbol
+    (2) symbol -> . ID
+
+    )               reduce using rule 10 (fargs -> .)
+    ID              shift and go to state 7
+
+    fargs                          shift and go to state 20
+    nfargs                         shift and go to state 21
+    symbol                         shift and go to state 22
+
+state 14
+
+    (16) naargs -> expression .
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    ,               reduce using rule 16 (naargs -> expression .)
+    )               reduce using rule 16 (naargs -> expression .)
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 15
+
+    (7) expression -> expression ( aargs . )
+
+    )               shift and go to state 23
+
+
+state 16
+
+    (15) aargs -> naargs .
+    (17) naargs -> naargs . , expression
+
+    )               reduce using rule 15 (aargs -> naargs .)
+    ,               shift and go to state 24
+
+
+state 17
+
+    (8) expression -> expression + expression .
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+  ! shift/reduce conflict for ( resolved as shift
+  ! shift/reduce conflict for + resolved as shift
+    $end            reduce using rule 8 (expression -> expression + expression .)
+    )               reduce using rule 8 (expression -> expression + expression .)
+    ,               reduce using rule 8 (expression -> expression + expression .)
+    }               reduce using rule 8 (expression -> expression + expression .)
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+  ! (               [ reduce using rule 8 (expression -> expression + expression .) ]
+  ! +               [ reduce using rule 8 (expression -> expression + expression .) ]
+
+
+state 18
+
+    (5) expression -> IF ( expression . ) { expression } ELSE { expression }
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    )               shift and go to state 25
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 19
+
+    (9) expression -> ( expression ) .
+
+    (               reduce using rule 9 (expression -> ( expression ) .)
+    +               reduce using rule 9 (expression -> ( expression ) .)
+    $end            reduce using rule 9 (expression -> ( expression ) .)
+    )               reduce using rule 9 (expression -> ( expression ) .)
+    ,               reduce using rule 9 (expression -> ( expression ) .)
+    }               reduce using rule 9 (expression -> ( expression ) .)
+
+
+state 20
+
+    (6) expression -> FN ( fargs . ) { expression }
+
+    )               shift and go to state 26
+
+
+state 21
+
+    (11) fargs -> nfargs .
+    (13) nfargs -> nfargs . , symbol
+
+    )               reduce using rule 11 (fargs -> nfargs .)
+    ,               shift and go to state 27
+
+
+state 22
+
+    (12) nfargs -> symbol .
+
+    ,               reduce using rule 12 (nfargs -> symbol .)
+    )               reduce using rule 12 (nfargs -> symbol .)
+
+
+state 23
+
+    (7) expression -> expression ( aargs ) .
+
+    (               reduce using rule 7 (expression -> expression ( aargs ) .)
+    +               reduce using rule 7 (expression -> expression ( aargs ) .)
+    $end            reduce using rule 7 (expression -> expression ( aargs ) .)
+    )               reduce using rule 7 (expression -> expression ( aargs ) .)
+    ,               reduce using rule 7 (expression -> expression ( aargs ) .)
+    }               reduce using rule 7 (expression -> expression ( aargs ) .)
+
+
+state 24
+
+    (17) naargs -> naargs , . expression
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 28
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 25
+
+    (5) expression -> IF ( expression ) . { expression } ELSE { expression }
+
+    {               shift and go to state 29
+
+
+state 26
+
+    (6) expression -> FN ( fargs ) . { expression }
+
+    {               shift and go to state 30
+
+
+state 27
+
+    (13) nfargs -> nfargs , . symbol
+    (2) symbol -> . ID
+
+    ID              shift and go to state 7
+
+    symbol                         shift and go to state 31
+
+state 28
+
+    (17) naargs -> naargs , expression .
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    ,               reduce using rule 17 (naargs -> naargs , expression .)
+    )               reduce using rule 17 (naargs -> naargs , expression .)
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 29
+
+    (5) expression -> IF ( expression ) { . expression } ELSE { expression }
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 32
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 30
+
+    (6) expression -> FN ( fargs ) { . expression }
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 33
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 31
+
+    (13) nfargs -> nfargs , symbol .
+
+    ,               reduce using rule 13 (nfargs -> nfargs , symbol .)
+    )               reduce using rule 13 (nfargs -> nfargs , symbol .)
+
+
+state 32
+
+    (5) expression -> IF ( expression ) { expression . } ELSE { expression }
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    }               shift and go to state 34
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 33
+
+    (6) expression -> FN ( fargs ) { expression . }
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    }               shift and go to state 35
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 34
+
+    (5) expression -> IF ( expression ) { expression } . ELSE { expression }
+
+    ELSE            shift and go to state 36
+
+
+state 35
+
+    (6) expression -> FN ( fargs ) { expression } .
+
+    (               reduce using rule 6 (expression -> FN ( fargs ) { expression } .)
+    +               reduce using rule 6 (expression -> FN ( fargs ) { expression } .)
+    $end            reduce using rule 6 (expression -> FN ( fargs ) { expression } .)
+    )               reduce using rule 6 (expression -> FN ( fargs ) { expression } .)
+    ,               reduce using rule 6 (expression -> FN ( fargs ) { expression } .)
+    }               reduce using rule 6 (expression -> FN ( fargs ) { expression } .)
+
+
+state 36
+
+    (5) expression -> IF ( expression ) { expression } ELSE . { expression }
+
+    {               shift and go to state 37
+
+
+state 37
+
+    (5) expression -> IF ( expression ) { expression } ELSE { . expression }
+    (1) expression -> . symbol
+    (3) expression -> . number
+    (5) expression -> . IF ( expression ) { expression } ELSE { expression }
+    (6) expression -> . FN ( fargs ) { expression }
+    (7) expression -> . expression ( aargs )
+    (8) expression -> . expression + expression
+    (9) expression -> . ( expression )
+    (2) symbol -> . ID
+    (4) number -> . NUMBER
+
+    IF              shift and go to state 4
+    FN              shift and go to state 6
+    (               shift and go to state 5
+    ID              shift and go to state 7
+    NUMBER          shift and go to state 8
+
+    expression                     shift and go to state 38
+    symbol                         shift and go to state 2
+    number                         shift and go to state 3
+
+state 38
+
+    (5) expression -> IF ( expression ) { expression } ELSE { expression . }
+    (7) expression -> expression . ( aargs )
+    (8) expression -> expression . + expression
+
+    }               shift and go to state 39
+    (               shift and go to state 9
+    +               shift and go to state 10
+
+
+state 39
+
+    (5) expression -> IF ( expression ) { expression } ELSE { expression } .
+
+    (               reduce using rule 5 (expression -> IF ( expression ) { expression } ELSE { expression } .)
+    +               reduce using rule 5 (expression -> IF ( expression ) { expression } ELSE { expression } .)
+    $end            reduce using rule 5 (expression -> IF ( expression ) { expression } ELSE { expression } .)
+    )               reduce using rule 5 (expression -> IF ( expression ) { expression } ELSE { expression } .)
+    ,               reduce using rule 5 (expression -> IF ( expression ) { expression } ELSE { expression } .)
+    }               reduce using rule 5 (expression -> IF ( expression ) { expression } ELSE { expression } .)
+
+WARNING: 
+WARNING: Conflicts:
+WARNING: 
+WARNING: shift/reduce conflict for ( in state 17 resolved as shift
+WARNING: shift/reduce conflict for + in state 17 resolved as shift
