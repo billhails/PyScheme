@@ -1,0 +1,225 @@
+from unittest import TestCase
+import pyscheme.expr as expr
+from pyscheme.exceptions import NonBooleanExpressionError
+
+
+class TestExpr(TestCase):
+    def setUp(self):
+        self.expr = expr.Expr()
+
+    def tearDown(self):
+        self.expr = None
+
+    def test_equality(self):
+        self.assertEqual(self.expr, self.expr, "expression should equal itself")
+
+    def test_non_equality(self):
+        self.assertNotEqual(self.expr, expr.Expr(), "different objects should not normally compare equal")
+
+    def test_eq(self):
+        self.assertIsInstance(self.expr.eq(self.expr), expr.T, "eq method returns boolean T")
+
+    def test_not_null(self):
+        self.assertFalse(self.expr.is_null(), "only null should be null")
+
+    def test_non_boolean_exception(self):
+        with self.assertRaises(NonBooleanExpressionError):
+            self.expr.is_true()
+
+
+class TestConstant(TestCase):
+    def setUp(self):
+        self.constant_10 = expr.Constant(10)
+        self.constant_10b = expr.Constant(10)
+        self.constant_12 = expr.Constant(12)
+
+    def tearDown(self):
+        self.constant_10 = None
+        self.constant_10b = None
+        self.constant_12 = None
+
+    def test_value(self):
+        self.assertEqual(10, self.constant_10.value(), "value should return underlying value")
+
+    def test_equality(self):
+        self.assertEqual(self.constant_10, self.constant_10b, "two constants with the same value should compare equal")
+
+    def test_non_equality(self):
+        self.assertNotEqual(self.constant_10,
+                            self.constant_12,
+                            "two constants with different values should not compare equal")
+
+    def test_string(self):
+        self.assertEqual("Constant(10)", str(self.constant_10), "string value should be sensible")
+
+
+class TestBoolean(TestCase):
+    def setUp(self):
+        self.t = expr.Boolean.true()
+        self.f = expr.Boolean.false()
+        self.u = expr.Boolean.unknown()
+
+    def tearDown(self):
+        self.t = None
+        self.f = None
+        self.u = None
+
+    def test_not(self):
+        t = self.t
+        f = self.f
+        u = self.u
+        for args in [
+            [t, f],
+            [f, t],
+            [u, u]
+        ]:
+            with self.subTest(args = args):
+                self.assertEqual(args[1], ~args[0])
+
+    def test_and(self):
+        t = self.t
+        f = self.f
+        u = self.u
+        for args in [
+            [t, t, t],
+            [t, f, f],
+            [t, u, u],
+            [f, t, f],
+            [f, f, f],
+            [f, u, f],
+            [u, t, u],
+            [u, f, f],
+            [u, u, u]
+        ]:
+            with self.subTest(args = args):
+                self.assertEqual(args[2], args[0] & args[1])
+
+    def test_or(self):
+        t = self.t
+        f = self.f
+        u = self.u
+        for args in [
+            [t, t, t],
+            [t, f, t],
+            [t, u, t],
+            [f, t, t],
+            [f, f, f],
+            [f, u, u],
+            [u, t, t],
+            [u, f, u],
+            [u, u, u]
+        ]:
+            with self.subTest(args = args):
+                self.assertEqual(args[2], args[0] | args[1])
+
+    def test_xor(self):
+        t = self.t
+        f = self.f
+        u = self.u
+        for args in [
+            [t, t, f],
+            [t, f, t],
+            [t, u, u],
+            [f, t, t],
+            [f, f, f],
+            [f, u, u],
+            [u, t, u],
+            [u, f, u],
+            [u, u, u]
+        ]:
+            with self.subTest(args = args):
+                self.assertEqual(args[2], args[0] ^ args[1])
+
+    def test_eq(self):
+        t = self.t
+        f = self.f
+        u = self.u
+        for args in [
+            [t, t, t],
+            [t, f, f],
+            [t, u, u],
+            [f, t, f],
+            [f, f, t],
+            [f, u, u],
+            [u, t, u],
+            [u, f, u],
+            [u, u, u]
+        ]:
+            with self.subTest(args=args):
+                self.assertEqual(args[2], args[0].eq(args[1]))
+
+    def test_str(self):
+        self.assertEqual("Boolean(T)", str(self.t))
+        self.assertEqual("Boolean(F)", str(self.f))
+        self.assertEqual("Boolean(?)", str(self.u))
+
+
+class TestSymbol(TestCase):
+    def setUp(self):
+        self.a = expr.Symbol.make("a")
+        self.b = expr.Symbol.make("b")
+        self.b2 = expr.Symbol.make("b")
+
+    def tearDown(self):
+        self.a = None
+        self.b = None
+        self.b2 = None
+
+    def test_equality(self):
+        self.assertEqual(self.b, self.b2, "two symbols with the same name should compare equal")
+
+    def test_non_equality(self):
+        self.assertNotEqual(self.a, self.b, "two symbols with different names should not compare equal")
+
+    def test_comparison(self):
+        self.assertIsInstance(self.a.eq(self.b), expr.F, "boolean object should be false")
+        self.assertIsInstance(self.b.eq(self.b2), expr.T, "boolean object should be true")
+
+    def test_hash(self):
+        self. assertEqual(hash(self.a), id(self.a), "hash function should use id")
+
+    def test_str(self):
+        self.assertEqual("Symbol(a)", str(self.a), "string representation should be sensible")
+
+
+class TestList(TestCase):
+    def setUp(self):
+        self.a = expr.Symbol.make("a")
+        self.b = expr.Symbol.make("b")
+        self.c = expr.Symbol.make("c")
+        self.list = expr.List.list(self.a, self.b, self.c)
+
+    def tearDown(self):
+        self.a = None
+        self.b = None
+        self.c = None
+        self.list = None
+
+    def test_null(self):
+        self.assertTrue(expr.List.null().is_null(), "null class method should return null")
+        self.assertFalse(self.list.is_null(), "non-empty list should not be null")
+
+    def test_car(self):
+        self.assertEqual(self.a, self.list.car(), "car of list should be a")
+
+    def test_cdr(self):
+        self.assertEqual(self.b, self.list.cdr().car(), "car of cdr of list should be b")
+
+    def test_len(self):
+        self.assertEqual(3, len(self.list), "list should be length three")
+
+    def test_str(self):
+        self.assertEqual("(Symbol(a), Symbol(b), Symbol(c))",
+                         str(self.list),
+                         "list as string should be sensible")
+
+    def test_append(self):
+        self.assertEqual("(Symbol(a), Symbol(b), Symbol(c), Symbol(a), Symbol(b), Symbol(c))",
+                         str(self.list.append(self.list)),
+                         "append to self should double size")
+
+    def test_iter(self):
+        result = []
+        for s in self.list:
+            result += [s]
+        self.assertEqual([self.a, self.b, self.c], result, "iteration should work")

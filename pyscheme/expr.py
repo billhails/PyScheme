@@ -1,8 +1,8 @@
-import pyscheme.op
+import pyscheme.op as op
 import pyscheme.environment as environment
-import pyscheme.list as list
 from typing import Callable
 from pyscheme.exceptions import NonBooleanExpressionError
+
 
 class Expr:
     def eval(self, env: environment.Environment, ret: Callable):
@@ -11,6 +11,22 @@ class Expr:
     def is_true(self):
         raise NonBooleanExpressionError()
 
+    def __eq__(self, other):
+        return id(self) == id(other)
+
+    def eq(self, other):
+        if self == other:
+            return Boolean.true()
+        else:
+            return Boolean.false()
+
+    def is_null(self):
+        return False
+
+
+class List(Expr):
+    pass
+
 
 class Constant(Expr):
     def __init__(self, value):
@@ -18,6 +34,15 @@ class Constant(Expr):
 
     def eval(self, env: environment.Environment, ret: Callable):
         return lambda: ret(self)
+
+    def value(self):
+        return self._value
+
+    def __eq__(self, other: Expr):
+        if other.__class__ == Constant:
+            return self._value == other.value()
+        else:
+            return False
 
     def __str__(self):
         return "Constant(" + str(self._value) + ")"
@@ -74,6 +99,17 @@ class T(Boolean):
     def __invert__(self):
         return Boolean.false()
 
+    def __str__(self):
+        return "Boolean(T)"
+
+    def eq(self, other):
+        if self == other:
+            return self
+        else:
+            return other
+
+    __repr__ = __str__
+
 
 class F(Boolean):
     def __and__(self, other: Boolean):
@@ -84,6 +120,19 @@ class F(Boolean):
 
     def __invert__(self):
         return Boolean.true()
+
+    def __str__(self):
+        return "Boolean(F)"
+
+    def eq(self, other):
+        if self == other:
+            return Boolean.true()
+        elif other == Boolean.unknown():
+            return other
+        else:
+            return self
+
+    __repr__ = __str__
 
 
 class U(Boolean):
@@ -102,6 +151,14 @@ class U(Boolean):
     def __invert__(self):
         return self
 
+    def eq(self, other):
+        return self
+
+    def __str__(self):
+        return "Boolean(?)"
+
+    __repr__ = __str__
+
 
 class Symbol(Expr):
     symbols = {}
@@ -109,7 +166,7 @@ class Symbol(Expr):
     @classmethod
     def make(cls, name) -> Expr:
         if name not in cls.symbols.keys():
-            cls.symbols[name] = Symbol(name)
+            cls.symbols[name] = cls(name)
         return cls.symbols[name]
 
     def __init__(self, name):
@@ -128,6 +185,138 @@ class Symbol(Expr):
         return "Symbol(" + str(self._name) + ")"
 
     __repr__ = __str__
+
+
+class List(Expr):
+    _null_instance = None
+
+    @classmethod
+    def null(cls):
+        """singleton factory method for Null"""
+        if cls._null_instance is None:
+            cls._null_instance = Null()
+        return cls._null_instance
+
+    @classmethod
+    def list(cls, *args):
+        if len(args) == 0:
+            return cls.null()
+        else:
+            return Cons(args[0], cls.list(*(args[1:])))
+
+    def is_null(self):
+        return False
+
+    def car(self):
+        pass
+
+    def cdr(self):
+        pass
+
+    def map_eval(self, env: environment.Environment, ret: Callable):
+        pass
+
+    def __len__(self):
+        pass
+
+    def __str__(self):
+        pass
+
+    def __repr__(self):
+        pass
+
+    def trailing_string(self) -> str:
+        pass
+
+    def append(self, other) -> List:
+        pass
+
+    def __iter__(self):
+        return ListIterator(self)
+
+
+class Cons(List):
+    def __init__(self, car, cdr: List):
+        self._car = car
+        self._cdr = cdr
+        self._len = 1 + len(cdr)
+
+    def car(self):
+        return self._car
+
+    def cdr(self):
+        return self._cdr
+
+    def map_eval(self, env: environment.Environment, ret: Callable):
+        def car_continuation(evaluated_car):
+            def cdr_continuation(evaluated_cdr):
+                return lambda: ret(Cons(evaluated_car, evaluated_cdr))
+            return lambda: self._cdr.map_eval(env, cdr_continuation)
+        return self._car.eval(env, car_continuation)
+
+    def __len__(self):
+        return self._len
+
+    def __str__(self):
+        return '(' + str(self._car) + self._cdr.trailing_string()
+
+    __repr__ = __str__
+
+    def trailing_string(self) -> str:
+        return ', ' + str(self._car) + self._cdr.trailing_string()
+
+    def append(self, other: List):
+        return Cons(self._car, self._cdr.append(other))
+
+    def __eq__(self, other: List):
+        if other.__class__ == Cons:
+            return self._car == other.car() and self._cdr == other.cdr()
+        else:
+            return False
+
+
+class Null(List):
+    def is_null(self):
+        return True
+
+    def car(self):
+        return self
+
+    def cdr(self):
+        return self
+
+    def map_eval(self, env: environment.Environment, ret: Callable):
+        return ret(self)
+
+    def __len__(self):
+        return 0
+
+    def __str__(self):
+        return '()'
+
+    __repr__ = __str__
+
+    def trailing_string(self) -> str:
+        return ')'
+
+    def append(self, other):
+        return other
+
+    def __eq__(self, other: Expr):
+        return other.is_null()
+
+
+class ListIterator:
+    def __init__(self, lst: List):
+        self._lst = lst
+
+    def __next__(self):
+        if self._lst.is_null():
+            raise StopIteration
+        else:
+            val = self._lst.car()
+            self._lst = self._lst.cdr()
+            return val
 
 
 class Conditional(Expr):
@@ -153,12 +342,12 @@ class Conditional(Expr):
 
 
 class Lambda(Expr):
-    def __init__(self, args: list.List, body: Expr):
+    def __init__(self, args: List, body: Expr):
         self._args = args
         self._body = body
 
     def eval(self, env: environment.Environment, ret: Callable):
-        return lambda: ret(pyscheme.op.Closure(self._args, self._body, env))
+        return lambda: ret(op.Closure(self._args, self._body, env))
 
     def __str__(self):
         return "Lambda(" + str(self._args) + "{" + str(self._body) + "})"
@@ -167,7 +356,7 @@ class Lambda(Expr):
 
 
 class Application(Expr):
-    def __init__(self, operation: Expr, operands: list.List):
+    def __init__(self, operation: Expr, operands: List):
         self._operation = operation
         self._operands = operands
 
@@ -180,3 +369,5 @@ class Application(Expr):
 
     def __str__(self):
         return "Application(" + str(self._operation) + ": " + str(self._operands) + ")"
+
+

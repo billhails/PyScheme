@@ -1,6 +1,4 @@
-import pyscheme.expr
 from functools import reduce
-import pyscheme.list as list
 from typing import Callable
 
 class Op:
@@ -9,12 +7,12 @@ class Op:
 
 
 class Closure(Op):
-    def __init__(self, args: list.List, body, env):
+    def __init__(self, args, body, env):
         self._args = args
         self._body = body
         self._env = env
 
-    def apply(self, args: list.List, ret: Callable):
+    def apply(self, args, ret: Callable):
         return lambda: self._body.eval(self._env.extend(dict(zip(self._args, args))), ret)
 
 
@@ -24,4 +22,10 @@ class Primitive(Op):
 
 class Addition(Primitive):
     def apply(self, args, ret: Callable):
-        return lambda: ret(pyscheme.expr.Constant(reduce(lambda x, y: x._value + y._value, args)))
+        import pyscheme.expr as expr
+        return lambda: ret(expr.Constant(reduce(lambda x, y: x.value() + y.value(), args)))
+
+
+class Equality(Primitive):
+    def apply(self, args, ret: Callable):
+        return lambda: ret(args.car().eq(args.cdr().car()))

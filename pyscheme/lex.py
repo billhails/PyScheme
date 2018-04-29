@@ -9,7 +9,8 @@ reserved = {
 tokens = [
     'NUMBER',
     'ID',
-    'COMMENT'
+    'COMMENT',
+    'EQ'
 ] + list(reserved.values())
 
 literals = '+{}(),'
@@ -29,6 +30,11 @@ def t_NUMBER(t):
 
 def t_COMMENT(t):
     r'//.*'
+    pass
+
+
+def t_EQ(t):
+    r'=='
     pass
 
 

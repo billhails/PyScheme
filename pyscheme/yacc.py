@@ -1,7 +1,5 @@
 import ply.yacc as yacc
-
 import pyscheme.expr as expr
-import pyscheme.list as list
 
 from pyscheme.lex import tokens
 
@@ -42,8 +40,11 @@ def p_expression_application(p):
 
 def p_expression_addition(p):
     "expression : expression '+' expression"
-    p[0] = expr.Application(expr.Symbol.make('+'), list.List.list(p[1], p[3]))
+    p[0] = expr.Application(expr.Symbol.make('+'), expr.List.list(p[1], p[3]))
 
+def p_expression_eq(p):
+    "expression : expression EQ expression"
+    p[0] = expr.Application(expr.Symbol.make('=='), expr.List.list(p[1], p[3]))
 
 def p_expression_parentheses(p):
     "expression : '(' expression ')'"
@@ -52,12 +53,12 @@ def p_expression_parentheses(p):
 
 def p_actuals(p):
     "actuals : aargs"
-    p[0] = list.List.list(*(p[1]))
+    p[0] = expr.List.list(*(p[1]))
 
 
 def p_formals(p):
     "formals : fargs"
-    p[0] = list.List.list(*(p[1]))
+    p[0] = expr.List.list(*(p[1]))
 
 
 def p_fargs_empty(p):
