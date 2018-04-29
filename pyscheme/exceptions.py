@@ -5,3 +5,7 @@ class PySchemeError(Exception):
 class SymbolNotFoundError(PySchemeError):
     def __init__(self, symbol):
         self._symbol = symbol
+
+
+class NonBooleanExpressionError(PySchemeError):
+    pass

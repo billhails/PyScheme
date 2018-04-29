@@ -2,13 +2,14 @@ import pyscheme.op
 import pyscheme.environment as environment
 import pyscheme.list as list
 from typing import Callable
+from pyscheme.exceptions import NonBooleanExpressionError
 
 class Expr:
     def eval(self, env: environment.Environment, ret: Callable):
         pass
 
     def is_true(self):
-        return True
+        raise NonBooleanExpressionError()
 
 
 class Constant(Expr):
@@ -22,6 +23,84 @@ class Constant(Expr):
         return "Constant(" + str(self._value) + ")"
 
     __repr__ = __str__
+
+
+class Boolean(Expr):
+    _true = None
+    _false = None
+    _unknown = None
+
+    @classmethod
+    def true(cls):
+        if cls._true is None:
+            cls._true = T()
+        return cls._true
+
+    @classmethod
+    def false(cls):
+        if cls._false is None:
+            cls._false = F()
+        return cls._false
+
+    @classmethod
+    def unknown(cls):
+        if cls._unknown is None:
+            cls._unknown = U()
+        return cls._unknown
+
+    def __and__(self, other):
+        pass
+
+    def __or__(self, other):
+        pass
+
+    def __invert__(self):
+        pass
+
+    def __xor__(self, other):
+        return (self & ~other) | (other & ~self)
+
+    def is_true(self):
+        return self == Boolean.true()
+
+
+class T(Boolean):
+    def __and__(self, other: Boolean):
+        return other
+
+    def __or__(self, other: Boolean):
+        return self
+
+    def __invert__(self):
+        return Boolean.false()
+
+
+class F(Boolean):
+    def __and__(self, other: Boolean):
+        return self
+
+    def __or__(self, other: Boolean):
+        return other
+
+    def __invert__(self):
+        return Boolean.true()
+
+
+class U(Boolean):
+    def __and__(self, other):
+        if other == Boolean.false():
+            return other
+        else:
+            return self
+
+    def __or__(self, other):
+        if other == Boolean.true():
+            return other
+        else:
+            return self
+
+    def __invert__(self):
+        return self
 
 
 class Symbol(Expr):
