@@ -12,7 +12,9 @@ class Lexer:
         'and': 'LAND',
         'or': 'LOR',
         'not': 'LNOT',
-        'xor': 'LXOR'
+        'xor': 'LXOR',
+        'then': 'THEN',
+        'fail': 'FAIL'
     }
 
     tokens = [

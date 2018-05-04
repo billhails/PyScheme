@@ -6,7 +6,7 @@ class Environment:
     def extend(self, dictionary):
         return Frame(self, dictionary)
 
-    def lookup(self, symbol, ret: Callable):
+    def lookup(self, symbol, ret: Callable, amb: Callable):
         raise SymbolNotFoundError(symbol)
 
 
@@ -15,8 +15,8 @@ class Frame(Environment):
         self._parent = parent
         self._dictionary = dictionary
 
-    def lookup(self, symbol, ret: Callable):
+    def lookup(self, symbol, ret: Callable, amb: Callable):
         if symbol in self._dictionary.keys():
-            return lambda: ret(self._dictionary.get(symbol))
+            return lambda: ret(self._dictionary.get(symbol), amb)
         else:
-            return lambda: self._parent.lookup(symbol, ret)
+            return lambda: self._parent.lookup(symbol, ret, amb)

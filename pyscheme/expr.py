@@ -5,7 +5,7 @@ from pyscheme.exceptions import NonBooleanExpressionError
 
 
 class Expr:
-    def eval(self, env: environment.Environment, ret: Callable):
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
         pass
 
     def is_true(self):
@@ -38,8 +38,8 @@ class Constant(Expr):
     def __init__(self, value):
         self._value = value
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        return lambda: ret(self)
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        return lambda: ret(self, amb)
 
     def value(self):
         return self._value
@@ -202,8 +202,8 @@ class Symbol(Expr):
     def __init__(self, name):
         self._name = name
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        return lambda: env.lookup(self, ret)
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        return lambda: env.lookup(self, ret, amb)
 
     def __hash__(self):
         return id(self)
@@ -279,12 +279,18 @@ class Pair(List):
     def cdr(self):
         return self._cdr
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        def car_continuation(evaluated_car):
-            def cdr_continuation(evaluated_cdr):
-                return lambda: ret(Pair(evaluated_car, evaluated_cdr))
-            return lambda: self._cdr.eval(env, cdr_continuation)
-        return self._car.eval(env, car_continuation)
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        def car_continuation(evaluated_car, amb: Callable):
+            def cdr_continuation(evaluated_cdr, amb: Callable):
+                return lambda: ret(Pair(evaluated_car, evaluated_cdr), amb)
+            return lambda: self._cdr.eval(env, cdr_continuation, amb)
+        return self._car.eval(env, car_continuation, amb)
+
+    def last(self):
+        if self._len == 1:
+            return self._car
+        else:
+            return self._cdr.last()
 
     def __len__(self):
         return self._len
@@ -317,8 +323,11 @@ class Null(List):
     def cdr(self):
         return self
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        return ret(self)
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        return ret(self, amb)
+
+    def last(self):
+        return self
 
     def __len__(self):
         return 0
@@ -357,13 +366,13 @@ class Conditional(Expr):
         self._consequent = consequent
         self._alternative = alternative
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        def deferred(result: Expr):
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        def deferred(result: Expr, amb: Callable):
             if result.is_true():
-                return lambda: self._consequent.eval(env, ret)
+                return lambda: self._consequent.eval(env, ret, amb)
             else:
-                return lambda: self._consequent.eval(env, ret)
-        return lambda: self._test.eval(env, deferred)
+                return lambda: self._alternative.eval(env, ret, amb)
+        return lambda: self._test.eval(env, deferred, amb)
 
     def __str__(self):
         return "if (" + str(self._test) + \
@@ -378,11 +387,11 @@ class Lambda(Expr):
         self._args = args
         self._body = body
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        return lambda: ret(op.Closure(self._args, self._body, env))
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        return lambda: ret(op.Closure(self._args, self._body, env), amb)
 
     def __str__(self):
-        return "Lambda(" + str(self._args) + "{" + str(self._body) + "})"
+        return "Lambda " + str(self._args) + ": { " + str(self._body) + " }"
 
     __repr__ = __str__
 
@@ -392,12 +401,21 @@ class Application(Expr):
         self._operation = operation
         self._operands = operands
 
-    def eval(self, env: environment.Environment, ret: Callable):
-        def deferred_op(evaluated_op):
-            return lambda: evaluated_op.apply(self._operands, env, ret)
-        return self._operation.eval(env, deferred_op)
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        def deferred_op(evaluated_op, amb: Callable):
+            return lambda: evaluated_op.apply(self._operands, env, ret, amb)
+        return self._operation.eval(env, deferred_op, amb)
 
     def __str__(self):
         return "Application(" + str(self._operation) + ": " + str(self._operands) + ")"
+
+class Sequence(Expr):
+    def __init__(self, exprs: List):
+        self._exprs = exprs
+
+    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+        def take_last(expr: List, amb: Callable):
+            return lambda: ret(expr.last(), amb)
+        return lambda: self._exprs.eval(env, take_last, amb)
 
 

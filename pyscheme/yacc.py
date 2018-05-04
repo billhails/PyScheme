@@ -9,9 +9,9 @@ precedence = (
     ('left', 'LNOT'),
     ('left', 'EQ'),
     ('right', 'CONS', 'APPEND'),
-    ('left', '+')
+    ('left', '+'),
+    ('right', 'THEN')
 )
-
 
 def p_expression_id(p):
     'expression : symbol'
@@ -171,6 +171,15 @@ def p_nexprs_comma(p):
     "nexprs : nexprs ',' expression"
     p[0] = p[1] + [p[3]]
 
+
+def p_expression_then(p):
+    "expression : expression THEN expression"
+    p[0] = expr.Application(expr.Symbol.make('then'), expr.List.list([p[1], p[3]]))
+
+
+def p_expression_fail(p):
+    "expression : FAIL"
+    p[0] = expr.Application(expr.Symbol.make('fail'), expr.List.null())
 
 def p_error(p):
     if p is not None:  # EOF

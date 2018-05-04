@@ -20,21 +20,21 @@ class TestEnvironment(unittest.TestCase):
         new_env = self.env.extend({a: b})
         c = None
 
-        def cont(v):
+        def cont(v, amb):
             nonlocal c
             c = v
 
-        new_env.lookup(a, cont)()  # we have to bounce the result to evaluate cont.
+        new_env.lookup(a, cont, lambda: None)()  # we have to bounce the result to evaluate cont.
         self.assertEqual(b, c, "lookup should find a = 10")
 
     def test_failed_lookup(self):
         a = expr.Symbol.make("a")
 
-        def cont(_):
+        def cont(_, amb):
             pass
 
         with self.assertRaises(SymbolNotFoundError):
-            self.env.lookup(a, cont)
+            self.env.lookup(a, cont, lambda: None)
 
 
 if __name__ == "__main__":

@@ -22,7 +22,9 @@ class Repl:
                 expr.Symbol.make("not"): op.Not(),
                 expr.Symbol.make("xor"): op.Xor(),
                 expr.Symbol.make("@"): op.Cons(),
-                expr.Symbol.make("@@"): op.Append()
+                expr.Symbol.make("@@"): op.Append(),
+                expr.Symbol.make("then"): op.Then(),
+                expr.Symbol.make("fail"): op.Fail()
             }
         )
 
@@ -33,30 +35,30 @@ class Repl:
             if next is not None:
                 threads += [next]
 
-    def read(self, ret: Callable):
+    def read(self, ret: Callable, amb: Callable):
         result = yacc.parser.parse(lexer=self.lexer)
         if result is None:
             return None  # stop the trampoline
-        return lambda: ret(result)
+        return lambda: ret(result, amb)
 
-    def eval(self, expr: expr.Expr, ret: Callable):
-        return lambda: expr.eval(self.env, ret)
+    def eval(self, expr: expr.Expr, ret: Callable, amb: Callable):
+        return lambda: expr.eval(self.env, ret, amb)
 
-    def print(self, expr: expr.Expr, ret: Callable):
+    def print(self, expr: expr.Expr, ret: Callable, amb: Callable):
         self.output.write(str(expr))
-        return lambda: ret(expr)
+        return lambda: ret(expr, amb)
 
-    def repl(self):
-        def deferred_eval(read_expr: expr.Expr):
-            def deferred_print(evaluated_expr: expr.Expr):
-                def deferred_repl(expr):
-                    return lambda: self.repl()
-                return lambda: self.print(evaluated_expr, deferred_repl)
-            return lambda: self.eval(read_expr, deferred_print)
-        return lambda: self.read(deferred_eval)
+    def repl(self, amb: Callable):
+        def deferred_eval(read_expr: expr.Expr, amb: Callable):
+            def deferred_print(evaluated_expr: expr.Expr, amb: Callable):
+                def deferred_repl(expr, amb: Callable):
+                    return lambda: self.repl(lambda: None)
+                return lambda: self.print(evaluated_expr, deferred_repl, amb)
+            return lambda: self.eval(read_expr, deferred_print, amb)
+        return lambda: self.read(deferred_eval, amb)
 
     def run(self):
-        self.trampoline([lambda: self.repl()])
+        self.trampoline([lambda: self.repl(lambda: None)])
 
 
 if __name__ == "__main__":

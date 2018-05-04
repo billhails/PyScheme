@@ -1,4 +1,6 @@
 venv
+htmlcov
+.coverage
 .idea
 parser.out
 parsetab.py

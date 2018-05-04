@@ -34,3 +34,9 @@ class TestClosure(Base):
                 )
             """
         )
+
+    def test_lambda_string(self):
+        self.assertEval(
+            "Closure([a]: if (Application(==: [a, 2])) {12} else {Lambda []: { 14 }})",
+            "fn (a) { if (a == 2) { 12 } else { fn () { 14 } } }"
+        )
