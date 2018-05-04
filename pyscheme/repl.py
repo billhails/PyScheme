@@ -5,11 +5,26 @@ import pyscheme.environment as environment
 import pyscheme.expr as expr
 import pyscheme.op as op
 from typing import Callable
+from pyscheme.stream import Stream
 
 
 class Repl:
-    def __init__(self):
-        self.env = environment.Environment().extend({expr.Symbol.make("+"): op.Addition()})
+    def __init__(self, input: Stream, output):
+        self.input = input
+        self.output = output
+        self.lexer = lex.Lexer(input)
+        self.env = environment.Environment().extend(
+            {
+                expr.Symbol.make("+"): op.Addition(),
+                expr.Symbol.make("=="): op.Equality(),
+                expr.Symbol.make("and"): op.And(),
+                expr.Symbol.make("or"): op.Or(),
+                expr.Symbol.make("not"): op.Not(),
+                expr.Symbol.make("xor"): op.Xor(),
+                expr.Symbol.make("@"): op.Cons(),
+                expr.Symbol.make("@@"): op.Append()
+            }
+        )
 
     def trampoline(self, threads: List):
         while len(threads) > 0:
@@ -19,20 +34,16 @@ class Repl:
                 threads += [next]
 
     def read(self, ret: Callable):
-        try:
-            s = input("F♮> ")
-        except EOFError:
-            return None
-        result = yacc.parser.parse(s, lexer=lex.lexer)
+        result = yacc.parser.parse(lexer=self.lexer)
         if result is None:
-            return None
+            return None  # stop the trampoline
         return lambda: ret(result)
 
     def eval(self, expr: expr.Expr, ret: Callable):
         return lambda: expr.eval(self.env, ret)
 
     def print(self, expr: expr.Expr, ret: Callable):
-        print(expr)
+        self.output.write(str(expr))
         return lambda: ret(expr)
 
     def repl(self):

@@ -1,7 +1,17 @@
 import ply.yacc as yacc
 import pyscheme.expr as expr
 
-from pyscheme.lex import tokens
+from pyscheme.lex import Lexer
+tokens = Lexer.tokens
+
+precedence = (
+    ('left', 'LAND', 'LOR', 'LXOR'),
+    ('left', 'LNOT'),
+    ('left', 'EQ'),
+    ('right', 'CONS', 'APPEND'),
+    ('left', '+')
+)
+
 
 def p_expression_id(p):
     'expression : symbol'
@@ -23,6 +33,36 @@ def p_number(p):
     p[0] = expr.Constant(p[1])
 
 
+def p_expression_boolean(p):
+    'expression : boolean'
+    p[0] = p[1]
+
+
+def p_boolean_true(p):
+    'boolean : TRUE'
+    p[0] = expr.Boolean.true()
+
+
+def p_boolean_false(p):
+    'boolean : FALSE'
+    p[0] = expr.Boolean.false()
+
+
+def p_boolean_unknown(p):
+    'boolean : UNKNOWN'
+    p[0] = expr.Boolean.unknown()
+
+
+def p_expression_list(p):
+    'expression : list'
+    p[0] = p[1]
+
+
+def p_list_literal(p):
+    "list : '[' exprs ']'"
+    p[0] = expr.List.list(p[2])
+
+
 def p_expression_conditional(p):
     "expression : IF '(' expression ')' '{' expression '}' ELSE '{' expression '}'"
     p[0] = expr.Conditional(p[3], p[6], p[10])
@@ -40,11 +80,42 @@ def p_expression_application(p):
 
 def p_expression_addition(p):
     "expression : expression '+' expression"
-    p[0] = expr.Application(expr.Symbol.make('+'), expr.List.list(p[1], p[3]))
+    p[0] = expr.Application(expr.Symbol.make('+'), expr.List.list([p[1], p[3]]))
+
 
 def p_expression_eq(p):
     "expression : expression EQ expression"
-    p[0] = expr.Application(expr.Symbol.make('=='), expr.List.list(p[1], p[3]))
+    p[0] = expr.Application(expr.Symbol.make('=='), expr.List.list([p[1], p[3]]))
+
+
+def p_expression_and(p):
+    "expression : expression LAND expression"
+    p[0] = expr.Application(expr.Symbol.make('and'), expr.List.list([p[1], p[3]]))
+
+
+def p_expression_or(p):
+    "expression : expression LOR expression"
+    p[0] = expr.Application(expr.Symbol.make('or'), expr.List.list([p[1], p[3]]))
+
+
+def p_expression_not(p):
+    "expression : LNOT expression"
+    p[0] = expr.Application(expr.Symbol.make('not'), expr.List.list([p[2]]))
+
+
+def p_expression_xor(p):
+    "expression : expression LXOR expression"
+    p[0] = expr.Application(expr.Symbol.make('xor'), expr.List.list([p[1], p[3]]))
+
+
+def p_expression_cons(p):
+    "expression : expression CONS expression"
+    p[0] = expr.Application(expr.Symbol.make('@'), expr.List.list([p[1], p[3]]))
+
+
+def p_expression_append(p):
+    "expression : expression APPEND expression"
+    p[0] = expr.Application(expr.Symbol.make('@@'), expr.List.list([p[1], p[3]]))
 
 def p_expression_parentheses(p):
     "expression : '(' expression ')'"
@@ -52,13 +123,13 @@ def p_expression_parentheses(p):
 
 
 def p_actuals(p):
-    "actuals : aargs"
-    p[0] = expr.List.list(*(p[1]))
+    "actuals : exprs"
+    p[0] = expr.List.list(p[1])
 
 
 def p_formals(p):
     "formals : fargs"
-    p[0] = expr.List.list(*(p[1]))
+    p[0] = expr.List.list(p[1])
 
 
 def p_fargs_empty(p):
@@ -81,28 +152,29 @@ def p_nfargs_comma(p):
     p[0] = p[1] + [p[3]]
 
 
-def p_aargs_empty(p):
-    'aargs : '
+def p_exprs_empty(p):
+    'exprs : '
     p[0] = []
 
 
-def p_aargs_nonempty(p):
-    'aargs : naargs'
+def p_exprs_nonempty(p):
+    'exprs : nexprs'
     p[0] = p[1]
 
 
-def p_naargs_expr(p):
-    'naargs : expression'
+def p_nexprs_expr(p):
+    'nexprs : expression'
     p[0] = [p[1]]
 
 
-def p_naargs_comma(p):
-    "naargs : naargs ',' expression"
-    p[0] = p[1]+ [p[3]]
+def p_nexprs_comma(p):
+    "nexprs : nexprs ',' expression"
+    p[0] = p[1] + [p[3]]
 
 
 def p_error(p):
-    print("syntax error in lambda input")
+    if p is not None:  # EOF
+        print("syntax error in lambda input: " + str(p))
 
 
 # Build the parser

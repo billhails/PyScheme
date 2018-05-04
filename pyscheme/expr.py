@@ -11,6 +11,12 @@ class Expr:
     def is_true(self):
         raise NonBooleanExpressionError()
 
+    def is_false(self):
+        raise NonBooleanExpressionError()
+
+    def is_unknown(self):
+        raise NonBooleanExpressionError()
+
     def __eq__(self, other):
         return id(self) == id(other)
 
@@ -45,15 +51,18 @@ class Constant(Expr):
             return False
 
     def __str__(self):
-        return "Constant(" + str(self._value) + ")"
+        return str(self._value)
 
     __repr__ = __str__
 
 
-class Boolean(Expr):
+class Boolean(Constant):
     _true = None
     _false = None
     _unknown = None
+
+    def __init__(self):
+        pass
 
     @classmethod
     def true(cls):
@@ -85,8 +94,20 @@ class Boolean(Expr):
     def __xor__(self, other):
         return (self & ~other) | (other & ~self)
 
+    def __eq__(self, other):
+        return id(self) == id(other)
+
     def is_true(self):
-        return self == Boolean.true()
+        return False
+
+    def is_true(self):
+        return False
+
+    def is_false(self):
+        return False
+
+    def is_unknown(self):
+        return False
 
 
 class T(Boolean):
@@ -100,13 +121,16 @@ class T(Boolean):
         return Boolean.false()
 
     def __str__(self):
-        return "Boolean(T)"
+        return "true"
 
     def eq(self, other):
         if self == other:
             return self
         else:
             return other
+
+    def is_true(self):
+        return True
 
     __repr__ = __str__
 
@@ -122,7 +146,7 @@ class F(Boolean):
         return Boolean.true()
 
     def __str__(self):
-        return "Boolean(F)"
+        return "false"
 
     def eq(self, other):
         if self == other:
@@ -131,6 +155,9 @@ class F(Boolean):
             return other
         else:
             return self
+
+    def is_false(self):
+        return True
 
     __repr__ = __str__
 
@@ -155,7 +182,10 @@ class U(Boolean):
         return self
 
     def __str__(self):
-        return "Boolean(?)"
+        return "unknown"
+
+    def is_unknown(self):
+        return True
 
     __repr__ = __str__
 
@@ -182,13 +212,18 @@ class Symbol(Expr):
         return id(self) == id(other)
 
     def __str__(self):
-        return "Symbol(" + str(self._name) + ")"
+        return str(self._name)
 
     __repr__ = __str__
 
 
 class List(Expr):
     _null_instance = None
+
+    """
+    we need some sort of builder here that defers evaluation
+    until runtime, otherwise literal lists will be constants
+    """
 
     @classmethod
     def null(cls):
@@ -198,11 +233,11 @@ class List(Expr):
         return cls._null_instance
 
     @classmethod
-    def list(cls, *args):
-        if len(args) == 0:
+    def list(cls, args, index=0):
+        if index == len(args):
             return cls.null()
         else:
-            return Cons(args[0], cls.list(*(args[1:])))
+            return Pair(args[index], cls.list(args, index=index + 1))
 
     def is_null(self):
         return False
@@ -211,9 +246,6 @@ class List(Expr):
         pass
 
     def cdr(self):
-        pass
-
-    def map_eval(self, env: environment.Environment, ret: Callable):
         pass
 
     def __len__(self):
@@ -235,7 +267,7 @@ class List(Expr):
         return ListIterator(self)
 
 
-class Cons(List):
+class Pair(List):
     def __init__(self, car, cdr: List):
         self._car = car
         self._cdr = cdr
@@ -247,18 +279,18 @@ class Cons(List):
     def cdr(self):
         return self._cdr
 
-    def map_eval(self, env: environment.Environment, ret: Callable):
+    def eval(self, env: environment.Environment, ret: Callable):
         def car_continuation(evaluated_car):
             def cdr_continuation(evaluated_cdr):
-                return lambda: ret(Cons(evaluated_car, evaluated_cdr))
-            return lambda: self._cdr.map_eval(env, cdr_continuation)
+                return lambda: ret(Pair(evaluated_car, evaluated_cdr))
+            return lambda: self._cdr.eval(env, cdr_continuation)
         return self._car.eval(env, car_continuation)
 
     def __len__(self):
         return self._len
 
     def __str__(self):
-        return '(' + str(self._car) + self._cdr.trailing_string()
+        return '[' + str(self._car) + self._cdr.trailing_string()
 
     __repr__ = __str__
 
@@ -266,10 +298,10 @@ class Cons(List):
         return ', ' + str(self._car) + self._cdr.trailing_string()
 
     def append(self, other: List):
-        return Cons(self._car, self._cdr.append(other))
+        return Pair(self._car, self._cdr.append(other))
 
     def __eq__(self, other: List):
-        if other.__class__ == Cons:
+        if other.__class__ == Pair:
             return self._car == other.car() and self._cdr == other.cdr()
         else:
             return False
@@ -285,19 +317,19 @@ class Null(List):
     def cdr(self):
         return self
 
-    def map_eval(self, env: environment.Environment, ret: Callable):
+    def eval(self, env: environment.Environment, ret: Callable):
         return ret(self)
 
     def __len__(self):
         return 0
 
     def __str__(self):
-        return '()'
+        return '[]'
 
     __repr__ = __str__
 
     def trailing_string(self) -> str:
-        return ')'
+        return ']'
 
     def append(self, other):
         return other
@@ -334,9 +366,9 @@ class Conditional(Expr):
         return lambda: self._test.eval(env, deferred)
 
     def __str__(self):
-        return "Conditional(if (" + str(self._test) + \
+        return "if (" + str(self._test) + \
                ") {" + str(self._consequent) + \
-               "} else {" + str(self._alternative) + "})"
+               "} else {" + str(self._alternative) + "}"
 
     __repr__ = __str__
 
@@ -362,9 +394,7 @@ class Application(Expr):
 
     def eval(self, env: environment.Environment, ret: Callable):
         def deferred_op(evaluated_op):
-            def deferred_args(evaluated_args):
-                return lambda: evaluated_op.apply(evaluated_args, ret)
-            return lambda: self._operands.map_eval(env, deferred_args)
+            return lambda: evaluated_op.apply(self._operands, env, ret)
         return self._operation.eval(env, deferred_op)
 
     def __str__(self):

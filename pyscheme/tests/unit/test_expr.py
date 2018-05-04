@@ -50,7 +50,7 @@ class TestConstant(TestCase):
                             "two constants with different values should not compare equal")
 
     def test_string(self):
-        self.assertEqual("Constant(10)", str(self.constant_10), "string value should be sensible")
+        self.assertEqual("10", str(self.constant_10), "string value should be sensible")
 
 
 class TestBoolean(TestCase):
@@ -149,9 +149,9 @@ class TestBoolean(TestCase):
                 self.assertEqual(args[2], args[0].eq(args[1]))
 
     def test_str(self):
-        self.assertEqual("Boolean(T)", str(self.t))
-        self.assertEqual("Boolean(F)", str(self.f))
-        self.assertEqual("Boolean(?)", str(self.u))
+        self.assertEqual("true", str(self.t))
+        self.assertEqual("false", str(self.f))
+        self.assertEqual("unknown", str(self.u))
 
 
 class TestSymbol(TestCase):
@@ -179,7 +179,7 @@ class TestSymbol(TestCase):
         self. assertEqual(hash(self.a), id(self.a), "hash function should use id")
 
     def test_str(self):
-        self.assertEqual("Symbol(a)", str(self.a), "string representation should be sensible")
+        self.assertEqual("a", str(self.a), "string representation should be sensible")
 
 
 class TestList(TestCase):
@@ -187,7 +187,7 @@ class TestList(TestCase):
         self.a = expr.Symbol.make("a")
         self.b = expr.Symbol.make("b")
         self.c = expr.Symbol.make("c")
-        self.list = expr.List.list(self.a, self.b, self.c)
+        self.list = expr.List.list([self.a, self.b, self.c])
 
     def tearDown(self):
         self.a = None
@@ -209,12 +209,12 @@ class TestList(TestCase):
         self.assertEqual(3, len(self.list), "list should be length three")
 
     def test_str(self):
-        self.assertEqual("(Symbol(a), Symbol(b), Symbol(c))",
+        self.assertEqual("[a, b, c]",
                          str(self.list),
                          "list as string should be sensible")
 
     def test_append(self):
-        self.assertEqual("(Symbol(a), Symbol(b), Symbol(c), Symbol(a), Symbol(b), Symbol(c))",
+        self.assertEqual("[a, b, c, a, b, c]",
                          str(self.list.append(self.list)),
                          "append to self should double size")
 
