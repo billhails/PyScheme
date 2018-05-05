@@ -204,8 +204,6 @@ class Symbol(Expr, metaclass=FlyWeight):
 
 
 class List(Expr):
-    _null_instance = None
-
     @classmethod
     def list(cls, args, index=0):
         if index == len(args):

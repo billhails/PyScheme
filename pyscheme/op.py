@@ -1,6 +1,7 @@
 from functools import reduce
 from typing import Callable
 from pyscheme.environment import Environment
+from pyscheme.singleton import Singleton
 
 """
 We need to distinguish between
@@ -47,37 +48,37 @@ class Closure(Primitive):
         return "Closure(" + str(self._args) + ": " + str(self._body) + ")"
 
 
-class Addition(Primitive):
+class Addition(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0] + args[1], amb)
 
 
-class Subtraction(Primitive):
+class Subtraction(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0] - args[1], amb)
 
 
-class Multiplication(Primitive):
+class Multiplication(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0] * args[1], amb)
 
 
-class Division(Primitive):
+class Division(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0] // args[1], amb)
 
 
-class Modulus(Primitive):
+class Modulus(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0] % args[1], amb)
 
 
-class Equality(Primitive):
+class Equality(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0].eq(args[1]), amb)
 
 
-class And(SpecialForm):
+class And(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         def cont(lhs, amb: Callable):
             if lhs.is_true():
@@ -95,7 +96,7 @@ class And(SpecialForm):
         return lambda: args[0].eval(env, cont, amb)
 
 
-class Or(SpecialForm):
+class Or(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         def cont(lhs, amb: Callable):
             if lhs.is_true():
@@ -113,57 +114,57 @@ class Or(SpecialForm):
         return lambda: args[0].eval(env, cont, amb)
 
 
-class Then(SpecialForm):
+class Then(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         def amb2():
             return lambda: args[1].eval(env, ret, amb)
         return lambda: args[0].eval(env, ret, amb2)
 
 
-class Fail(SpecialForm):
+class Fail(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         return lambda: amb()
 
 
-class Not(Primitive):
+class Not(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(~(args[0]), amb)
 
 
-class Xor(Primitive):
+class Xor(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0] ^ args[1], amb)
 
 
-class Cons(Primitive):
+class Cons(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         from pyscheme.expr import Pair
         return lambda: ret(Pair(args[0], args[1]), amb)
 
 
-class Append(Primitive):
+class Append(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0].append(args[1]), amb)
 
 
-class Head(Primitive):
+class Head(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0].car(), amb)
 
 
-class Tail(Primitive):
+class Tail(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         return lambda: ret(args[0].cdr(), amb)
 
 
-class Define(SpecialForm):
+class Define(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         def do_define(value, amb):
             return lambda: env.define(args[0], value, ret, amb)
         return lambda: args[1].eval(env, do_define, amb)
 
 
-class Length(Primitive):
+class Length(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         from pyscheme.expr import Constant
         return lambda: ret(Constant(len(args[0])), amb)
