@@ -78,6 +78,31 @@ class Equality(Primitive, metaclass=Singleton):
         return lambda: ret(args[0].eq(args[1]), amb)
 
 
+class GT(Primitive, metaclass=Singleton):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return lambda: ret(args[0].gt(args[1]), amb)
+
+
+class LT(Primitive, metaclass=Singleton):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return lambda: ret(args[0].lt(args[1]), amb)
+
+
+class GE(Primitive, metaclass=Singleton):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return lambda: ret(args[0].ge(args[1]), amb)
+
+
+class LE(Primitive, metaclass=Singleton):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return lambda: ret(args[0].le(args[1]), amb)
+
+
+class NE(Primitive, metaclass=Singleton):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return lambda: ret(args[0].ne(args[1]), amb)
+
+
 class And(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         def cont(lhs, amb: Callable):
@@ -168,3 +193,9 @@ class Length(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
         from pyscheme.expr import Constant
         return lambda: ret(Constant(len(args[0])), amb)
+
+
+class Print(Primitive, metaclass=Singleton):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        print(str(args))
+        return lambda: ret(args, amb)

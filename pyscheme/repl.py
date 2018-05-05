@@ -21,6 +21,11 @@ class Repl:
                 expr.Symbol("/"): op.Division(),
                 expr.Symbol("%"): op.Modulus(),
                 expr.Symbol("=="): op.Equality(),
+                expr.Symbol("<"): op.LT(),
+                expr.Symbol(">"): op.GT(),
+                expr.Symbol("<="): op.LE(),
+                expr.Symbol(">="): op.GE(),
+                expr.Symbol("!="): op.NE(),
                 expr.Symbol("and"): op.And(),
                 expr.Symbol("or"): op.Or(),
                 expr.Symbol("not"): op.Not(),
@@ -33,6 +38,7 @@ class Repl:
                 expr.Symbol("tail"): op.Tail(),
                 expr.Symbol("define"): op.Define(),
                 expr.Symbol("length"): op.Length(),
+                expr.Symbol("print"): op.Print(),
             }
         )
 

@@ -20,8 +20,15 @@ class Lexer:
 
     tokens = [
         'NUMBER',
+        'STRING',
+        'CHAR',
         'ID',
         'EQ',
+        'GT',
+        'LT',
+        'GE',
+        'LE',
+        'NE',
         'CONS',
         'APPEND'
     ] + list(reserved.values())
@@ -54,12 +61,42 @@ class Lexer:
         t.value = int(t.value)
         return t
 
+    def t_STRING(self, t):
+        r'"(\\.|[^"])*"'
+        t.value = str(t.value)[1:][:-1].strip('\\')
+        return t
+
+    def t_CHAR(self, t):
+        r"'(\\.|[^'])'"
+        t.value = str(t.value)[1:][:-1].strip('\\')
+        return t
+
     def t_COMMENT(self, t):
         r'//.*'
         pass
 
     def t_EQ(self, t):
         r'=='
+        return t
+
+    def t_GE(self, t):
+        r'>='
+        return t
+
+    def t_LE(self, t):
+        r'<='
+        return t
+
+    def t_GT(self, t):
+        r'>'
+        return t
+
+    def t_LT(self, t):
+        r'<'
+        return t
+
+    def t_NE(self, t):
+        r'!='
         return t
 
     def t_eof(self, t):

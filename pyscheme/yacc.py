@@ -5,13 +5,14 @@ from pyscheme.lex import Lexer
 tokens = Lexer.tokens
 
 precedence = (
+    ('right', 'THEN'),
     ('left', 'LAND', 'LOR', 'LXOR'),
     ('left', 'LNOT'),
-    ('left', 'EQ'),
+    ('left', 'EQ', 'GT', 'LT', 'GE', 'LE', 'NE'),
     ('right', 'CONS', 'APPEND'),
     ('left', '+', '-'),
     ('left', '*', '/', '%'),
-    ('right', 'THEN')
+    ('left', '('),
 )
 
 
@@ -53,6 +54,26 @@ def p_expression_number(p):
 def p_number(p):
     'number : NUMBER'
     p[0] = expr.Constant(p[1])
+
+
+def p_expression_string(p):
+    'expression : string'
+    p[0] = p[1]
+
+
+def p_string(p):
+    'string : STRING'
+    p[0] = expr.Constant(p[1])
+
+
+def p_expression_char(p):
+    'expression : char'
+    p[0] = p[1]
+
+
+def p_char(p):
+    'char : CHAR'
+    p[0] = expr.Char(p[1])
 
 
 def p_expression_boolean(p):
@@ -130,6 +151,31 @@ def p_expression_eq(p):
     p[0] = application('==', p[1], p[3])
 
 
+def p_expression_ne(p):
+    "expression : expression NE expression"
+    p[0] = application('!=', p[1], p[3])
+
+
+def p_expression_gt(p):
+    "expression : expression GT expression"
+    p[0] = application('>', p[1], p[3])
+
+
+def p_expression_lt(p):
+    "expression : expression LT expression"
+    p[0] = application('<', p[1], p[3])
+
+
+def p_expression_ge(p):
+    "expression : expression GE expression"
+    p[0] = application('>=', p[1], p[3])
+
+
+def p_expression_le(p):
+    "expression : expression LE expression"
+    p[0] = application('<=', p[1], p[3])
+
+
 def p_expression_and(p):
     "expression : expression LAND expression"
     p[0] = application('and', p[1], p[3])
@@ -161,7 +207,7 @@ def p_expression_append(p):
 
 def p_expression_parentheses(p):
     "expression : '(' expression ')'"
-    p[0] = p[1]
+    p[0] = p[2]
 
 
 def p_actuals(p):

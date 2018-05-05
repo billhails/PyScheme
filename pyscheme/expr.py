@@ -27,6 +27,36 @@ class Expr:
         else:
             return F()
 
+    def gt(self, other):
+        if self > other:
+            return T()
+        else:
+            return F()
+
+    def lt(self, other):
+        if self < other:
+            return T()
+        else:
+            return F()
+
+    def ge(self, other):
+        if self >= other:
+            return T()
+        else:
+            return F()
+
+    def le(self, other):
+        if self <= other:
+            return T()
+        else:
+            return F()
+
+    def ne(self, other):
+        if self != other:
+            return T()
+        else:
+            return F()
+
     def is_null(self):
         return False
 
@@ -46,8 +76,38 @@ class Constant(Expr):
         return self._value
 
     def __eq__(self, other: Expr):
-        if other.__class__ == Constant:
+        if type(other) is Constant:
             return self._value == other.value()
+        else:
+            return False
+
+    def __gt__(self, other):
+        if type(other) is Constant:
+            return self._value > other.value()
+        else:
+            return False
+
+    def __lt__(self, other):
+        if type(other) is Constant:
+            return self._value < other.value()
+        else:
+            return False
+
+    def __ge__(self, other):
+        if type(other) is Constant:
+            return self._value >= other.value()
+        else:
+            return False
+
+    def __le__(self, other):
+        if type(other) is Constant:
+            return self._value <= other.value()
+        else:
+            return False
+
+    def __ne__(self, other):
+        if type(other) is Constant:
+            return self._value != other.value()
         else:
             return False
 
@@ -90,9 +150,6 @@ class Boolean(Constant):
 
     def __eq__(self, other):
         return id(self) == id(other)
-
-    def is_true(self):
-        return False
 
     def is_true(self):
         return False
@@ -352,6 +409,14 @@ class ListIterator:
             val = self._lst.car()
             self._lst = self._lst.cdr()
             return val
+
+
+class Char(Expr, metaclass=FlyWeight):
+    def __init__(self, value):
+        self._value = value
+
+    def __str__(self):
+        return "'" + str(self._value) + "'"
 
 
 class Conditional(Expr):
