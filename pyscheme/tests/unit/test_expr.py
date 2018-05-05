@@ -55,9 +55,9 @@ class TestConstant(TestCase):
 
 class TestBoolean(TestCase):
     def setUp(self):
-        self.t = expr.Boolean.true()
-        self.f = expr.Boolean.false()
-        self.u = expr.Boolean.unknown()
+        self.t = expr.T()
+        self.f = expr.F()
+        self.u = expr.U()
 
     def tearDown(self):
         self.t = None
@@ -156,9 +156,9 @@ class TestBoolean(TestCase):
 
 class TestSymbol(TestCase):
     def setUp(self):
-        self.a = expr.Symbol.make("a")
-        self.b = expr.Symbol.make("b")
-        self.b2 = expr.Symbol.make("b")
+        self.a = expr.Symbol("a")
+        self.b = expr.Symbol("b")
+        self.b2 = expr.Symbol("b")
 
     def tearDown(self):
         self.a = None
@@ -184,26 +184,34 @@ class TestSymbol(TestCase):
 
 class TestList(TestCase):
     def setUp(self):
-        self.a = expr.Symbol.make("a")
-        self.b = expr.Symbol.make("b")
-        self.c = expr.Symbol.make("c")
+        self.a = expr.Symbol("a")
+        self.b = expr.Symbol("b")
+        self.c = expr.Symbol("c")
         self.list = expr.List.list([self.a, self.b, self.c])
+        self.null = expr.Null()
 
     def tearDown(self):
         self.a = None
         self.b = None
         self.c = None
         self.list = None
+        self.null = None
 
     def test_null(self):
-        self.assertTrue(expr.List.null().is_null(), "null class method should return null")
+        self.assertTrue(self.null.is_null(), "null class method should return null")
         self.assertFalse(self.list.is_null(), "non-empty list should not be null")
 
     def test_car(self):
         self.assertEqual(self.a, self.list.car(), "car of list should be a")
 
+    def test_car2(self):
+        self.assertEqual(self.null, self.null.car(), "car of null should be null")
+
     def test_cdr(self):
         self.assertEqual(self.b, self.list.cdr().car(), "car of cdr of list should be b")
+
+    def test_cdr2(self):
+        self.assertEqual(self.null, self.null.cdr(), "cdr of null should be null")
 
     def test_len(self):
         self.assertEqual(3, len(self.list), "list should be length three")
@@ -227,3 +235,29 @@ class TestList(TestCase):
     def test_getitem(self):
         self.assertEqual(self.b,
                          self.list[1])
+
+    def test_getitem2(self):
+        with self.assertRaises(KeyError):
+            print(self.null[0])
+
+    def test_getitem3(self):
+        with self.assertRaises(TypeError):
+            print(self.list["a"])
+
+    def test_getitem4(self):
+        with self.assertRaises(TypeError):
+            print(self.null["a"])
+
+    def test_getitem5(self):
+        with self.assertRaises(KeyError):
+            print(self.list[5])
+
+    def test_getitem6(self):
+        with self.assertRaises(KeyError):
+            print(self.list[-1])
+
+    def test_last1(self):
+        self.assertEqual(self.c, self.list.last(), "last item of list should be c")
+
+    def test_last2(self):
+        self.assertEqual(self.null, self.null.last(), "last item of null should be null")

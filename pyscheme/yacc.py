@@ -42,7 +42,7 @@ def p_expression_id(p):
 
 def p_symbol(p):
     'symbol : ID'
-    p[0] = expr.Symbol.make(p[1])
+    p[0] = expr.Symbol(p[1])
 
 
 def p_expression_number(p):
@@ -62,17 +62,17 @@ def p_expression_boolean(p):
 
 def p_boolean_true(p):
     'boolean : TRUE'
-    p[0] = expr.Boolean.true()
+    p[0] = expr.T()
 
 
 def p_boolean_false(p):
     'boolean : FALSE'
-    p[0] = expr.Boolean.false()
+    p[0] = expr.F()
 
 
 def p_boolean_unknown(p):
     'boolean : UNKNOWN'
-    p[0] = expr.Boolean.unknown()
+    p[0] = expr.U()
 
 
 def p_expression_list(p):
@@ -234,7 +234,7 @@ def p_error(p):
 
 
 def application(name: str, *args):
-    return expr.Application(expr.Symbol.make(name), expr.List.list(args))
+    return expr.Application(expr.Symbol(name), expr.List.list(args))
 
 
 # Build the parser

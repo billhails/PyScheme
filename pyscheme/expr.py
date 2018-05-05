@@ -2,6 +2,7 @@ import pyscheme.op as op
 import pyscheme.environment as environment
 from typing import Callable
 from pyscheme.exceptions import NonBooleanExpressionError
+from pyscheme.singleton import Singleton, FlyWeight
 
 
 class Expr:
@@ -22,9 +23,9 @@ class Expr:
 
     def eq(self, other):
         if self == other:
-            return Boolean.true()
+            return T()
         else:
-            return Boolean.false()
+            return F()
 
     def is_null(self):
         return False
@@ -72,30 +73,8 @@ class Constant(Expr):
 
 
 class Boolean(Constant):
-    _true = None
-    _false = None
-    _unknown = None
-
     def __init__(self):
         pass
-
-    @classmethod
-    def true(cls):
-        if cls._true is None:
-            cls._true = T()
-        return cls._true
-
-    @classmethod
-    def false(cls):
-        if cls._false is None:
-            cls._false = F()
-        return cls._false
-
-    @classmethod
-    def unknown(cls):
-        if cls._unknown is None:
-            cls._unknown = U()
-        return cls._unknown
 
     def __and__(self, other):
         pass
@@ -125,7 +104,7 @@ class Boolean(Constant):
         return False
 
 
-class T(Boolean):
+class T(Boolean, metaclass=Singleton):
     def __and__(self, other: Boolean):
         return other
 
@@ -133,7 +112,7 @@ class T(Boolean):
         return self
 
     def __invert__(self):
-        return Boolean.false()
+        return F()
 
     def __str__(self):
         return "true"
@@ -150,7 +129,7 @@ class T(Boolean):
     __repr__ = __str__
 
 
-class F(Boolean):
+class F(Boolean, metaclass=Singleton):
     def __and__(self, other: Boolean):
         return self
 
@@ -158,15 +137,15 @@ class F(Boolean):
         return other
 
     def __invert__(self):
-        return Boolean.true()
+        return T()
 
     def __str__(self):
         return "false"
 
     def eq(self, other):
         if self == other:
-            return Boolean.true()
-        elif other == Boolean.unknown():
+            return T()
+        elif other == U():
             return other
         else:
             return self
@@ -177,15 +156,15 @@ class F(Boolean):
     __repr__ = __str__
 
 
-class U(Boolean):
+class U(Boolean, metaclass=Singleton):
     def __and__(self, other):
-        if other == Boolean.false():
+        if other == F():
             return other
         else:
             return self
 
     def __or__(self, other):
-        if other == Boolean.true():
+        if other == T():
             return other
         else:
             return self
@@ -205,15 +184,7 @@ class U(Boolean):
     __repr__ = __str__
 
 
-class Symbol(Expr):
-    symbols = {}
-
-    @classmethod
-    def make(cls, name) -> Expr:
-        if name not in cls.symbols.keys():
-            cls.symbols[name] = cls(name)
-        return cls.symbols[name]
-
+class Symbol(Expr, metaclass=FlyWeight):
     def __init__(self, name):
         self._name = name
 
@@ -235,22 +206,10 @@ class Symbol(Expr):
 class List(Expr):
     _null_instance = None
 
-    """
-    we need some sort of builder here that defers evaluation
-    until runtime, otherwise literal lists will be constants
-    """
-
-    @classmethod
-    def null(cls):
-        """singleton factory method for Null"""
-        if cls._null_instance is None:
-            cls._null_instance = Null()
-        return cls._null_instance
-
     @classmethod
     def list(cls, args, index=0):
         if index == len(args):
-            return cls.null()
+            return Null()
         else:
             return Pair(args[index], cls.list(args, index=index + 1))
 
@@ -347,7 +306,7 @@ class Pair(List):
         return val.car()
 
 
-class Null(List):
+class Null(List, metaclass=Singleton):
     def is_null(self):
         return True
 
@@ -379,7 +338,7 @@ class Null(List):
         return other.is_null()
 
     def __getitem__(self, item):
-        if item is not int:
+        if type(item) is not int:
             raise TypeError
         raise KeyError
 

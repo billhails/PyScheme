@@ -15,7 +15,7 @@ class TestEnvironment(unittest.TestCase):
         self.assertIsInstance(self.env, env.Environment, "environment should be set up")
 
     def test_lookup(self):
-        a = expr.Symbol.make("a")
+        a = expr.Symbol("a")
         b = expr.Constant(10)
         new_env = self.env.extend({a: b})
         c = None
@@ -28,7 +28,7 @@ class TestEnvironment(unittest.TestCase):
         self.assertEqual(b, c, "lookup should find a = 10")
 
     def test_failed_lookup(self):
-        a = expr.Symbol.make("a")
+        a = expr.Symbol("a")
 
         def cont(_, amb):
             pass
