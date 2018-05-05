@@ -252,15 +252,20 @@ class List(Expr):
         pass
 
     def __str__(self):
+        return self.qualified_str('[', ', ', ']')
+
+    __repr__ = __str__
+
+    def qualified_str(self, start: str, sep: str, end: str) -> str:
         pass
 
-    def __repr__(self):
-        pass
-
-    def trailing_string(self) -> str:
+    def trailing_str(self, sep: str, end: str) -> str:
         pass
 
     def append(self, other) -> List:
+        pass
+
+    def last(self):
         pass
 
     def __iter__(self):
@@ -295,13 +300,11 @@ class Pair(List):
     def __len__(self):
         return self._len
 
-    def __str__(self):
-        return '[' + str(self._car) + self._cdr.trailing_string()
+    def qualified_str(self, start: str, sep: str, end: str) -> str:
+        return start + str(self._car) + self._cdr.trailing_str(sep, end)
 
-    __repr__ = __str__
-
-    def trailing_string(self) -> str:
-        return ', ' + str(self._car) + self._cdr.trailing_string()
+    def trailing_str(self, sep: str, end: str) -> str:
+        return sep + str(self._car) + self._cdr.trailing_str(sep, end)
 
     def append(self, other: List):
         return Pair(self._car, self._cdr.append(other))
@@ -332,13 +335,11 @@ class Null(List):
     def __len__(self):
         return 0
 
-    def __str__(self):
-        return '[]'
+    def qualified_str(self, start: str, sep: str, end: str) -> str:
+        return start + end
 
-    __repr__ = __str__
-
-    def trailing_string(self) -> str:
-        return ']'
+    def trailing_str(self, sep: str, end: str) -> str:
+        return end
 
     def append(self, other):
         return other
@@ -409,6 +410,7 @@ class Application(Expr):
     def __str__(self):
         return "Application(" + str(self._operation) + ": " + str(self._operands) + ")"
 
+
 class Sequence(Expr):
     def __init__(self, exprs: List):
         self._exprs = exprs
@@ -417,5 +419,8 @@ class Sequence(Expr):
         def take_last(expr: List, amb: Callable):
             return lambda: ret(expr.last(), amb)
         return lambda: self._exprs.eval(env, take_last, amb)
+
+    def __str__(self):
+        return self._exprs.qualified_str('', ' ; ', '')
 
 

@@ -26,7 +26,7 @@ class Lexer:
         'APPEND'
     ] + list(reserved.values())
 
-    literals = '+{}(),[]'
+    literals = '+{}(),[];'
 
     def __init__(self, stream):
         self.lexer = lex.lex(module=self)

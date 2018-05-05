@@ -13,6 +13,27 @@ precedence = (
     ('right', 'THEN')
 )
 
+
+def p_statement_expr(p):
+    'statement : statements'
+    p[0] = expr.Sequence(expr.List.list(p[1]))
+
+
+def p_statements_nonempty(p):
+    'statements : nstatements'
+    p[0] = p[1]
+
+
+def p_nstatements_expr(p):
+    'nstatements : expression'
+    p[0] = [p[1]]
+
+
+def p_nstatements_semicolon(p):
+    "nstatements : nstatements ';' expression"
+    p[0] = p[1] + [p[3]]
+
+
 def p_expression_id(p):
     'expression : symbol'
     p[0] = p[1]
@@ -64,12 +85,12 @@ def p_list_literal(p):
 
 
 def p_expression_conditional(p):
-    "expression : IF '(' expression ')' '{' expression '}' ELSE '{' expression '}'"
+    "expression : IF '(' expression ')' '{' statement '}' ELSE '{' statement '}'"
     p[0] = expr.Conditional(p[3], p[6], p[10])
 
 
 def p_expression_lambda(p):
-    "expression : FN '(' formals ')' '{' expression '}'"
+    "expression : FN '(' formals ')' '{' statement '}'"
     p[0] = expr.Lambda(p[3], p[6])
 
 
