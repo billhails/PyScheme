@@ -15,3 +15,4 @@ class TestAmb(Base):
                 } (10 then 12)
             """
         )
+

@@ -50,6 +50,21 @@ class Constant(Expr):
         else:
             return False
 
+    def __add__(self, other):
+        return Constant(self._value + other._value)
+
+    def __sub__(self, other):
+        return Constant(self._value - other._value)
+
+    def __mul__(self, other):
+        return Constant(self._value * other._value)
+
+    def __floordiv__(self, other):
+        return Constant(self._value // other._value)
+
+    def __mod__(self, other):
+        return Constant(self._value % other._value)
+
     def __str__(self):
         return str(self._value)
 
@@ -256,6 +271,9 @@ class List(Expr):
 
     __repr__ = __str__
 
+    def __getitem__(self, item):
+        pass
+
     def qualified_str(self, start: str, sep: str, end: str) -> str:
         pass
 
@@ -315,6 +333,19 @@ class Pair(List):
         else:
             return False
 
+    def __getitem__(self, item):
+        if type(item) is not int:
+            raise TypeError
+        if item < 0:
+            raise KeyError
+        val = self
+        while item > 0:
+            val = val.cdr()
+            item -= 1
+        if val.is_null():
+            raise KeyError
+        return val.car()
+
 
 class Null(List):
     def is_null(self):
@@ -346,6 +377,11 @@ class Null(List):
 
     def __eq__(self, other: Expr):
         return other.is_null()
+
+    def __getitem__(self, item):
+        if item is not int:
+            raise TypeError
+        raise KeyError
 
 
 class ListIterator:

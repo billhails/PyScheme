@@ -223,3 +223,7 @@ class TestList(TestCase):
         for s in self.list:
             result += [s]
         self.assertEqual([self.a, self.b, self.c], result, "iteration should work")
+
+    def test_getitem(self):
+        self.assertEqual(self.b,
+                         self.list[1])

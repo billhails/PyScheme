@@ -14,19 +14,19 @@ class Lexer:
         'not': 'LNOT',
         'xor': 'LXOR',
         'then': 'THEN',
-        'fail': 'FAIL'
+        'fail': 'FAIL',
+        'define': 'DEFINE',
     }
 
     tokens = [
         'NUMBER',
         'ID',
-        'COMMENT',
         'EQ',
         'CONS',
         'APPEND'
     ] + list(reserved.values())
 
-    literals = '+{}(),[];'
+    literals = '+-*/%{}(),[];='
 
     def __init__(self, stream):
         self.lexer = lex.lex(module=self)
@@ -71,8 +71,8 @@ class Lexer:
 
     # Define a rule so we can track line numbers
     def t_newline(self, t):
-        r'\n+'
-        t.lexer.lineno += len(t.value)
+        r'\n'
+        t.lexer.lineno += 1
 
     # A string containing ignored characters (spaces and tabs)
     t_ignore = ' \t'

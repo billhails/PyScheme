@@ -9,7 +9,8 @@ precedence = (
     ('left', 'LNOT'),
     ('left', 'EQ'),
     ('right', 'CONS', 'APPEND'),
-    ('left', '+'),
+    ('left', '+', '-'),
+    ('left', '*', '/', '%'),
     ('right', 'THEN')
 )
 
@@ -101,42 +102,62 @@ def p_expression_application(p):
 
 def p_expression_addition(p):
     "expression : expression '+' expression"
-    p[0] = expr.Application(expr.Symbol.make('+'), expr.List.list([p[1], p[3]]))
+    p[0] = application('+', p[1], p[3])
+
+
+def p_expression_subtraction(p):
+    "expression : expression '-' expression"
+    p[0] = application('-', p[1], p[3])
+
+
+def p_expression_multiplication(p):
+    "expression : expression '*' expression"
+    p[0] = application('*', p[1], p[3])
+
+
+def p_expression_division(p):
+    "expression : expression '/' expression"
+    p[0] = application('/', p[1], p[3])
+
+
+def p_expression_modulus(p):
+    "expression : expression '%' expression"
+    p[0] = application('%', p[1], p[3])
 
 
 def p_expression_eq(p):
     "expression : expression EQ expression"
-    p[0] = expr.Application(expr.Symbol.make('=='), expr.List.list([p[1], p[3]]))
+    p[0] = application('==', p[1], p[3])
 
 
 def p_expression_and(p):
     "expression : expression LAND expression"
-    p[0] = expr.Application(expr.Symbol.make('and'), expr.List.list([p[1], p[3]]))
+    p[0] = application('and', p[1], p[3])
 
 
 def p_expression_or(p):
     "expression : expression LOR expression"
-    p[0] = expr.Application(expr.Symbol.make('or'), expr.List.list([p[1], p[3]]))
+    p[0] = application('or', p[1], p[3])
 
 
 def p_expression_not(p):
     "expression : LNOT expression"
-    p[0] = expr.Application(expr.Symbol.make('not'), expr.List.list([p[2]]))
+    p[0] = application('not', p[2])
 
 
 def p_expression_xor(p):
     "expression : expression LXOR expression"
-    p[0] = expr.Application(expr.Symbol.make('xor'), expr.List.list([p[1], p[3]]))
+    p[0] = application('xor', p[1], p[3])
 
 
 def p_expression_cons(p):
     "expression : expression CONS expression"
-    p[0] = expr.Application(expr.Symbol.make('@'), expr.List.list([p[1], p[3]]))
+    p[0] = application('@', p[1], p[3])
 
 
 def p_expression_append(p):
     "expression : expression APPEND expression"
-    p[0] = expr.Application(expr.Symbol.make('@@'), expr.List.list([p[1], p[3]]))
+    p[0] = application('@@', p[1], p[3])
 
 def p_expression_parentheses(p):
     "expression : '(' expression ')'"
@@ -195,16 +216,25 @@ def p_nexprs_comma(p):
 
 def p_expression_then(p):
     "expression : expression THEN expression"
-    p[0] = expr.Application(expr.Symbol.make('then'), expr.List.list([p[1], p[3]]))
+    p[0] = application('then', p[1], p[3])
 
 
 def p_expression_fail(p):
     "expression : FAIL"
-    p[0] = expr.Application(expr.Symbol.make('fail'), expr.List.null())
+    p[0] = application('fail')
+
+
+def p_expression_define(p):
+    "expression : DEFINE symbol '=' expression"
+    p[0] = application('define', p[2], p[4])
 
 def p_error(p):
     if p is not None:  # EOF
         print("syntax error in lambda input: " + str(p))
+
+
+def application(name: str, *args):
+    return expr.Application(expr.Symbol.make(name), expr.List.list(args))
 
 
 # Build the parser

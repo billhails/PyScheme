@@ -13,6 +13,18 @@ class TestOperations(Base):
     def test_addition(self):
         self.assertEval("10", "5 + 5")
 
+    def test_subtraction(self):
+        self.assertEval("3", "10 - 7")
+
+    def test_multiplication(self):
+        self.assertEval("70", "10 * 7")
+
+    def test_division(self):
+        self.assertEval("3", "10 / 3")
+
+    def test_modulus(self):
+        self.assertEval("1", "10 % 3")
+
     def test_equality(self):
         self.assertEval("true", "5 == 5")
 
@@ -87,6 +99,36 @@ class TestOperations(Base):
         self.assertEval(
             "[8, 10, 12]",
             "[8, 10] @@ [12] @@ []"
+        )
+
+    def test_head(self):
+        self.assertEval(
+            "5",
+            "head([5, 5])"
+        )
+
+    def test_tail(self):
+        self.assertEval(
+            "[5]",
+            "tail([5, 5])"
+        )
+
+    def test_tail2(self):
+        self.assertEval(
+            "[]",
+            "tail([5])"
+        )
+
+    def test_tail3(self):
+        self.assertEval(
+            "[]",
+            "tail([])"
+        )
+
+    def test_length(self):
+        self.assertEval(
+            "2",
+            "length([5, 5])"
         )
 
 

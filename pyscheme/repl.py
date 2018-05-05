@@ -16,6 +16,10 @@ class Repl:
         self.env = environment.Environment().extend(
             {
                 expr.Symbol.make("+"): op.Addition(),
+                expr.Symbol.make("-"): op.Subtraction(),
+                expr.Symbol.make("*"): op.Multiplication(),
+                expr.Symbol.make("/"): op.Division(),
+                expr.Symbol.make("%"): op.Modulus(),
                 expr.Symbol.make("=="): op.Equality(),
                 expr.Symbol.make("and"): op.And(),
                 expr.Symbol.make("or"): op.Or(),
@@ -24,7 +28,11 @@ class Repl:
                 expr.Symbol.make("@"): op.Cons(),
                 expr.Symbol.make("@@"): op.Append(),
                 expr.Symbol.make("then"): op.Then(),
-                expr.Symbol.make("fail"): op.Fail()
+                expr.Symbol.make("fail"): op.Fail(),
+                expr.Symbol.make("head"): op.Head(),
+                expr.Symbol.make("tail"): op.Tail(),
+                expr.Symbol.make("define"): op.Define(),
+                expr.Symbol.make("length"): op.Length(),
             }
         )
 

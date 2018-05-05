@@ -2,5 +2,5 @@
 
 . ./venv/bin/activate
 
-coverage run -m unittest discover -s /Users/billhails/PycharmProjects/PyScheme/pyscheme/tests -t /Users/billhails/PycharmProjects/PyScheme/pyscheme/tests
+coverage run -m unittest discover -s pyscheme/tests -t pyscheme/tests
 coverage html
