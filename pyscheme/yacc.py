@@ -21,6 +21,7 @@ import ply.yacc as yacc
 import pyscheme.expr as expr
 
 from pyscheme.lex import Lexer
+
 tokens = Lexer.tokens
 
 precedence = (
@@ -36,23 +37,47 @@ precedence = (
 
 
 def p_statement_expr(p):
-    'statement : statements'
-    p[0] = expr.Sequence(expr.List.list(p[1]))
-
-
-def p_statements_nonempty(p):
-    'statements : nstatements'
+    "statement : expression ';'"
     p[0] = p[1]
 
 
-def p_nstatements_expr(p):
-    'nstatements : expression'
-    p[0] = [p[1]]
+def p_statement_conditional(p):
+    "statement : IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'"
+    p[0] = expr.Conditional(p[3], p[6], p[10])
 
 
-def p_nstatements_semicolon(p):
-    "nstatements : nstatements ';' expression"
-    p[0] = p[1] + [p[3]]
+def p_statement_fn(p):
+    "statement : FN symbol '(' formals ')' '{' statements '}'"
+    p[0] = application('define', p[2], expr.Lambda(p[4], p[7]))
+
+
+def p_statements_multi_statement(p):
+    "statements : multi_statement"
+    p[0] = expr.Sequence(p[1])
+
+
+def p_multi_statement_statement(p):
+    "multi_statement : inner_statement"
+    p[0] = expr.List.list([p[1]])
+
+
+def p_multi_statement_statements(p):
+    "multi_statement : inner_statement multi_statement"
+    p[0] = expr.Pair(p[1], p[2])
+
+def p_inner_statement_expr(p):
+    "inner_statement : expression ';'"
+    p[0] = p[1]
+
+
+def p_inner_statement_conditional(p):
+    "inner_statement : IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'"
+    p[0] = expr.Conditional(p[3], p[6], p[10])
+
+
+def p_inner_statement_fn(p):
+    "inner_statement : FN symbol '(' formals ')' '{' statements '}'"
+    p[0] = application('define', p[2], expr.Lambda(p[4], p[7]))
 
 
 def p_expression_id(p):
@@ -125,14 +150,14 @@ def p_list_literal(p):
     p[0] = expr.List.list(p[2])
 
 
-def p_expression_conditional(p):
-    "expression : IF '(' expression ')' '{' statement '}' ELSE '{' statement '}'"
-    p[0] = expr.Conditional(p[3], p[6], p[10])
-
-
 def p_expression_lambda(p):
-    "expression : FN '(' formals ')' '{' statement '}'"
+    "expression : FN '(' formals ')' '{' statements '}'"
     p[0] = expr.Lambda(p[3], p[6])
+
+
+def p_expression_define(p):
+    "expression : DEFINE symbol '=' expression"
+    p[0] = application('define', p[2], p[4])
 
 
 def p_expression_application(p):
@@ -235,17 +260,17 @@ def p_actuals(p):
 
 
 def p_formals(p):
-    "formals : fargs"
+    "formals : formals"
     p[0] = expr.List.list(p[1])
 
 
 def p_fargs_empty(p):
-    'fargs : '
+    'formals : '
     p[0] = []
 
 
 def p_fargs_nonempty(p):
-    'fargs : nfargs'
+    'formals : nfargs'
     p[0] = p[1]
 
 
@@ -284,14 +309,10 @@ def p_expression_then(p):
     p[0] = application('then', p[1], p[3])
 
 
-def p_expression_fail(p):
-    "expression : FAIL"
-    p[0] = application('fail')
+def p_expression_back(p):
+    "expression : BACK"
+    p[0] = application('back')
 
-
-def p_expression_define(p):
-    "expression : DEFINE symbol '=' expression"
-    p[0] = application('define', p[2], p[4])
 
 def p_error(p):
     if p is not None:  # EOF

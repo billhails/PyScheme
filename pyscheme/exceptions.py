@@ -36,3 +36,9 @@ class SymbolAlreadyDefinedError(SymbolError):
 
 class NonBooleanExpressionError(PySchemeError):
     pass
+
+class SyntaxError(Exception):
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+    pass

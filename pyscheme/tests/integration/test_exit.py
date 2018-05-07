@@ -14,36 +14,18 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 from pyscheme.tests.integration.base import Base
 
 
-class TestDefine(Base):
-    def test_define(self):
+class TestExit(Base):
+    def test_exit(self):
         self.assertEval(
-            "10",
+            "",
             """
-                fn () {
-                    define t = 10 ;
-                    t
-                }()
+            fn () {
+                exit();
+                1
+            }()
             """
         )
 
-    def test_define_fn(self):
-        self.assertEval(
-            "4",
-            """
-                define double = fn (x) { x + x };
-                double(2)
-            """
-        )
-
-    def test_sugar_define_fn(self):
-        self.assertEval(
-            "4",
-            """
-                fn double(x) { x * 2 };
-                double(2)
-            """
-        )

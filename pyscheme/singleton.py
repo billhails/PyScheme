@@ -20,7 +20,7 @@
 class Singleton(type):
     """Singleton type
 
-    Singletons are fine as long as you don't keep state in them
+    Singletons are *not* an anti-pattern, keeping global state in a singleton is the anti-pattern.
     """
 
     _instances = {}
@@ -34,7 +34,8 @@ class Singleton(type):
 class FlyWeight(type):
     """FlyWeight type
 
-    The first argument to the constructor must be the identifier of the flyweight
+    The first argument to the constructor of classes using this as a metaclass must be the string
+    identifier of the flyweight.
     """
 
     _instances = {}

@@ -153,7 +153,6 @@ class Or(SpecialForm, metaclass=Singleton):
                     else:
                         return lambda: ret(lhs, amb)
                 return lambda: args[1].eval(env, cont2, amb)
-
         return lambda: args[0].eval(env, cont, amb)
 
 
@@ -164,7 +163,7 @@ class Then(SpecialForm, metaclass=Singleton):
         return lambda: args[0].eval(env, ret, amb2)
 
 
-class Fail(SpecialForm, metaclass=Singleton):
+class Back(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
         return lambda: amb()
 
@@ -202,6 +201,7 @@ class Tail(Primitive, metaclass=Singleton):
 
 class Define(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+
         def do_define(value, amb):
             return lambda: env.define(args[0], value, ret, amb)
         return lambda: args[1].eval(env, do_define, amb)
@@ -213,7 +213,46 @@ class Length(Primitive, metaclass=Singleton):
         return lambda: ret(Constant(len(args[0])), amb)
 
 
-class Print(Primitive, metaclass=Singleton):
+class Print(Primitive):
+    def __init__(self, output):
+        self._output = output
+
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
-        print(str(args))
+        self._output.write(str(args) + "\n")
         return lambda: ret(args, amb)
+
+
+class Continuation(Primitive):
+    def __init__(self, ret: callable):
+        self._ret = ret
+
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return lambda: self._ret(args[0], amb)
+
+    def eval(self, env, ret: callable, amb: callable):
+        return lambda: ret(self, amb)
+
+
+class CallCC(SpecialForm, metaclass=Singleton):
+    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+        from pyscheme.expr import List
+        def do_apply(closure: Closure, amb):
+            return lambda: closure.apply(List.list([Continuation(ret)]), env, ret, amb)
+        return lambda: args[0].eval(env, do_apply, amb)
+
+
+class Exit(Primitive):
+    def apply_evaluated(self, args, ret: Callable, amb: Callable):
+        return None
+
+class Error(SpecialForm):
+    def __init__(self, cont):
+        self.cont = cont
+
+    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+        from pyscheme.expr import Symbol
+
+        def print_continuation(printer: Print, amb: callable):
+            return lambda: printer.apply(args, env, self.cont, amb)
+
+        return lambda: env.lookup(Symbol("print"), print_continuation, amb)

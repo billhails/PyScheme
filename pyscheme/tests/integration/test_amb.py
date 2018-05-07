@@ -19,13 +19,23 @@ from pyscheme.tests.integration.base import Base
 
 
 class TestAmb(Base):
-    def test_then_fail(self):
+    """
+    "amb" adds chronological backtracking by doing three things:
+    1. A binary operator "then" which:
+        a. evaluates and returns its lhs.
+        b. if backtracked to once evaluates and returns its rhs.
+        c. if backtracked to a second time backtracks further.
+    2. A keyword "back" that backtracks immediately.
+    3. A change to "define" which undoes its definition before backtracking further.
+    """
+
+    def test_then_back(self):
         self.assertEval(
             "12",
             """
                 fn (x) {
                     if (x == 10) {
-                        fail
+                        back
                     } else {
                         x
                     }
@@ -33,12 +43,18 @@ class TestAmb(Base):
             """
         )
 
-    def test_logic_puzzle(self):
-
+    def test_barrels_of_fun(self):
+        """
+        A wine merchant has six barrels of wine and beer containing 30, 32, 36, 38, 40 and 62 gallons respectively.
+        Five barrels are filled with wine, and one with beer.
+        The first customer purchases two barrels of wine.
+        The second customer purchases twice as much wine as the first customer.
+        Which barrel contains beer?
+        """
         self.assertEval(
             "40",
             """
-            define barrels_of_fun = fn () {
+            fn barrels_of_fun() {
                 define barrels = [30, 32, 36, 38, 40, 62];
                 define beer = one_of(barrels);
                 define wine = exclude([beer], barrels);
@@ -49,12 +65,12 @@ class TestAmb(Base):
                 beer
             }
             ;
-            define one_of = fn (list) {
+            fn one_of(list) {
                 require(length(list) > 0);
                 head(list) then one_of(tail(list))
             }
             ;
-            define exclude = fn (items, list) {
+            fn exclude(items, list) {
                 if (length(list) > 0) {
                     if (member(head(list), items)) {
                         exclude(items, tail(list))
@@ -66,7 +82,7 @@ class TestAmb(Base):
                 }
             }
             ;
-            define member = fn (item, list) {
+            fn member(item, list) {
                 if (length(list) > 0) {
                     if (item == (head(list))) {
                         true
@@ -78,20 +94,20 @@ class TestAmb(Base):
                 }
             }
             ;
-            define some_of = fn (list) {
+            fn some_of(list) {
                 require(length(list) > 0);
                 [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list))
             }
             ;
-            define require = fn (condition) {
+            fn require(condition) {
                 if (condition) {
                     true
                 } else {
-                    fail
+                    back
                 }
             }
             ;
-            define sum = fn (list) {
+            fn sum(list) {
                 if (length(list) == 0) {
                     0
                 } else {

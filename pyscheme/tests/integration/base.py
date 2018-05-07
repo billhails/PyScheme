@@ -22,13 +22,13 @@ import io
 
 
 class Base(TestCase):
-    def eval(self, expr: str) -> str:
-        stream_expr = StringStream(expr)
+    def eval(self, args: list) -> str:
+        stream_expr = StringStream(*args)
         output = io.StringIO()
         repl = Repl(stream_expr, output)
         repl.run()
         return output.getvalue()
 
-    def assertEval(self, expected: str, expr: str, msg: str = ''):
-        result = self.eval(expr)
+    def assertEval(self, expected: str, *args, msg: str = ''):
+        result = self.eval(args)
         self.assertEqual(expected, result, msg)

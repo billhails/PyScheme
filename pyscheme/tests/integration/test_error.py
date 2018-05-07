@@ -18,32 +18,15 @@
 from pyscheme.tests.integration.base import Base
 
 
-class TestDefine(Base):
-    def test_define(self):
+class TestError(Base):
+    def test_error(self):
         self.assertEval(
-            "10",
-            """
-                fn () {
-                    define t = 10 ;
-                    t
-                }()
-            """
+            "[message 1]\n",
+            '''
+            fn test_error(message) { error(message) }
+            test_error("message 1");
+            test_error("message 2");
+            '''
         )
 
-    def test_define_fn(self):
-        self.assertEval(
-            "4",
-            """
-                define double = fn (x) { x + x };
-                double(2)
-            """
-        )
 
-    def test_sugar_define_fn(self):
-        self.assertEval(
-            "4",
-            """
-                fn double(x) { x * 2 };
-                double(2)
-            """
-        )

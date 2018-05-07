@@ -52,12 +52,15 @@ class Repl:
                 expr.Symbol("@"): op.Cons(),
                 expr.Symbol("@@"): op.Append(),
                 expr.Symbol("then"): op.Then(),
-                expr.Symbol("fail"): op.Fail(),
+                expr.Symbol("back"): op.Back(),
                 expr.Symbol("head"): op.Head(),
                 expr.Symbol("tail"): op.Tail(),
                 expr.Symbol("define"): op.Define(),
                 expr.Symbol("length"): op.Length(),
-                expr.Symbol("print"): op.Print(),
+                expr.Symbol("print"): op.Print(self.output),
+                expr.Symbol("here"): op.CallCC(),
+                expr.Symbol("exit"): op.Exit(),
+                expr.Symbol("error"): op.Error(lambda val, amb: lambda: self.repl(lambda: None))
             }
         )
 
@@ -70,6 +73,7 @@ class Repl:
 
     def read(self, ret: Callable, amb: Callable):
         result = yacc.parser.parse(lexer=self.lexer)
+        print("parse result: " + str(result))
         if result is None:
             return None  # stop the trampoline
         return lambda: ret(result, amb)
@@ -82,12 +86,15 @@ class Repl:
         return lambda: ret(expr, amb)
 
     def repl(self, amb: Callable):
+        def deferred_repl(expr, amb: Callable):
+            return lambda: self.repl(lambda: None)
+
+        def deferred_print(evaluated_expr: expr.Expr, amb: Callable):
+            return lambda: self.print(evaluated_expr, deferred_repl, amb)
+
         def deferred_eval(read_expr: expr.Expr, amb: Callable):
-            def deferred_print(evaluated_expr: expr.Expr, amb: Callable):
-                def deferred_repl(expr, amb: Callable):
-                    return lambda: self.repl(lambda: None)
-                return lambda: self.print(evaluated_expr, deferred_repl, amb)
             return lambda: self.eval(read_expr, deferred_print, amb)
+
         return lambda: self.read(deferred_eval, amb)
 
     def run(self):

@@ -33,7 +33,7 @@ class Lexer:
         'not': 'LNOT',
         'xor': 'LXOR',
         'then': 'THEN',
-        'fail': 'FAIL',
+        'back': 'BACK',
         'define': 'DEFINE',
     }
 
