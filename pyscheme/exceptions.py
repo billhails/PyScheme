@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 class PySchemeError(Exception):
     pass
 
@@ -37,8 +38,14 @@ class SymbolAlreadyDefinedError(SymbolError):
 class NonBooleanExpressionError(PySchemeError):
     pass
 
+
 class SyntaxError(Exception):
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-    pass
+    def __init__(self, msg, line, next):
+        self.msg = msg
+        self.line = line
+        self.next = next
+
+    def __str__(self):
+        return str(self.msg) + ", line: " + str(self.line) + ", next token: " + str(self.next)
+
+    __repr__ = __str__

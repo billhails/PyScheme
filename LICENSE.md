@@ -408,7 +408,7 @@ modify it is void, and will automatically terminate your rights under
 this License (including any patent licenses granted under the third
 paragraph of section 11).
 
-However, if you cease all violation of this License, then your license
+However, if you cease all violation of this License, binop_then your license
 from a particular copyright holder is reinstated (a) provisionally,
 unless and until the copyright holder explicitly and finally
 terminates your license, and (b) permanently, if the copyright holder
@@ -496,7 +496,7 @@ If you convey a covered work, knowingly relying on a patent license,
 and the Corresponding Source of the work is not available for anyone
 to copy, free of charge and under the terms of this License, through a
 publicly available network server or other readily accessible means,
-then you must either (1) cause the Corresponding Source to be so
+binop_then you must either (1) cause the Corresponding Source to be so
 available, or (2) arrange to deprive yourself of the benefit of the
 patent license for this particular work, or (3) arrange, in a manner
 consistent with the requirements of this License, to extend the patent
@@ -510,7 +510,7 @@ If, pursuant to or in connection with a single transaction or
 arrangement, you convey, or propagate by procuring conveyance of, a
 covered work, and grant a patent license to some of the parties
 receiving the covered work authorizing them to use, propagate, modify
-or convey a specific copy of the covered work, then the patent license
+or convey a specific copy of the covered work, binop_then the patent license
 you grant is automatically extended to all recipients of the covered
 work and works based on it.
 
@@ -539,7 +539,7 @@ If conditions are imposed on you (whether by court order, agreement or
 otherwise) that contradict the conditions of this License, they do not
 excuse you from the conditions of this License. If you cannot convey a
 covered work so as to satisfy simultaneously your obligations under
-this License and any other pertinent obligations, then as a
+this License and any other pertinent obligations, binop_then as a
 consequence you may not convey it at all. For example, if you agree to
 terms that obligate you to collect a royalty for further conveying
 from those to whom you convey the Program, the only way you could

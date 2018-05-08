@@ -28,7 +28,7 @@ class TestExpr(TestCase):
         self.expr = None
 
     def test_equality(self):
-        self.assertEqual(self.expr, self.expr, "expression should equal itself")
+        self.assertEqual(self.expr, self.expr, "op_funcall should equal itself")
 
     def test_non_equality(self):
         self.assertNotEqual(self.expr, expr.Expr(), "different objects should not normally compare equal")

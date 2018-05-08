@@ -21,7 +21,7 @@ from pyscheme.tests.integration.base import Base
 class TestAmb(Base):
     """
     "amb" adds chronological backtracking by doing three things:
-    1. A binary operator "then" which:
+    1. A binary operator "binop_then" which:
         a. evaluates and returns its lhs.
         b. if backtracked to once evaluates and returns its rhs.
         c. if backtracked to a second time backtracks further.
@@ -35,11 +35,12 @@ class TestAmb(Base):
             """
                 fn (x) {
                     if (x == 10) {
-                        back
+                        print("here");
+                        back;
                     } else {
-                        x
+                        x;
                     }
-                } (10 then 12)
+                } (10 binop_then 12);
             """
         )
 
@@ -62,59 +63,59 @@ class TestAmb(Base):
                 define barrel_2 = one_of(exclude([barrel_1], wine));
                 define purchase = some_of(exclude([barrel_1, barrel_2], wine));
                 require((barrel_1 + barrel_2) * 2 == sum(purchase));
-                beer
+                beer;
             }
-            ;
+            
             fn one_of(list) {
                 require(length(list) > 0);
-                head(list) then one_of(tail(list))
+                head(list) then one_of(tail(list));
             }
-            ;
+            
             fn exclude(items, list) {
                 if (length(list) > 0) {
                     if (member(head(list), items)) {
-                        exclude(items, tail(list))
+                        exclude(items, tail(list));
                     } else {
-                        head(list) @ exclude(items, tail(list))
+                        head(list) @ exclude(items, tail(list));
                     }
                 } else {
-                    []
+                    [];
                 }
             }
-            ;
+            
             fn member(item, list) {
                 if (length(list) > 0) {
                     if (item == (head(list))) {
-                        true
+                        true;
                     } else {
-                        member(item, tail(list))
+                        member(item, tail(list));
                     }
                 } else {
-                    false
+                    false;
                 }
             }
-            ;
+            
             fn some_of(list) {
                 require(length(list) > 0);
-                [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list))
+                [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list));
             }
-            ;
+            
             fn require(condition) {
                 if (condition) {
-                    true
+                    true;
                 } else {
-                    back
+                    back;
                 }
             }
-            ;
+            
             fn sum(list) {
                 if (length(list) == 0) {
-                    0
+                    0;
                 } else {
-                    head(list) + sum(tail(list))
+                    head(list) + sum(tail(list));
                 }
             }
-            ;
+            
             barrels_of_fun()
             """
         )

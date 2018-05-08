@@ -18,20 +18,19 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from typing import List
-import pyscheme.yacc as yacc
-import pyscheme.lex as lex
 import pyscheme.environment as environment
 import pyscheme.expr as expr
 import pyscheme.op as op
 from typing import Callable
-from pyscheme.stream import Stream
-
+from io import FileIO
+import pyscheme.reader as reader
 
 class Repl:
-    def __init__(self, input: Stream, output):
+    def __init__(self, input: FileIO, output: FileIO, error: FileIO):
         self.input = input
         self.output = output
-        self.lexer = lex.Lexer(input)
+        self.tokeniser = reader.Tokeniser(input)
+        self.reader = reader.Reader(self.tokeniser, error)
         self.env = environment.Environment().extend(
             {
                 expr.Symbol("+"): op.Addition(),
@@ -51,7 +50,7 @@ class Repl:
                 expr.Symbol("xor"): op.Xor(),
                 expr.Symbol("@"): op.Cons(),
                 expr.Symbol("@@"): op.Append(),
-                expr.Symbol("then"): op.Then(),
+                expr.Symbol("binop_then"): op.Then(),
                 expr.Symbol("back"): op.Back(),
                 expr.Symbol("head"): op.Head(),
                 expr.Symbol("tail"): op.Tail(),
@@ -72,7 +71,7 @@ class Repl:
                 threads += [next]
 
     def read(self, ret: Callable, amb: Callable):
-        result = yacc.parser.parse(lexer=self.lexer)
+        result = self.reader.read()
         print("parse result: " + str(result))
         if result is None:
             return None  # stop the trampoline

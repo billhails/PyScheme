@@ -37,12 +37,12 @@ precedence = (
 
 
 def p_statement_expr(p):
-    "statement : expression ';'"
+    "statement : op_funcall ';'"
     p[0] = p[1]
 
 
 def p_statement_conditional(p):
-    "statement : IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'"
+    "statement : IF '(' op_funcall ')' '{' statements '}' ELSE '{' statements '}'"
     p[0] = expr.Conditional(p[3], p[6], p[10])
 
 
@@ -66,12 +66,12 @@ def p_multi_statement_statements(p):
     p[0] = expr.Pair(p[1], p[2])
 
 def p_inner_statement_expr(p):
-    "inner_statement : expression ';'"
+    "inner_statement : op_funcall ';'"
     p[0] = p[1]
 
 
 def p_inner_statement_conditional(p):
-    "inner_statement : IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'"
+    "inner_statement : IF '(' op_funcall ')' '{' statements '}' ELSE '{' statements '}'"
     p[0] = expr.Conditional(p[3], p[6], p[10])
 
 
@@ -81,7 +81,7 @@ def p_inner_statement_fn(p):
 
 
 def p_expression_id(p):
-    'expression : symbol'
+    'op_funcall : symbol'
     p[0] = p[1]
 
 
@@ -91,7 +91,7 @@ def p_symbol(p):
 
 
 def p_expression_number(p):
-    'expression : number'
+    'op_funcall : number'
     p[0] = p[1]
 
 
@@ -101,7 +101,7 @@ def p_number(p):
 
 
 def p_expression_string(p):
-    'expression : string'
+    'op_funcall : string'
     p[0] = p[1]
 
 
@@ -111,7 +111,7 @@ def p_string(p):
 
 
 def p_expression_char(p):
-    'expression : char'
+    'op_funcall : char'
     p[0] = p[1]
 
 
@@ -121,7 +121,7 @@ def p_char(p):
 
 
 def p_expression_boolean(p):
-    'expression : boolean'
+    'op_funcall : boolean'
     p[0] = p[1]
 
 
@@ -141,7 +141,7 @@ def p_boolean_unknown(p):
 
 
 def p_expression_list(p):
-    'expression : list'
+    'op_funcall : list'
     p[0] = p[1]
 
 
@@ -151,106 +151,106 @@ def p_list_literal(p):
 
 
 def p_expression_lambda(p):
-    "expression : FN '(' formals ')' '{' statements '}'"
+    "op_funcall : FN '(' formals ')' '{' statements '}'"
     p[0] = expr.Lambda(p[3], p[6])
 
 
 def p_expression_define(p):
-    "expression : DEFINE symbol '=' expression"
+    "op_funcall : DEFINE symbol '=' op_funcall"
     p[0] = application('define', p[2], p[4])
 
 
 def p_expression_application(p):
-    "expression : expression '(' actuals ')'"
+    "op_funcall : op_funcall '(' actuals ')'"
     p[0] = expr.Application(p[1], p[3])
 
 
 def p_expression_addition(p):
-    "expression : expression '+' expression"
+    "op_funcall : op_funcall '+' op_funcall"
     p[0] = application('+', p[1], p[3])
 
 
 def p_expression_subtraction(p):
-    "expression : expression '-' expression"
+    "op_funcall : op_funcall '-' op_funcall"
     p[0] = application('-', p[1], p[3])
 
 
 def p_expression_multiplication(p):
-    "expression : expression '*' expression"
+    "op_funcall : op_funcall '*' op_funcall"
     p[0] = application('*', p[1], p[3])
 
 
 def p_expression_division(p):
-    "expression : expression '/' expression"
+    "op_funcall : op_funcall '/' op_funcall"
     p[0] = application('/', p[1], p[3])
 
 
 def p_expression_modulus(p):
-    "expression : expression '%' expression"
+    "op_funcall : op_funcall '%' op_funcall"
     p[0] = application('%', p[1], p[3])
 
 
 def p_expression_eq(p):
-    "expression : expression EQ expression"
+    "op_funcall : op_funcall EQ op_funcall"
     p[0] = application('==', p[1], p[3])
 
 
 def p_expression_ne(p):
-    "expression : expression NE expression"
+    "op_funcall : op_funcall NE op_funcall"
     p[0] = application('!=', p[1], p[3])
 
 
 def p_expression_gt(p):
-    "expression : expression GT expression"
+    "op_funcall : op_funcall GT op_funcall"
     p[0] = application('>', p[1], p[3])
 
 
 def p_expression_lt(p):
-    "expression : expression LT expression"
+    "op_funcall : op_funcall LT op_funcall"
     p[0] = application('<', p[1], p[3])
 
 
 def p_expression_ge(p):
-    "expression : expression GE expression"
+    "op_funcall : op_funcall GE op_funcall"
     p[0] = application('>=', p[1], p[3])
 
 
 def p_expression_le(p):
-    "expression : expression LE expression"
+    "op_funcall : op_funcall LE op_funcall"
     p[0] = application('<=', p[1], p[3])
 
 
 def p_expression_and(p):
-    "expression : expression LAND expression"
+    "op_funcall : op_funcall LAND op_funcall"
     p[0] = application('and', p[1], p[3])
 
 
 def p_expression_or(p):
-    "expression : expression LOR expression"
+    "op_funcall : op_funcall LOR op_funcall"
     p[0] = application('or', p[1], p[3])
 
 
 def p_expression_not(p):
-    "expression : LNOT expression"
+    "op_funcall : LNOT op_funcall"
     p[0] = application('not', p[2])
 
 
 def p_expression_xor(p):
-    "expression : expression LXOR expression"
+    "op_funcall : op_funcall LXOR op_funcall"
     p[0] = application('xor', p[1], p[3])
 
 
 def p_expression_cons(p):
-    "expression : expression CONS expression"
+    "op_funcall : op_funcall CONS op_funcall"
     p[0] = application('@', p[1], p[3])
 
 
 def p_expression_append(p):
-    "expression : expression APPEND expression"
+    "op_funcall : op_funcall APPEND op_funcall"
     p[0] = application('@@', p[1], p[3])
 
 def p_expression_parentheses(p):
-    "expression : '(' expression ')'"
+    "op_funcall : '(' op_funcall ')'"
     p[0] = p[2]
 
 
@@ -295,22 +295,22 @@ def p_exprs_nonempty(p):
 
 
 def p_nexprs_expr(p):
-    'nexprs : expression'
+    'nexprs : op_funcall'
     p[0] = [p[1]]
 
 
 def p_nexprs_comma(p):
-    "nexprs : nexprs ',' expression"
+    "nexprs : nexprs ',' op_funcall"
     p[0] = p[1] + [p[3]]
 
 
 def p_expression_then(p):
-    "expression : expression THEN expression"
-    p[0] = application('then', p[1], p[3])
+    "op_funcall : op_funcall THEN op_funcall"
+    p[0] = application('binop_then', p[1], p[3])
 
 
 def p_expression_back(p):
-    "expression : BACK"
+    "op_funcall : BACK"
     p[0] = application('back')
 
 

@@ -5,7 +5,7 @@ A small lambda-language interpreter written in Python
 I have a few ideas I'd like to pull in from my abortive F-natural project,
 specifically:
 
-* incorporate `amb` with keywords `then` and `fail`, i.e. `def x = 5 then 6`
+* incorporate `amb` with keywords `binop_then` and `fail`, i.e. `def x = 5 binop_then 6`
 and `if (x == 0) { fail }`. DONE
 * strong implicit type checking.
 * first-class environments.
@@ -41,12 +41,12 @@ In order to get this running on my laptop after pushing to GitHub from my home c
    * `git status`
 
 You'll additionally need to install `ply` and `coverage`. To install `ply` just open `pyscheme/yacc.py` and go to the
-line that says `import ply.yacc as yacc`, click on it, and then on the red lightbulb and the consequent "install" link.
+line that says `import ply.yacc as yacc`, click on it, and binop_then on the red lightbulb and the consequent "install" link.
 To install `coverage` I just temporarily added the line `import coverage` to that file, waited for PyCharm to notice 
-then followed the same process, deleting the unneeded line afterwards.
+binop_then followed the same process, deleting the unneeded line afterwards.
 
 ## Test Coverage
 
-Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), then open
+Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), binop_then open
 `htmlcov/index.html` in your browser. For other plarforms you can look at `coverage.sh` and see what it does (it's only
 two lines of code.) If anyone wants to provide a `coverage.bat` or similar for other platforms please submit a PR.

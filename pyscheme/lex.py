@@ -32,7 +32,7 @@ class Lexer:
         'or': 'LOR',
         'not': 'LNOT',
         'xor': 'LXOR',
-        'then': 'THEN',
+        'binop_then': 'THEN',
         'back': 'BACK',
         'define': 'DEFINE',
     }

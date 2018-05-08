@@ -30,7 +30,7 @@ We need to distinguish between
 3. closures that have their arguments evaluated for them
    still need a continuation to evaluate the body
 4. macros
-   evaluate body with unevaluated args, then re-evaluate result
+   evaluate body with unevaluated args, binop_then re-evaluate result
 """
 
 

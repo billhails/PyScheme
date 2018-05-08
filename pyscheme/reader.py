@@ -18,7 +18,7 @@
 from pyscheme.exceptions import SyntaxError
 import pyscheme.expr as expr
 from typing import TypeVar, Union
-import regex
+import re
 
 S = TypeVar('S')
 Maybe = Union[S, None]
@@ -103,12 +103,12 @@ class Tokeniser:
                     return Token('EOF')
                 self._line_number += 1
                 self._line = self._line.lstrip()
-                self._line = regex.sub(r'^//.*', '', self._line, 1)
+                self._line = re.sub(r'^//.*', '', self._line, 1)
             for rex in self.regexes.keys():
-                match = regex.match(rex, self._line)
+                match = re.match(rex, self._line)
                 if match:
-                    self._line = regex.sub(rex, '', self._line, 1).lstrip()
-                    self._line = regex.sub(r'^//.*', '', self._line, 1)
+                    self._line = re.sub(rex, '', self._line, 1).lstrip()
+                    self._line = re.sub(r'^//.*', '', self._line, 1)
                     text = match.group(1)
                     if self.regexes[rex] == 'ID':
                         if text in self.reserved:
@@ -120,30 +120,98 @@ class Tokeniser:
             for literal in self.literals:
                 if self._line.startswith(literal):
                     self._line = self._line[len(literal):].lstrip()
-                    self._line = regex.sub(r'^//.*', '', self._line, 1)
+                    self._line = re.sub(r'^//.*', '', self._line, 1)
                     return Token(literal, literal)
             return Token('ERROR', self._line)
 
+    def __str__(self):
+        return "<tokens: " + str(self._tokens) + ' remaining: "' + self._line + '">'
 
+    __repr__ = __str__
 
 
 class Reader:
+    """
+        statement : expression ';'
+                  | IF '(' op_funcall ')' '{' statements '}' ELSE '{' statements '}'
+                  | FN symbol '(' formals ')' '{' statements '}'
+
+        statements : multi_statement
+
+        multi_statement : statement
+                        | statement multi_statement
+
+        expression : binop_then
+
+        binop_then : binop_and THEN binop_then
+               | binop_and
+
+        binop_and : unop_not {AND unop_not}
+               | unop_not {OR unop_not}
+               | unop_not {XOR unop_not}
+               | unop_not
+
+        unop_not : NOT unop_not
+               | binop_compare
+
+        binop_compare : binop_cons EQ binop_cons
+               | binop_cons NE binop_cons
+               | binop_cons GT binop_cons
+               | binop_cons LT binop_cons
+               | binop_cons GE binop_cons
+               | binop_cons LE binop_cons
+               | binop_cons
+
+        binop_cons : binop_add CONS binop_cons
+               | binop_add APPEND binop_cons
+               | binop_add
+
+        binop_add : binop_mul {'+' binop_mul}
+               | binop_mul {'-' binop_mul}
+               | binop_mul
+
+        binop_mul : op_funcall {'*' op_funcall}
+               | op_funcall {'/' op_funcall}
+               | op_funcall {'%' op_funcall}
+               | op_funcall
+
+        op_funcall : atom {'(' actuals ')'}
+                   | atom
+
+        atom : symbol
+               | number
+               | string
+               | char
+               | boolean
+               | lst
+               | FN '(' formals ')' '{' statements '}'
+               | DEFINE symbol '=' expression
+               | BACK
+               | '(' expression ')'
+    """
+
+    debugging = False
+
     def __init__(self, tokeniser: Tokeniser, stderr):
         self.tokeniser = tokeniser
         self.stderr = stderr
 
     def read(self) -> expr.Expr:
-        return self.statement()
+        self.debug("*******************************************************")
+        result = self.statement()
+        self.debug("read", result=result)
+        return result
 
     def statement(self, fail=True) -> expr.Expr:
         """
             statement : expression ';'
-                      | IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'
+                      | IF '(' op_funcall ')' '{' statements '}' ELSE '{' statements '}'
                       | FN symbol '(' formals ')' '{' statements '}'
         """
+        self.debug("statement")
         if self.swallow('IF'):
             self.consume('(')
-            test = self.expression()
+            test = self.op_funcall()
             self.consume(')', '{')
             consequent = self.statements()
             self.consume('}', 'ELSE', '{')
@@ -167,6 +235,7 @@ class Reader:
         """
             statements : multi_statement
         """
+        self.debug("statements")
         return expr.Sequence(self.multi_statement())
 
     def multi_statement(self, fail=True) -> expr.List:
@@ -174,6 +243,7 @@ class Reader:
             multi_statement : statement
                             | statement multi_statement
         """
+        self.debug("multi_statement")
         statement = self.statement(fail)
         if statement is None:
             return expr.Null()
@@ -181,97 +251,104 @@ class Reader:
             multi_statement = self.multi_statement(False)  # may return empty list
             return expr.Pair(statement, multi_statement)
 
-    def expression(self, fail=True) -> Maybe[expr.Expr]:
+    def expression(self, fail=True):
         """
-            expression : prec_1 '(' actuals ')'
-                       | prec_1
+            expression : binop_then
         """
-        prec_1 = self.prec_1(fail)
-        if prec_1 is None:
-            return None
-        if self.swallow('('):
-            actuals = self.exprs()
-            self.consume(')')
-            return expr.Application(prec_1, actuals)
+        return self.binop_then(fail)
 
-    def binop(self, m_lhs, ops, m_rhs, fail) -> Maybe[expr.Expr]:
-        lhs = m_lhs(fail)
-        if lhs is None:
-            return None
-        op = self.swallow(*ops)
-        if op:
-            rhs = m_rhs()
-            return self.apply_token(op, lhs, rhs)
-        else:
-            return lhs
+    def binop_then(self, fail=True) -> Maybe[expr.Expr]:
+        """
+            binop_then : binop_and THEN binop_then
+                   | binop_and
+        """
+        self.debug("binop_then")
+        return self.rassoc_binop(self.binop_and, ['THEN'], self.binop_then, fail)
 
-    def prec_1(self, fail=True) -> Maybe[expr.Expr]:
+    def binop_and(self, fail=True) -> Maybe[expr.Expr]:
         """
-            prec_1 : prec_2 '*' prec_1
-                   | prec_2 '/' prec_1
-                   | prec_2 '%' prec_1
-                   | prec_2
+            binop_and : unop_not {AND unop_not}
+                   | unop_not {OR unop_not}
+                   | unop_not {XOR unop_not}
+                   | unop_not
         """
-        return self.binop(self.prec_2, ['*', '/', '%'], self.prec_1, fail)
+        self.debug("binop_and")
+        return self.lassoc_binop(self.unop_not, ['AND', 'OR', 'XOR'], fail)
 
-    def prec_2(self, fail=True) -> Maybe[expr.Expr]:
+    def unop_not(self, fail=True) -> Maybe[expr.Expr]:
         """
-            prec_2 : prec_3 '+' prec_2
-                   | prec_3 '-' prec_2
-                   | prec_3
+            unop_not : NOT unop_not
+                   | binop_compare
         """
-        return self.binop(self.prec_3, ['+', '-'], self.prec_2, fail)
-
-    def prec_3(self, fail=True) -> Maybe[expr.Expr]:
-        """
-            prec_3 : prec_4 CONS prec_3
-                   | prec_4 APPEND prec_3
-                   | prec_4
-        """
-        return self.binop(self.prec_4, ['@', '@@'], self.prec_3, fail)
-
-    def prec_4(self, fail=True) -> Maybe[expr.Expr]:
-        """
-            prec_4 : prec_5 EQ prec_4
-                   | prec_5 NE prec_4
-                   | prec_5 GT prec_4
-                   | prec_5 LT prec_4
-                   | prec_5 GE prec_4
-                   | prec_5 LE prec_4
-                   | prec_5
-        """
-        return self.binop(self.prec_5, ['==', '!=', '>', '<', '>=', '<='], self.prec_4, fail)
-
-    def prec_5(self, fail=True) -> Maybe[expr.Expr]:
-        """
-            prec_5 : LNOT prec_6
-                   | prec_6
-        """
+        self.debug("unop_not")
         token = self.swallow('NOT')
         if token:
-            return self.apply_token(token, self.prec_6())
+            return self.apply_token(token, self.unop_not())
         else:
-            return self.prec_6(fail)
+            return self.binop_compare(fail)
 
-    def prec_6(self, fail=True) -> Maybe[expr.Expr]:
+    def binop_compare(self, fail=True) -> Maybe[expr.Expr]:
         """
-            prec_6 : prec_7 LAND prec_6
-                   | prec_7 LOR prec_6
-                   | prec_7 LXOR prec_6
-                   | prec_7
+            binop_compare : binop_cons EQ binop_cons
+                   | binop_cons NE binop_cons
+                   | binop_cons GT binop_cons
+                   | binop_cons LT binop_cons
+                   | binop_cons GE binop_cons
+                   | binop_cons LE binop_cons
+                   | binop_cons
         """
-        return self.binop(self.prec_7, ['AND', 'OR', 'XOR'], self.prec_6, fail)
+        self.debug("binop_compare")
+        return self.rassoc_binop(self.binop_cons, ['==', '!=', '>', '<', '>=', '<='], self.binop_cons, fail)
 
-    def prec_7(self, fail=True) -> Maybe[expr.Expr]:
+    def binop_cons(self, fail=True) -> Maybe[expr.Expr]:
         """
-            prec_7 : prec_8 THEN prec_7
-                   | prec_8
+            binop_cons : binop_add CONS binop_cons
+                   | binop_add APPEND binop_cons
+                   | binop_add
         """
-        return self.binop(self.prec_8, ['THEN'], self.prec_7, fail)
+        self.debug("binop_cons")
+        return self.rassoc_binop(self.binop_add, ['@', '@@'], self.binop_cons, fail)
 
-    def prec_8(self, fail=True) -> Maybe[expr.Expr]:
+    def binop_add(self, fail=True) -> Maybe[expr.Expr]:
         """
-            prec_8 : symbol
+            binop_add : binop_mul '+' binop_add
+                   | binop_mul '-' binop_add
+                   | binop_mul
+        """
+        self.debug("binop_add")
+        return self.lassoc_binop(self.binop_mul, ['+', '-'], fail)
+
+    def binop_mul(self, fail=True) -> Maybe[expr.Expr]:
+        """
+            binop_mul : op_funcall {'*' op_funcall}
+                   | op_funcall {'/' op_funcall}
+                   | op_funcall {'%' op_funcall}
+                   | op_funcall
+        """
+        self.debug("binop_mul")
+        return self.lassoc_binop(self.op_funcall, ['*', '/', '%'], fail)
+
+    def op_funcall(self, fail=True) -> Maybe[expr.Expr]:
+        """
+            op_funcall : atom {'(' actuals ')'}
+                       | atom
+        """
+        self.debug("op_funcall", fail=fail)
+        atom = self.atom(fail)
+        if atom is None:
+            self.debug("op_funcall -> atom == None")
+            return None
+        while True:
+            if self.swallow('('):
+                actuals = self.exprs()
+                self.consume(')')
+                atom = expr.Application(atom, actuals)
+            else:
+                return atom
+
+    def atom(self, fail=True) -> Maybe[expr.Expr]:
+        """
+            atom : symbol
                    | number
                    | string
                    | char
@@ -282,6 +359,7 @@ class Reader:
                    | BACK
                    | '(' expression ')'
         """
+        self.debug("atom")
         symbol = self.symbol(False)
         if symbol:
             return symbol
@@ -321,6 +399,10 @@ class Reader:
             expression = self.expression()
             return self.apply_token(token, symbol, expression)
 
+        token = self.swallow('BACK')
+        if token:
+            return self.apply_token(token)
+
         if self.swallow('('):
             expression = self.expression()
             self.consume(')')
@@ -334,6 +416,7 @@ class Reader:
         """
             symbol : ID
         """
+        self.debug("symbol")
         identifier = self.swallow('ID')
         if identifier:
             return expr.Symbol(identifier.value)
@@ -346,6 +429,7 @@ class Reader:
         """
             number : NUMBER
         """
+        self.debug("number")
         number = self.swallow('NUMBER')
         if number:
             return expr.Constant(number.value)
@@ -358,6 +442,7 @@ class Reader:
         """
             string : STRING
         """
+        self.debug("string")
         string = self.swallow('STRING')
         if string:
             return expr.Constant(string.value)
@@ -370,6 +455,7 @@ class Reader:
         """
             char : CHAR
         """
+        self.debug("char")
         char = self.swallow('CHAR')
         if char:
             return expr.Char(char.value)
@@ -384,6 +470,7 @@ class Reader:
                     | FALSE
                     | UNKNOWN
         """
+        self.debug("boolean")
         token = self.swallow('TRUE')
         if token:
             return expr.T()
@@ -405,6 +492,7 @@ class Reader:
         """
             list : '[' exprs ']'
         """
+        self.debug("lst")
         if self.swallow('['):
             exprs = self.exprs()
             self.consume(']')
@@ -420,6 +508,7 @@ class Reader:
             formals : symbol
             formals : symbol ',' nfargs
         """
+        self.debug("formals")
         symbol = self.symbol(False)
         if symbol is None:
             return expr.Null()
@@ -435,7 +524,8 @@ class Reader:
             exprs : expression
             exprs : expression ',' exprs
         """
-        expression = self.symbol(False)
+        self.debug("exprs")
+        expression = self.expression(False)
         if expression is None:
             return expr.Null()
         if self.swallow(','):
@@ -443,6 +533,29 @@ class Reader:
             return expr.Pair(expression, exprs)
         else:
             return expr.List.list([expression])
+
+    def rassoc_binop(self, m_lhs, ops, m_rhs, fail) -> Maybe[expr.Expr]:
+        lhs = m_lhs(fail)
+        if lhs is None:
+            return None
+        op = self.swallow(*ops)
+        if op:
+            rhs = m_rhs()
+            return self.apply_token(op, lhs, rhs)
+        else:
+            return lhs
+
+    def lassoc_binop(self, method, ops, fail):
+        lhs = method(fail)
+        if lhs is None:
+            return None
+        while True:
+            op = self.swallow(*ops)
+            if op:
+                rhs = method()
+                lhs = self.apply_token(op, lhs, rhs)
+            else:
+                return lhs
 
     def apply_token(self, token: Token, *args):
         return self.apply_string(token.value, *args)
@@ -458,6 +571,7 @@ class Reader:
         :param args: array
         :return: bool
         """
+        self.debug("swallow", args=args)
         for token_type in args:
             token = self.tokeniser.swallow(token_type)
             if token is not None:
@@ -470,6 +584,7 @@ class Reader:
         :param args:
         :return: void
         """
+        self.debug("consume", args=args)
         for name in args:
             if self.tokeniser.swallow(name) is None:
                 self.error("expected " + name)
@@ -481,3 +596,11 @@ class Reader:
             line=self.tokeniser.line_number(),
             next=self.tokeniser.peek().value
         )
+
+    def debug(self, *args, **kwargs):
+        if self.debugging:
+            for arg in args:
+                print(arg, end=' ')
+            for k in kwargs:
+                print(k + '=' + str(kwargs[k]), end=' ')
+            print(self.tokeniser)

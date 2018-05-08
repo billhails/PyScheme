@@ -485,7 +485,7 @@ class Application(Expr):
         return self._operation.eval(env, deferred_op, amb)
 
     def __str__(self):
-        return "Application(" + str(self._operation) + ": " + str(self._operands) + ")"
+        return str(self._operation) + str(self._operands)
 
 
 class Sequence(Expr):

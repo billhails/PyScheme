@@ -17,18 +17,18 @@
 
 from unittest import TestCase
 from pyscheme.repl import Repl
-from pyscheme.stream import StringStream
 import io
 
 
 class Base(TestCase):
-    def eval(self, args: list) -> str:
-        stream_expr = StringStream(*args)
+    def eval(self, text: str) -> str:
+        input = io.StringIO(text)
         output = io.StringIO()
-        repl = Repl(stream_expr, output)
+        error = io.StringIO()
+        repl = Repl(input, output, error)
         repl.run()
         return output.getvalue()
 
-    def assertEval(self, expected: str, *args, msg: str = ''):
-        result = self.eval(args)
+    def assertEval(self, expected: str, text: str, msg: str = ''):
+        result = self.eval(text)
         self.assertEqual(expected, result, msg)
