@@ -29,7 +29,7 @@ class TestAmb(Base):
     3. A change to "define" which undoes its definition before backtracking further.
     """
 
-    def test_then_back(self):
+    def dont_test_then_back(self):
         self.assertEval(
             "12",
             """

@@ -72,7 +72,6 @@ class Repl:
 
     def read(self, ret: Callable, amb: Callable):
         result = self.reader.read()
-        print("parse result: " + str(result))
         if result is None:
             return None  # stop the trampoline
         return lambda: ret(result, amb)

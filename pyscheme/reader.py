@@ -19,6 +19,7 @@ from pyscheme.exceptions import SyntaxError
 import pyscheme.expr as expr
 from typing import TypeVar, Union
 import re
+import inspect
 
 S = TypeVar('S')
 Maybe = Union[S, None]
@@ -100,14 +101,14 @@ class Tokeniser:
             while self._line == '':
                 self._line = self._stream.readline()
                 if self._line == '':  # EOF
-                    return Token('EOF')
+                    return Token('EOF', 'EOF')
                 self._line_number += 1
-                self._line = self._line.lstrip()
+                self._line = self._line.strip()
                 self._line = re.sub(r'^//.*', '', self._line, 1)
             for rex in self.regexes.keys():
                 match = re.match(rex, self._line)
                 if match:
-                    self._line = re.sub(rex, '', self._line, 1).lstrip()
+                    self._line = re.sub(rex, '', self._line, 1).strip()
                     self._line = re.sub(r'^//.*', '', self._line, 1)
                     text = match.group(1)
                     if self.regexes[rex] == 'ID':
@@ -133,7 +134,7 @@ class Tokeniser:
 class Reader:
     """
         statement : expression ';'
-                  | IF '(' op_funcall ')' '{' statements '}' ELSE '{' statements '}'
+                  | IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'
                   | FN symbol '(' formals ')' '{' statements '}'
 
         statements : multi_statement
@@ -197,6 +198,8 @@ class Reader:
         self.stderr = stderr
 
     def read(self) -> expr.Expr:
+        if self.debugging:
+            self.depth=len(inspect.stack())
         self.debug("*******************************************************")
         result = self.statement()
         self.debug("read", result=result)
@@ -205,13 +208,13 @@ class Reader:
     def statement(self, fail=True) -> expr.Expr:
         """
             statement : expression ';'
-                      | IF '(' op_funcall ')' '{' statements '}' ELSE '{' statements '}'
+                      | IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'
                       | FN symbol '(' formals ')' '{' statements '}'
         """
-        self.debug("statement")
+        self.debug("statement", fail=fail)
         if self.swallow('IF'):
             self.consume('(')
-            test = self.op_funcall()
+            test = self.expression()
             self.consume(')', '{')
             consequent = self.statements()
             self.consume('}', 'ELSE', '{')
@@ -228,7 +231,8 @@ class Reader:
             return self.apply_string('define', symbol, expr.Lambda(formals, body))
         else:
             expression = self.expression(fail)
-            self.consume(';')
+            if expression is not None:
+                self.consume(';')
             return expression
 
     def statements(self) -> expr.Sequence:
@@ -243,7 +247,7 @@ class Reader:
             multi_statement : statement
                             | statement multi_statement
         """
-        self.debug("multi_statement")
+        self.debug("multi_statement", fail=fail)
         statement = self.statement(fail)
         if statement is None:
             return expr.Null()
@@ -262,7 +266,7 @@ class Reader:
             binop_then : binop_and THEN binop_then
                    | binop_and
         """
-        self.debug("binop_then")
+        self.debug("binop_then", fail=fail)
         return self.rassoc_binop(self.binop_and, ['THEN'], self.binop_then, fail)
 
     def binop_and(self, fail=True) -> Maybe[expr.Expr]:
@@ -272,7 +276,7 @@ class Reader:
                    | unop_not {XOR unop_not}
                    | unop_not
         """
-        self.debug("binop_and")
+        self.debug("binop_and", fail=fail)
         return self.lassoc_binop(self.unop_not, ['AND', 'OR', 'XOR'], fail)
 
     def unop_not(self, fail=True) -> Maybe[expr.Expr]:
@@ -280,7 +284,7 @@ class Reader:
             unop_not : NOT unop_not
                    | binop_compare
         """
-        self.debug("unop_not")
+        self.debug("unop_not", fail=fail)
         token = self.swallow('NOT')
         if token:
             return self.apply_token(token, self.unop_not())
@@ -297,7 +301,7 @@ class Reader:
                    | binop_cons LE binop_cons
                    | binop_cons
         """
-        self.debug("binop_compare")
+        self.debug("binop_compare", fail=fail)
         return self.rassoc_binop(self.binop_cons, ['==', '!=', '>', '<', '>=', '<='], self.binop_cons, fail)
 
     def binop_cons(self, fail=True) -> Maybe[expr.Expr]:
@@ -306,7 +310,7 @@ class Reader:
                    | binop_add APPEND binop_cons
                    | binop_add
         """
-        self.debug("binop_cons")
+        self.debug("binop_cons", fail=fail)
         return self.rassoc_binop(self.binop_add, ['@', '@@'], self.binop_cons, fail)
 
     def binop_add(self, fail=True) -> Maybe[expr.Expr]:
@@ -315,7 +319,7 @@ class Reader:
                    | binop_mul '-' binop_add
                    | binop_mul
         """
-        self.debug("binop_add")
+        self.debug("binop_add", fail=fail)
         return self.lassoc_binop(self.binop_mul, ['+', '-'], fail)
 
     def binop_mul(self, fail=True) -> Maybe[expr.Expr]:
@@ -325,7 +329,7 @@ class Reader:
                    | op_funcall {'%' op_funcall}
                    | op_funcall
         """
-        self.debug("binop_mul")
+        self.debug("binop_mul", fail=fail)
         return self.lassoc_binop(self.op_funcall, ['*', '/', '%'], fail)
 
     def op_funcall(self, fail=True) -> Maybe[expr.Expr]:
@@ -336,7 +340,6 @@ class Reader:
         self.debug("op_funcall", fail=fail)
         atom = self.atom(fail)
         if atom is None:
-            self.debug("op_funcall -> atom == None")
             return None
         while True:
             if self.swallow('('):
@@ -359,7 +362,7 @@ class Reader:
                    | BACK
                    | '(' expression ')'
         """
-        self.debug("atom")
+        self.debug("atom", fail=fail)
         symbol = self.symbol(False)
         if symbol:
             return symbol
@@ -381,7 +384,7 @@ class Reader:
             return boolean
 
         lst = self.lst(False)
-        if lst:
+        if lst is not None:
             return lst
 
         if self.swallow('FN'):
@@ -416,7 +419,7 @@ class Reader:
         """
             symbol : ID
         """
-        self.debug("symbol")
+        self.debug("symbol", fail=fail)
         identifier = self.swallow('ID')
         if identifier:
             return expr.Symbol(identifier.value)
@@ -429,7 +432,7 @@ class Reader:
         """
             number : NUMBER
         """
-        self.debug("number")
+        self.debug("number", fail=fail)
         number = self.swallow('NUMBER')
         if number:
             return expr.Constant(number.value)
@@ -442,7 +445,7 @@ class Reader:
         """
             string : STRING
         """
-        self.debug("string")
+        self.debug("string", fail=fail)
         string = self.swallow('STRING')
         if string:
             return expr.Constant(string.value)
@@ -455,7 +458,7 @@ class Reader:
         """
             char : CHAR
         """
-        self.debug("char")
+        self.debug("char", fail=fail)
         char = self.swallow('CHAR')
         if char:
             return expr.Char(char.value)
@@ -470,7 +473,7 @@ class Reader:
                     | FALSE
                     | UNKNOWN
         """
-        self.debug("boolean")
+        self.debug("boolean", fail=fail)
         token = self.swallow('TRUE')
         if token:
             return expr.T()
@@ -492,7 +495,7 @@ class Reader:
         """
             list : '[' exprs ']'
         """
-        self.debug("lst")
+        self.debug("lst", fail=fail)
         if self.swallow('['):
             exprs = self.exprs()
             self.consume(']')
@@ -571,7 +574,7 @@ class Reader:
         :param args: array
         :return: bool
         """
-        self.debug("swallow", args=args)
+        self.debug("swallow", args=args, caller=inspect.stack()[1][3])
         for token_type in args:
             token = self.tokeniser.swallow(token_type)
             if token is not None:
@@ -584,7 +587,7 @@ class Reader:
         :param args:
         :return: void
         """
-        self.debug("consume", args=args)
+        self.debug("consume", args=args, caller=inspect.stack()[1][3])
         for name in args:
             if self.tokeniser.swallow(name) is None:
                 self.error("expected " + name)
@@ -599,6 +602,9 @@ class Reader:
 
     def debug(self, *args, **kwargs):
         if self.debugging:
+            depth = len(inspect.stack()) - self.depth
+            print('   |' * (depth // 4), end='')
+            print(' ' * (depth % 4), end='')
             for arg in args:
                 print(arg, end=' ')
             for k in kwargs:
