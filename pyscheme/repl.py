@@ -52,6 +52,7 @@ class Repl:
                 expr.Symbol("@@"): op.Append(),
                 expr.Symbol("binop_then"): op.Then(),
                 expr.Symbol("back"): op.Back(),
+                expr.Symbol("then"): op.Then(),
                 expr.Symbol("head"): op.Head(),
                 expr.Symbol("tail"): op.Tail(),
                 expr.Symbol("define"): op.Define(),
@@ -80,7 +81,8 @@ class Repl:
         return lambda: expr.eval(self.env, ret, amb)
 
     def print(self, expr: expr.Expr, ret: Callable, amb: Callable):
-        self.output.write(str(expr))
+        if expr is not None:
+            self.output.write(str(expr) + "\n")
         return lambda: ret(expr, amb)
 
     def repl(self, amb: Callable):

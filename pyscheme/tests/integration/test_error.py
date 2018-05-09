@@ -21,9 +21,9 @@ from pyscheme.tests.integration.base import Base
 class TestError(Base):
     def test_error(self):
         self.assertEval(
-            "[message 1]\n",
+            "message 1\nmessage 2",
             '''
-            fn test_error(message) { error(message) }
+            fn test_error(message) { error(message); }
             test_error("message 1");
             test_error("message 2");
             '''

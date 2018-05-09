@@ -56,7 +56,7 @@ class Tokeniser:
     regexes = {
         r'([a-zA-Z_][a-zA-Z_0-9]*)': 'ID',
         r'(\d+)': 'NUMBER',
-        r'"(\\.|[^"])*"': 'STRING',
+        r'"((\\.|[^"])*)"': 'STRING',
         r"'(\\.|[^'])'": 'CHAR',
     }
 
@@ -88,8 +88,11 @@ class Tokeniser:
 
     def peek(self) -> Maybe[Token]:
         token = self.next_token()
-        self._tokens += [token]
+        self.pushback(token)
         return token
+
+    def pushback(self, token: Token):
+        self._tokens += [token]
 
     def line_number(self):
         return self._line_number
@@ -210,8 +213,12 @@ class Reader:
             statement : expression ';'
                       | IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'
                       | FN symbol '(' formals ')' '{' statements '}'
+                      | EOF
         """
         self.debug("statement", fail=fail)
+        if self.swallow('EOF'):
+            return None
+
         if self.swallow('IF'):
             self.consume('(')
             test = self.expression()
@@ -221,19 +228,26 @@ class Reader:
             alternative = self.statements()
             self.consume('}')
             return expr.Conditional(test, consequent, alternative)
-        elif self.swallow('FN'):
-            symbol = self.symbol()
-            self.consume('(')
-            formals = self.formals()
-            self.consume(')', '{')
-            body = self.statements()
-            self.consume('}')
-            return self.apply_string('define', symbol, expr.Lambda(formals, body))
-        else:
-            expression = self.expression(fail)
-            if expression is not None:
-                self.consume(';')
-            return expression
+
+        fn = self.swallow('FN')
+        if fn is not None:
+            symbol = self.symbol(False)
+            if symbol is None:
+                self.pushback(fn)
+            else:
+                self.consume('(')
+                formals = self.formals()
+                self.consume(')', '{')
+                body = self.statements()
+                self.consume('}')
+                return self.apply_string('define', symbol, expr.Lambda(formals, body))
+
+        expression = self.expression(fail)
+        if expression is not None:
+            self.consume(';')
+        return expression
+
+
 
     def statements(self) -> expr.Sequence:
         """
@@ -435,7 +449,7 @@ class Reader:
         self.debug("number", fail=fail)
         number = self.swallow('NUMBER')
         if number:
-            return expr.Constant(number.value)
+            return expr.Constant(int(number.value))
         elif fail:
             self.error("expected number")
         else:
@@ -591,6 +605,9 @@ class Reader:
         for name in args:
             if self.tokeniser.swallow(name) is None:
                 self.error("expected " + name)
+
+    def pushback(self, token: Token):
+        self.tokeniser.pushback(token)
 
     def error(self, msg):
         self.stderr.write(msg + "\n")

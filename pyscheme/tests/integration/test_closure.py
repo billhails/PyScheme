@@ -22,19 +22,26 @@ class TestClosure(Base):
     def test_simple_lambda(self):
         self.assertEval(
             "Closure([x]: x)",
-            "fn (x) { x }"
+            "fn (x) { x; };"
         )
 
     def test_simple_lambda_application(self):
-        self.assertEval("12", "fn (a) { a + a }(6)")
+        self.assertEval(
+            "12",
+            """
+                fn (a) {
+                    a + a;
+                }(6);
+                """
+        )
 
     def test_lambda_application(self):
         self.assertEval(
             "10",
             """
                 fn (double) {
-                    double(5)
-                }(fn (a) { a + a })
+                    double(5);
+                }(fn (a) { a + a; });
             """
         )
 
@@ -43,17 +50,27 @@ class TestClosure(Base):
             "7",
             """
                 fn (add2) {
-                    add2(5)
+                    add2(5);
                 }(
                     fn (a) {
-                        fn (b) { a + b }
+                        fn (b) { a + b; };
                     }(2)
-                )
+                );
             """
         )
 
     def test_lambda_string(self):
         self.assertEval(
-            "Closure([a]: if (Application(==: [a, 2])) {12} else {Lambda []: { 14 }})",
-            "fn (a) { if (a == 2) { 12 } else { fn () { 14 } } }"
+            "Closure([a]: if (==[a, 2]) {12} else {Lambda []: { 14 }})",
+            """
+                fn (a) {
+                    if (a == 2) {
+                        12;
+                    } else {
+                        fn () {
+                            14;
+                        };
+                    }
+                };
+            """
         )

@@ -203,7 +203,9 @@ class Define(SpecialForm, metaclass=Singleton):
     def apply(self, args, env: Environment, ret: Callable, amb: Callable):
 
         def do_define(value, amb):
-            return lambda: env.define(args[0], value, ret, amb)
+            def ret_none(value, amb):
+                return lambda: ret(None, amb)
+            return lambda: env.define(args[0], value, ret_none, amb)
         return lambda: args[1].eval(env, do_define, amb)
 
 
@@ -218,7 +220,9 @@ class Print(Primitive):
         self._output = output
 
     def apply_evaluated(self, args, ret: Callable, amb: Callable):
-        self._output.write(str(args) + "\n")
+        for arg in args:
+            self._output.write(str(arg))
+        self._output.write("\n")
         return lambda: ret(args, amb)
 
 

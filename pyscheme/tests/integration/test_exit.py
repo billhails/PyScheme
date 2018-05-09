@@ -24,8 +24,8 @@ class TestExit(Base):
             """
             fn () {
                 exit();
-                1
-            }()
+                1;
+            }();
             """
         )
 

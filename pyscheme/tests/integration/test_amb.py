@@ -29,9 +29,9 @@ class TestAmb(Base):
     3. A change to "define" which undoes its definition before backtracking further.
     """
 
-    def dont_test_then_back(self):
+    def test_then_back(self):
         self.assertEval(
-            "12",
+            "here\n12",
             """
                 fn (x) {
                     if (x == 10) {
@@ -40,7 +40,7 @@ class TestAmb(Base):
                     } else {
                         x;
                     }
-                } (10 binop_then 12);
+                } (10 then 12);
             """
         )
 
@@ -116,6 +116,6 @@ class TestAmb(Base):
                 }
             }
             
-            barrels_of_fun()
+            barrels_of_fun();
             """
         )

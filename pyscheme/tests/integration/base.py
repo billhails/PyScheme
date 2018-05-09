@@ -31,4 +31,4 @@ class Base(TestCase):
 
     def assertEval(self, expected: str, text: str, msg: str = ''):
         result = self.eval(text)
-        self.assertEqual(expected, result, msg)
+        self.assertEqual(expected, result.rstrip(), msg)

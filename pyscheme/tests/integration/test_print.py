@@ -21,13 +21,13 @@ from pyscheme.tests.integration.base import Base
 class TestPrint(Base):
     def test_print(self):
         self.assertEval(
-            "[hello]\n1",
+            "hello\n1",
             """
             fn hello () {
                 print("hello");
-                1
+                1;
             }
-            ;
-            hello()
+            
+            hello();
             """
         )
