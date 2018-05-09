@@ -18,8 +18,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from typing import Callable
-from pyscheme.environment import Environment
+from pyscheme import environment
 from pyscheme.singleton import Singleton
+from pyscheme import expr
 
 """
 We need to distinguish between
@@ -35,12 +36,12 @@ We need to distinguish between
 
 
 class Op:
-    def apply(self, args, env, ret: Callable, amb: Callable):
+    def apply(self, args: 'expr.List', env, ret: Callable, amb: Callable):
         pass
 
 
 class Primitive(Op):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         def deferred_apply(evaluated_args, amb: Callable):
             return lambda: self.apply_evaluated(evaluated_args, ret, amb)
         return args.eval(env, deferred_apply, amb)
@@ -54,7 +55,7 @@ class SpecialForm(Op):
 
 
 class Closure(Primitive):
-    def __init__(self, args, body, env: Environment):
+    def __init__(self, args, body, env: 'environment.Environment'):
         self._args = args
         self._body = body
         self._env = env
@@ -122,7 +123,7 @@ class NE(Primitive, metaclass=Singleton):
 
 
 class And(SpecialForm, metaclass=Singleton):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         def cont(lhs, amb: Callable):
             if lhs.is_true():
                 return lambda: args[1].eval(env, ret, amb)
@@ -140,7 +141,7 @@ class And(SpecialForm, metaclass=Singleton):
 
 
 class Or(SpecialForm, metaclass=Singleton):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         def cont(lhs, amb: Callable):
             if lhs.is_true():
                 return lambda: ret(lhs, amb)
@@ -157,14 +158,14 @@ class Or(SpecialForm, metaclass=Singleton):
 
 
 class Then(SpecialForm, metaclass=Singleton):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         def amb2():
             return lambda: args[1].eval(env, ret, amb)
         return lambda: args[0].eval(env, ret, amb2)
 
 
 class Back(SpecialForm, metaclass=Singleton):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         return lambda: amb()
 
 
@@ -200,7 +201,7 @@ class Tail(Primitive, metaclass=Singleton):
 
 
 class Define(SpecialForm, metaclass=Singleton):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
 
         def do_define(value, amb):
             def ret_none(value, amb):
@@ -238,7 +239,7 @@ class Continuation(Primitive):
 
 
 class CallCC(SpecialForm, metaclass=Singleton):
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         from pyscheme.expr import List
         def do_apply(closure: Closure, amb):
             return lambda: closure.apply(List.list([Continuation(ret)]), env, ret, amb)
@@ -253,7 +254,7 @@ class Error(SpecialForm):
     def __init__(self, cont):
         self.cont = cont
 
-    def apply(self, args, env: Environment, ret: Callable, amb: Callable):
+    def apply(self, args, env: 'environment.Environment', ret: Callable, amb: Callable):
         from pyscheme.expr import Symbol
 
         def print_continuation(printer: Print, amb: callable):

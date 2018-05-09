@@ -18,65 +18,66 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import pyscheme.op as op
-import pyscheme.environment as environment
+from pyscheme import environment
 from typing import Callable
 from pyscheme.exceptions import NonBooleanExpressionError
 from pyscheme.singleton import Singleton, FlyWeight
+from pyscheme.types import Promise, Continuation, Amb
 
 
 class Expr:
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Continuation, amb: Amb) -> Promise:
         pass
 
-    def is_true(self):
+    def is_true(self) -> bool:
         raise NonBooleanExpressionError()
 
-    def is_false(self):
+    def is_false(self) -> bool:
         raise NonBooleanExpressionError()
 
-    def is_unknown(self):
+    def is_unknown(self) -> bool:
         raise NonBooleanExpressionError()
 
-    def __eq__(self, other):
+    def __eq__(self, other: 'Expr') -> bool:
         return id(self) == id(other)
 
-    def eq(self, other):
+    def eq(self, other: 'Expr') -> 'Bool':
         if self == other:
             return T()
         else:
             return F()
 
-    def gt(self, other):
+    def gt(self, other: 'Expr') -> 'Bool':
         if self > other:
             return T()
         else:
             return F()
 
-    def lt(self, other):
+    def lt(self, other: 'Expr') -> 'Bool':
         if self < other:
             return T()
         else:
             return F()
 
-    def ge(self, other):
+    def ge(self, other: 'Expr') -> 'Bool':
         if self >= other:
             return T()
         else:
             return F()
 
-    def le(self, other):
+    def le(self, other: 'Expr') -> 'Bool':
         if self <= other:
             return T()
         else:
             return F()
 
-    def ne(self, other):
+    def ne(self, other: 'Expr') -> 'Bool':
         if self != other:
             return T()
         else:
             return F()
 
-    def is_null(self):
+    def is_null(self) -> bool:
         return False
 
 
@@ -88,64 +89,64 @@ class Constant(Expr):
     def __init__(self, value):
         self._value = value
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Continuation, amb: Amb) -> Promise:
         return lambda: ret(self, amb)
 
     def value(self):
         return self._value
 
-    def __eq__(self, other: Expr):
+    def __eq__(self, other: Expr) -> bool:
         if type(other) is Constant:
             return self._value == other.value()
         else:
             return False
 
-    def __gt__(self, other):
+    def __gt__(self, other: Expr) -> bool:
         if type(other) is Constant:
             return self._value > other.value()
         else:
             return False
 
-    def __lt__(self, other):
+    def __lt__(self, other: Expr) -> bool:
         if type(other) is Constant:
             return self._value < other.value()
         else:
             return False
 
-    def __ge__(self, other):
+    def __ge__(self, other: Expr) -> bool:
         if type(other) is Constant:
             return self._value >= other.value()
         else:
             return False
 
-    def __le__(self, other):
+    def __le__(self, other: Expr) -> bool:
         if type(other) is Constant:
             return self._value <= other.value()
         else:
             return False
 
-    def __ne__(self, other):
+    def __ne__(self, other: Expr) -> bool:
         if type(other) is Constant:
             return self._value != other.value()
         else:
             return False
 
-    def __add__(self, other):
+    def __add__(self, other: Expr):
         return Constant(self._value + other._value)
 
-    def __sub__(self, other):
+    def __sub__(self, other: Expr):
         return Constant(self._value - other._value)
 
-    def __mul__(self, other):
+    def __mul__(self, other: Expr):
         return Constant(self._value * other._value)
 
-    def __floordiv__(self, other):
+    def __floordiv__(self, other: Expr):
         return Constant(self._value // other._value)
 
-    def __mod__(self, other):
+    def __mod__(self, other: Expr):
         return Constant(self._value % other._value)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._value)
 
     __repr__ = __str__
@@ -155,70 +156,70 @@ class Boolean(Constant):
     def __init__(self):
         pass
 
-    def __and__(self, other):
+    def __and__(self, other: 'Boolean') -> 'Boolean':
         pass
 
-    def __or__(self, other):
+    def __or__(self, other: 'Boolean') -> 'Boolean':
         pass
 
-    def __invert__(self):
+    def __invert__(self) -> 'Boolean':
         pass
 
-    def __xor__(self, other):
+    def __xor__(self, other: 'Boolean') -> 'Boolean':
         return (self & ~other) | (other & ~self)
 
-    def __eq__(self, other):
+    def __eq__(self, other: 'Boolean') -> 'Boolean':
         return id(self) == id(other)
 
-    def is_true(self):
+    def is_true(self) -> bool:
         return False
 
-    def is_false(self):
+    def is_false(self) -> bool:
         return False
 
-    def is_unknown(self):
+    def is_unknown(self) -> bool:
         return False
 
 
 class T(Boolean, metaclass=Singleton):
-    def __and__(self, other: Boolean):
+    def __and__(self, other: Boolean) -> Boolean:
         return other
 
-    def __or__(self, other: Boolean):
+    def __or__(self, other: Boolean) -> Boolean:
         return self
 
-    def __invert__(self):
+    def __invert__(self) -> Boolean:
         return F()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "true"
 
-    def eq(self, other):
+    def eq(self, other: Boolean) -> Boolean:
         if self == other:
             return self
         else:
             return other
 
-    def is_true(self):
+    def is_true(self) -> bool:
         return True
 
     __repr__ = __str__
 
 
 class F(Boolean, metaclass=Singleton):
-    def __and__(self, other: Boolean):
+    def __and__(self, other: Boolean) -> Boolean:
         return self
 
-    def __or__(self, other: Boolean):
+    def __or__(self, other: Boolean) -> Boolean:
         return other
 
-    def __invert__(self):
+    def __invert__(self) -> Boolean:
         return T()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "false"
 
-    def eq(self, other):
+    def eq(self, other) -> Boolean:
         if self == other:
             return T()
         elif other == U():
@@ -226,35 +227,35 @@ class F(Boolean, metaclass=Singleton):
         else:
             return self
 
-    def is_false(self):
+    def is_false(self) -> bool:
         return True
 
     __repr__ = __str__
 
 
 class U(Boolean, metaclass=Singleton):
-    def __and__(self, other):
+    def __and__(self, other: Boolean) -> Boolean:
         if other == F():
             return other
         else:
             return self
 
-    def __or__(self, other):
+    def __or__(self, other: Boolean) -> Boolean:
         if other == T():
             return other
         else:
             return self
 
-    def __invert__(self):
+    def __invert__(self) -> Boolean:
         return self
 
-    def eq(self, other):
+    def eq(self, other: Boolean) -> Boolean:
         return self
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "unknown"
 
-    def is_unknown(self):
+    def is_unknown(self) -> bool:
         return True
 
     __repr__ = __str__
@@ -264,7 +265,7 @@ class Symbol(Expr, metaclass=FlyWeight):
     def __init__(self, name):
         self._name = name
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Continuation, amb: Amb) -> Promise:
         return lambda: env.lookup(self, ret, amb)
 
     def __hash__(self):
@@ -335,7 +336,7 @@ class Pair(List):
     def cdr(self):
         return self._cdr
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Callable, amb: Callable):
         def car_continuation(evaluated_car, amb: Callable):
             def cdr_continuation(evaluated_cdr, amb: Callable):
                 return lambda: ret(Pair(evaluated_car, evaluated_cdr), amb)
@@ -390,7 +391,7 @@ class Null(List, metaclass=Singleton):
     def cdr(self):
         return self
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Callable, amb: Callable):
         return ret(self, amb)
 
     def last(self):
@@ -444,7 +445,7 @@ class Conditional(Expr):
         self._consequent = consequent
         self._alternative = alternative
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Callable, amb: Callable):
         def deferred(result: Expr, amb: Callable):
             if result.is_true():
                 return lambda: self._consequent.eval(env, ret, amb)
@@ -465,7 +466,7 @@ class Lambda(Expr):
         self._args = args
         self._body = body
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Callable, amb: Callable):
         return lambda: ret(op.Closure(self._args, self._body, env), amb)
 
     def __str__(self):
@@ -479,7 +480,7 @@ class Application(Expr):
         self._operation = operation
         self._operands = operands
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Callable, amb: Callable):
         def deferred_op(evaluated_op, amb: Callable):
             return lambda: evaluated_op.apply(self._operands, env, ret, amb)
         return self._operation.eval(env, deferred_op, amb)
@@ -492,7 +493,7 @@ class Sequence(Expr):
     def __init__(self, exprs: List):
         self._exprs = exprs
 
-    def eval(self, env: environment.Environment, ret: Callable, amb: Callable):
+    def eval(self, env: 'environment.Environment', ret: Callable, amb: Callable):
         def take_last(expr: List, amb: Callable):
             return lambda: ret(expr.last(), amb)
         return lambda: self._exprs.eval(env, take_last, amb)

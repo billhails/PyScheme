@@ -1,6 +1,6 @@
 # PyScheme lambda language written in Python
 #
-# Various Exceptions (likely temporary as we'll handle exceptions through the repl)
+# Expressions (created by the parser) for evaluation
 #
 # Copyright (C) 2018  Bill Hails
 #
@@ -17,34 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-class PySchemeError(Exception):
-    pass
+from typing import Callable, Optional
+from pyscheme import expr
 
+Promise = Callable[[], Optional['Promise']]
 
-class SymbolError(PySchemeError):
-    def __init__(self, symbol):
-        self._symbol = symbol
+Continuation = Callable[['expr.Expr', 'Amb'], Promise]
 
-
-class SymbolNotFoundError(SymbolError):
-    pass
-
-
-class SymbolAlreadyDefinedError(SymbolError):
-    pass
-
-
-class NonBooleanExpressionError(PySchemeError):
-    pass
-
-
-class SyntaxError(Exception):
-    def __init__(self, msg: str, line: int, next):
-        self.msg = msg
-        self.line = line
-        self.next = next
-
-    def __str__(self) -> str:
-        return str(self.msg) + ", line: " + str(self.line) + ", next token: " + str(self.next)
-
-    __repr__ = __str__
+Amb = Callable[[], Promise]
