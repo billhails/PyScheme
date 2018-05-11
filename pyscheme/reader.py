@@ -17,21 +17,21 @@
 
 from pyscheme.exceptions import SyntaxError
 import pyscheme.expr as expr
-from typing import TypeVar, Union
+from pyscheme.types import Maybe
 import re
 import inspect
-
-S = TypeVar('S')
-Maybe = Union[S, None]
-
+import io
 
 class Token:
     def __init__(self, token_type, token_value=''):
         self.type = token_type
         self.value = token_value
 
-    def __str__(self):
-        return '<' + self.type + ': ' + self.value + '>'
+    def __str__(self) -> str:
+        if self.type == self.value:
+            return '<' + str(self.type) + '>'
+        else:
+            return '<' + str(self.type) + ': ' + str(self.value) + '>'
 
     __repr__ = __str__
 
@@ -72,7 +72,7 @@ class Tokeniser:
         '=',
     )
 
-    def __init__(self, stream):
+    def __init__(self, stream: io.StringIO):
         self._stream = stream
         self._line_number = 0
         self._tokens = []
@@ -91,10 +91,10 @@ class Tokeniser:
         self.pushback(token)
         return token
 
-    def pushback(self, token: Token):
+    def pushback(self, token: Token) -> None:
         self._tokens += [token]
 
-    def line_number(self):
+    def line_number(self) -> int:
         return self._line_number
 
     def next_token(self) -> Maybe[Token]:
@@ -128,7 +128,7 @@ class Tokeniser:
                     return Token(literal, literal)
             return Token('ERROR', self._line)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<tokens: " + str(self._tokens) + ' remaining: "' + self._line + '">'
 
     __repr__ = __str__
@@ -196,7 +196,7 @@ class Reader:
 
     debugging = False
 
-    def __init__(self, tokeniser: Tokeniser, stderr):
+    def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
         self.tokeniser = tokeniser
         self.stderr = stderr
 

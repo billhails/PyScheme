@@ -18,88 +18,86 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from typing import List
+from pyscheme import types
 import pyscheme.environment as environment
 import pyscheme.expr as expr
-import pyscheme.op as op
-from typing import Callable
-from io import FileIO
+from io import StringIO
 import pyscheme.reader as reader
 
 class Repl:
-    def __init__(self, input: FileIO, output: FileIO, error: FileIO):
+    def __init__(self, input: StringIO, output: StringIO, error: StringIO):
         self.input = input
         self.output = output
         self.tokeniser = reader.Tokeniser(input)
         self.reader = reader.Reader(self.tokeniser, error)
         self.env = environment.Environment().extend(
-            {
-                expr.Symbol("+"): op.Addition(),
-                expr.Symbol("-"): op.Subtraction(),
-                expr.Symbol("*"): op.Multiplication(),
-                expr.Symbol("/"): op.Division(),
-                expr.Symbol("%"): op.Modulus(),
-                expr.Symbol("=="): op.Equality(),
-                expr.Symbol("<"): op.LT(),
-                expr.Symbol(">"): op.GT(),
-                expr.Symbol("<="): op.LE(),
-                expr.Symbol(">="): op.GE(),
-                expr.Symbol("!="): op.NE(),
-                expr.Symbol("and"): op.And(),
-                expr.Symbol("or"): op.Or(),
-                expr.Symbol("not"): op.Not(),
-                expr.Symbol("xor"): op.Xor(),
-                expr.Symbol("@"): op.Cons(),
-                expr.Symbol("@@"): op.Append(),
-                expr.Symbol("binop_then"): op.Then(),
-                expr.Symbol("back"): op.Back(),
-                expr.Symbol("then"): op.Then(),
-                expr.Symbol("head"): op.Head(),
-                expr.Symbol("tail"): op.Tail(),
-                expr.Symbol("define"): op.Define(),
-                expr.Symbol("length"): op.Length(),
-                expr.Symbol("print"): op.Print(self.output),
-                expr.Symbol("here"): op.CallCC(),
-                expr.Symbol("exit"): op.Exit(),
-                expr.Symbol("error"): op.Error(lambda val, amb: lambda: self.repl(lambda: None))
+            { expr.Symbol(k): v for k, v in
+                {
+                    "+": expr.Addition(),
+                    "-": expr.Subtraction(),
+                    "*": expr.Multiplication(),
+                    "/": expr.Division(),
+                    "%": expr.Modulus(),
+                    "==": expr.Equality(),
+                    "<": expr.LT(),
+                    ">": expr.GT(),
+                    "<=": expr.LE(),
+                    ">=": expr.GE(),
+                    "!=": expr.NE(),
+                    "and": expr.And(),
+                    "or": expr.Or(),
+                    "not": expr.Not(),
+                    "xor": expr.Xor(),
+                    "@": expr.Cons(),
+                    "@@": expr.Append(),
+                    "binop_then": expr.Then(),
+                    "back": expr.Back(),
+                    "then": expr.Then(),
+                    "head": expr.Head(),
+                    "tail": expr.Tail(),
+                    "define": expr.Define(),
+                    "length": expr.Length(),
+                    "print": expr.Print(self.output),
+                    "here": expr.CallCC(),
+                    "exit": expr.Exit(),
+                    "error": expr.Error(lambda val, amb: lambda: self.repl(lambda: None))
+                }.items()
             }
         )
 
-    def trampoline(self, threads: List):
+    def trampoline(self, threads: List['types.Promise']):
         while len(threads) > 0:
             thunk = threads.pop(0)
             next = thunk()
             if next is not None:
                 threads += [next]
 
-    def read(self, ret: Callable, amb: Callable):
+    def read(self, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         result = self.reader.read()
         if result is None:
             return None  # stop the trampoline
         return lambda: ret(result, amb)
 
-    def eval(self, expr: expr.Expr, ret: Callable, amb: Callable):
+    def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: expr.eval(self.env, ret, amb)
 
-    def print(self, expr: expr.Expr, ret: Callable, amb: Callable):
+    def print(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         if expr is not None:
             self.output.write(str(expr) + "\n")
         return lambda: ret(expr, amb)
 
-    def repl(self, amb: Callable):
-        def deferred_repl(expr, amb: Callable):
+    def repl(self, amb: 'types.Amb') -> 'types.Promise':
+        def print_continuation(expr, amb: 'types.Amb') -> 'types.Promise':
             return lambda: self.repl(lambda: None)
 
-        def deferred_print(evaluated_expr: expr.Expr, amb: Callable):
-            return lambda: self.print(evaluated_expr, deferred_repl, amb)
+        def eval_continuation(evaluated_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
+            return lambda: self.print(evaluated_expr, print_continuation, amb)
 
-        def deferred_eval(read_expr: expr.Expr, amb: Callable):
-            return lambda: self.eval(read_expr, deferred_print, amb)
+        def read_continuation(read_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
+            return lambda: self.eval(read_expr, eval_continuation, amb)
 
-        return lambda: self.read(deferred_eval, amb)
+        return lambda: self.read(read_continuation, amb)
 
     def run(self):
         self.trampoline([lambda: self.repl(lambda: None)])
 
-
-if __name__ == "__main__":
-    Repl().run()

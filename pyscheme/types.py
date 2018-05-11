@@ -17,11 +17,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from typing import Callable, Optional
+from typing import Callable, Union, TypeVar
 from pyscheme import expr
 
-Promise = Callable[[], Optional['Promise']]
+S = TypeVar('S')
+Maybe = Union[S, None]
 
-Continuation = Callable[['expr.Expr', 'Amb'], Promise]
+# Promises are used by the trampoline in the repl.
+# A promise is either None or a callable of no arguments that returns a Promise.
+# If the trampoline sees None it will terminate the thread.
+Promise = Maybe[Callable[[], 'Promise']]
 
+# A Continuation is a callable that takes an Expr and an Amb (backtracking continuation)
+# and returns a promise.
+Continuation = Callable[[Maybe['expr.Expr'], 'Amb'], Promise]
+
+# An Amb (backtracking continuation) is a callable of no arguments that returns a Promise to resume a
+# chronologically previous operation.
 Amb = Callable[[], Promise]
