@@ -50,7 +50,7 @@ class Frame(Environment):
             raise SymbolAlreadyDefinedError
         else:
             self._dictionary[symbol] = value
-            def undo() -> 'types.Promise':
+            def undo_continuation() -> 'types.Promise':
                 del self._dictionary[symbol]
                 return lambda: amb()
-            return lambda: ret(symbol, undo)
+            return lambda: ret(symbol, undo_continuation)
