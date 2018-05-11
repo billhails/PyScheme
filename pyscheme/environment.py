@@ -20,16 +20,17 @@
 from pyscheme.exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError
 from typing import Callable
 from pyscheme import expr
+from pyscheme import types
 
 
 class Environment:
     def extend(self, dictionary) -> 'Frame':
         return Frame(self, dictionary)
 
-    def lookup(self, symbol, ret: Callable, amb: Callable) -> 'expr.Expr':
+    def lookup(self, symbol, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         raise SymbolNotFoundError(symbol)
 
-    def define(self, symbol, value, ret: Callable, amb: Callable):
+    def define(self, symbol, value, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         pass
 
 
@@ -38,18 +39,18 @@ class Frame(Environment):
         self._parent = parent
         self._dictionary = dictionary
 
-    def lookup(self, symbol, ret: Callable, amb: Callable) -> 'expr.Expr':
+    def lookup(self, symbol, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         if symbol in self._dictionary.keys():
             return lambda: ret(self._dictionary.get(symbol), amb)
         else:
             return lambda: self._parent.lookup(symbol, ret, amb)
 
-    def define(self, symbol: 'expr.Symbol', value: 'expr.Expr', ret: Callable, amb: Callable) -> 'expr.Symbol':
+    def define(self, symbol: 'expr.Symbol', value: 'expr.Expr', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         if symbol in self._dictionary.keys():
             raise SymbolAlreadyDefinedError
         else:
             self._dictionary[symbol] = value
-            def undo() -> Callable:
+            def undo() -> 'types.Promise':
                 del self._dictionary[symbol]
                 return lambda: amb()
             return lambda: ret(symbol, undo)
