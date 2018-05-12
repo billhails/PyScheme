@@ -8,10 +8,10 @@ specifically:
 * incorporate `amb` with keywords `binop_then` and `fail`, i.e. `def x = 5 binop_then 6`
 and `if (x == 0) { fail }`. DONE
 * strong implicit type checking.
-* first-class environments.
+* first-class environments. DONE
 * built in linked lists with `@` (cons) and `@@` (append) operators. DONE
 * strings are linked lists of char.
-* 
+* ...
 
 I'm also toying with the idea of a three-valued logic
 system with values `true` `false` and `unknown`. So `true || unknown == true`
