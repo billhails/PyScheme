@@ -154,8 +154,6 @@ class Constant(Expr):
 
 
 class Boolean(Constant):
-    def __init__(self):
-        pass
 
     def __and__(self, other: 'Boolean') -> 'Boolean':
         pass
@@ -183,6 +181,9 @@ class Boolean(Constant):
 
 
 class T(Boolean, metaclass=Singleton):
+    def __init__(self):
+        super(T, self).__init__('true')
+
     def __and__(self, other: Boolean) -> Boolean:
         return other
 
@@ -208,6 +209,9 @@ class T(Boolean, metaclass=Singleton):
 
 
 class F(Boolean, metaclass=Singleton):
+    def __init__(self):
+        super(F, self).__init__('false')
+
     def __and__(self, other: Boolean) -> Boolean:
         return self
 
@@ -235,6 +239,9 @@ class F(Boolean, metaclass=Singleton):
 
 
 class U(Boolean, metaclass=Singleton):
+    def __init__(self):
+        super(U, self).__init__('unknown')
+
     def __and__(self, other: Boolean) -> Boolean:
         if other == F():
             return other

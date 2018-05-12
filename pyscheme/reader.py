@@ -199,6 +199,7 @@ class Reader:
     def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
         self.tokeniser = tokeniser
         self.stderr = stderr
+        self.depth = 0
 
     def read(self) -> expr.Expr:
         if self.debugging:
