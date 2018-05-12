@@ -5,13 +5,14 @@ A small lambda-language interpreter written in Python
 I have a few ideas I'd like to pull in from my abortive F-natural project,
 specifically:
 
-* incorporate `amb` with keywords `binop_then` and `fail`, i.e. `def x = 5 binop_then 6`
-and `if (x == 0) { fail }`. DONE
+* incorporate `amb` with keywords `then` and `back`, i.e. `define x = 5 then 6`
+and `if (x == 0) { back }`. DONE
 * strong implicit type checking.
 * first-class environments. DONE
 * built in linked lists with `@` (cons) and `@@` (append) operators. DONE
 * strings are linked lists of char.
 * Three-valued logic system. DONE
+* Partial and over-complete function application.
 
 Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
 which isn't ideal.
@@ -20,7 +21,7 @@ which isn't ideal.
 
 I'm new to Python so if anyone has any better way of doing this please comment.
 
-In order to get this running on my laptop after pushing to GitHub from my home computer:
+In order to get this running on my laptop after pushing to GitHub from my home computer I did the following:
 
 1. Use PyCharm to create a new project called PyScheme.
 1. go to your pycharm projects root directory:
@@ -35,7 +36,11 @@ In order to get this running on my laptop after pushing to GitHub from my home c
    * `cd PyScheme`
    * `git status`
 
-You'll additionally need to install `coverage`. To install `coverage` go to the root of the distro and do `source ./venv/bin/activate; pip install coverage`.
+You'll additionally need to install `coverage`. To install `coverage` go to the root of the distro and do
+```
+$ source ./venv/bin/activate
+$ pip install coverage
+```
 
 ## Test Coverage
 
