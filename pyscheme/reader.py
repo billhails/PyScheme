@@ -226,7 +226,7 @@ class Reader:
 
     def read(self) -> expr.Expr:
         if self.debugging:
-            self.depth=len(inspect.stack())
+            self.depth = len(inspect.stack())
         self.debug("*******************************************************")
         result = self.top()
         self.debug("read", result=result)
@@ -243,7 +243,7 @@ class Reader:
         if self.swallow('EOF'):
             return None
 
-        definition =  self.definition(False)
+        definition = self.definition(False)
         if definition is not None:
             self.consume(';')
             return definition
@@ -469,7 +469,8 @@ class Reader:
                    | char
                    | boolean
                    | lst
-                   | FN '(' formals ')' '{' statements '}'
+                   | FN  formals body
+                   | ENV body
                    | BACK
                    | '(' expression ')'
         """
@@ -502,6 +503,10 @@ class Reader:
             formals = self.formals()
             body = self.body()
             return expr.Lambda(formals, body)
+
+        if self.swallow('ENV'):
+            body = self.body()
+            return expr.Env(body)
 
         token = self.swallow('BACK')
         if token:

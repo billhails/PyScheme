@@ -44,6 +44,27 @@ class TestAmb(Base):
             """
         )
 
+    def test_then_back_2(self):
+        self.assertEval(
+            "4",
+            """
+                fn require(x) {
+                    x or back
+                }
+                
+                fn one_of(list) {
+                    require(length(list) > 0);
+                    head(list) then one_of(tail(list));
+                }
+                
+                {
+                    define x = one_of([1, 2, 3, 4, 5]);
+                    require(x == 4);
+                    x;
+                }
+            """
+        )
+
     def test_barrels_of_fun(self):
         """
         A wine merchant has six barrels of wine and beer containing 30, 32, 36, 38, 40 and 62 gallons respectively.
@@ -55,69 +76,64 @@ class TestAmb(Base):
         self.assertEval(
             "40",
             """
-            env a {
-                fn barrels_of_fun() {
-                    define barrels = [30, 32, 36, 38, 40, 62];
-                    define beer = one_of(barrels);
-                    define wine = exclude([beer], barrels);
-                    define barrel_1 = one_of(wine);
-                    define barrel_2 = one_of(exclude([barrel_1], wine));
-                    define purchase = some_of(exclude([barrel_1, barrel_2], wine));
-                    require((barrel_1 + barrel_2) * 2 == sum(purchase));
-                    beer;
-                }
-                
-                fn one_of(list) {
-                    require(length(list) > 0);
-                    head(list) then one_of(tail(list))
-                }
-                
-                fn exclude(items, list) {
-                    if (length(list) > 0) {
-                        if (member(head(list), items)) {
-                            exclude(items, tail(list))
-                        } else {
-                            head(list) @ exclude(items, tail(list))
-                        }
+            
+            fn barrels_of_fun() {
+                define barrels = [30, 32, 36, 38, 40, 62];
+                define beer = one_of(barrels);
+                define wine = exclude([beer], barrels);
+                define barrel_1 = one_of(wine);
+                define barrel_2 = one_of(exclude([barrel_1], wine));
+                define purchase = some_of(exclude([barrel_1, barrel_2], wine));
+                require((barrel_1 + barrel_2) * 2 == sum(purchase));
+                beer;
+            }
+            
+            fn one_of(list) {
+                require(length(list) > 0);
+                head(list) then one_of(tail(list))
+            }
+            
+            fn exclude(items, list) {
+                if (length(list) > 0) {
+                    if (member(head(list), items)) {
+                        exclude(items, tail(list))
                     } else {
-                        []
+                        head(list) @ exclude(items, tail(list))
                     }
-                }
-                
-                fn member(item, list) {
-                    if (length(list) > 0) {
-                        if (item == (head(list))) {
-                            true
-                        } else {
-                            member(item, tail(list));
-                        }
-                    } else {
-                        false
-                    }
-                }
-                
-                fn some_of(list) {
-                    require(length(list) > 0);
-                    [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list));
-                }
-                
-                fn require(condition) {
-                    if (condition) {
-                        true
-                    } else {
-                        back
-                    }
-                }
-                
-                fn sum(list) {
-                    if (length(list) == 0) {
-                        0
-                    } else {
-                        head(list) + sum(tail(list))
-                    }
+                } else {
+                    []
                 }
             }
             
-            a.barrels_of_fun();
+            fn member(item, list) {
+                if (length(list) > 0) {
+                    if (item == (head(list))) {
+                        true
+                    } else {
+                        member(item, tail(list));
+                    }
+                } else {
+                    false
+                }
+            }
+
+            fn some_of(list) {
+                require(length(list) > 0);
+                [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list));
+            }
+
+            fn require(condition) {
+                condition or back
+            }
+
+            fn sum(list) {
+                if (length(list) == 0) {
+                    0
+                } else {
+                    head(list) + sum(tail(list))
+                }
+            }
+
+            barrels_of_fun();
             """
         )
