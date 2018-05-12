@@ -11,15 +11,10 @@ and `if (x == 0) { fail }`. DONE
 * first-class environments. DONE
 * built in linked lists with `@` (cons) and `@@` (append) operators. DONE
 * strings are linked lists of char.
-* ...
+* Three-valued logic system. DONE
 
-I'm also toying with the idea of a three-valued logic
-system with values `true` `false` and `unknown`. So `true || unknown == true`
-and `false && unknown == false`, also `!unknown == unknown` etc.
-It might be useful for decidability problems and if you never use the
-`unknown` value all the remaining logic remains standard.
-
-Syntax is very much in the javascript style, and I'm using `ply` to parse.
+Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
+which isn't ideal.
 
 ## Cloning
 
@@ -40,13 +35,10 @@ In order to get this running on my laptop after pushing to GitHub from my home c
    * `cd PyScheme`
    * `git status`
 
-You'll additionally need to install `ply` and `coverage`. To install `ply` just open `pyscheme/yacc.py` and go to the
-line that says `import ply.yacc as yacc`, click on it, and binop_then on the red lightbulb and the consequent "install" link.
-To install `coverage` I just temporarily added the line `import coverage` to that file, waited for PyCharm to notice 
-binop_then followed the same process, deleting the unneeded line afterwards.
+You'll additionally need to install `coverage`. To install `coverage` go to the root of the distro and do `source ./venv/bin/activate; pip install coverage`.
 
 ## Test Coverage
 
-Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), binop_then open
+Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), then open
 `htmlcov/index.html` in your browser. For other plarforms you can look at `coverage.sh` and see what it does (it's only
-two lines of code.) If anyone wants to provide a `coverage.bat` or similar for other platforms please submit a PR.
+a couple of lines of code.) If anyone wants to provide a `coverage.bat` or similar for other platforms please submit a PR.
