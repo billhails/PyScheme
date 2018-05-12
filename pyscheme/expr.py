@@ -459,7 +459,7 @@ class Conditional(Expr):
                 return lambda: self._consequent.eval(env, ret, amb)
             else:
                 return lambda: self._alternative.eval(env, ret, amb)
-        return lambda: self._test.eval(env, test_continuation, amb)
+        return self._test.eval(env, test_continuation, amb)
 
     def __str__(self) -> str:
         return "if (" + str(self._test) + \
@@ -501,13 +501,42 @@ class Sequence(Expr):
     def __init__(self, exprs: List):
         self._exprs = exprs
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb'):
+    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         def take_last(expr: List, amb: 'types.Amb') -> 'types.Promise':
             return lambda: ret(expr.last(), amb)
-        return lambda: self._exprs.eval(env, take_last, amb)
+        return self._exprs.eval(env, take_last, amb)
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('', ' ; ', '')
+
+
+class Nest(Expr):
+    def __init__(self, body: Sequence):
+        self._body = body
+
+    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        return self._body.eval(env.extend({}), ret, amb)
+
+    def __str__(self):
+        return str(self._body)
+
+class EnvironmentWrapper(Expr):
+    def __init__(self, env: 'environment.Environment'):
+        self._env = env
+
+    def env(self):
+        return self._env
+
+
+class Env(Expr):
+    def __init__(self, body: Sequence):
+        self._body = body
+
+    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        new_env = env.extend({})
+        def eval_continuation(val: Expr, amb: 'types.Amb') -> 'types.Promise':
+            return ret(EnvironmentWrapper(new_env), amb)
+        return self._body.eval(new_env, eval_continuation, amb)
 
 
 class Op(Expr):
@@ -540,7 +569,6 @@ class Closure(Primitive):
 
     def __str__(self) -> str:
         return "Closure(" + str(self._args) + ": " + str(self._body) + ")"
-
 
 class Addition(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
@@ -715,7 +743,7 @@ class CallCC(SpecialForm, metaclass=Singleton):
         from pyscheme.expr import List
         def do_apply(closure: Closure, amb: 'types.Amb') -> 'types.Promise':
             return lambda: closure.apply(List.list([Cont(ret)]), env, ret, amb)
-        return lambda: args[0].eval(env, do_apply, amb)
+        return args[0].eval(env, do_apply, amb)
 
 
 class Exit(Primitive):
@@ -732,4 +760,11 @@ class Error(SpecialForm):
         def print_continuation(printer: Print, amb: 'types.Amb') -> 'types.Promise':
             return lambda: printer.apply(args, env, self.cont, amb)
 
-        return lambda: env.lookup(Symbol("print"), print_continuation, amb)
+        return env.lookup(Symbol("print"), print_continuation, amb)
+
+
+class EvaluateInEnv(SpecialForm):
+    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        def env_continuation(new_env: EnvironmentWrapper, amb: 'types.Amb') -> 'types.Promise':
+            return lambda: args[1].eval(new_env.env(), ret, amb)
+        return args[0].eval(env, env_continuation, amb)

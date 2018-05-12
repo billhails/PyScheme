@@ -25,7 +25,7 @@ class TestPrint(Base):
             """
             fn hello () {
                 print("hello");
-                1;
+                1
             }
             
             hello();

@@ -30,7 +30,7 @@ class TestClosure(Base):
             "12",
             """
                 fn (a) {
-                    a + a;
+                    a + a
                 }(6);
                 """
         )
@@ -40,7 +40,7 @@ class TestClosure(Base):
             "10",
             """
                 fn (double) {
-                    double(5);
+                    double(5)
                 }(fn (a) { a + a; });
             """
         )
@@ -50,10 +50,10 @@ class TestClosure(Base):
             "7",
             """
                 fn (add2) {
-                    add2(5);
+                    add2(5)
                 }(
                     fn (a) {
-                        fn (b) { a + b; };
+                        fn (b) { a + b }
                     }(2)
                 );
             """
@@ -65,11 +65,11 @@ class TestClosure(Base):
             """
                 fn (a) {
                     if (a == 2) {
-                        12;
+                        12
                     } else {
                         fn () {
-                            14;
-                        };
+                            14
+                        }
                     }
                 };
             """

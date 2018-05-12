@@ -24,6 +24,8 @@ from pyscheme import types
 
 
 class Environment:
+    counter = [0]
+
     def extend(self, dictionary) -> 'Frame':
         return Frame(self, dictionary)
 
@@ -33,11 +35,16 @@ class Environment:
     def define(self, symbol, value, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         pass
 
+    def __str__(self):
+        return '<0>'
+
 
 class Frame(Environment):
     def __init__(self, parent: Environment, dictionary):
         self._parent = parent
         self._dictionary = dictionary
+        self.counter[0] += 1
+        self._number = self.counter[0]
 
     def lookup(self, symbol, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         if symbol in self._dictionary.keys():
@@ -54,3 +61,6 @@ class Frame(Environment):
                 del self._dictionary[symbol]
                 return lambda: amb()
             return lambda: ret(symbol, undo_continuation)
+
+    def __str__(self):
+        return '<' + str(self._number) + '> -> ' + str(self._parent)

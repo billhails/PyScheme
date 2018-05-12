@@ -25,7 +25,7 @@ class TestDefine(Base):
             """
                 fn () {
                     define t = 10;
-                    t;
+                    t
                 }();
             """
         )
@@ -34,7 +34,7 @@ class TestDefine(Base):
         self.assertEval(
             "4",
             """
-                define double = fn (x) { x + x; };
+                define double = fn (x) { x + x };
                 double(2);
             """
         )
@@ -43,7 +43,7 @@ class TestDefine(Base):
         self.assertEval(
             "4",
             """
-                fn double(x) { x * 2; }
+                fn double(x) { x * 2 }
                 double(2);
             """
         )

@@ -22,6 +22,7 @@ import re
 import inspect
 import io
 
+
 class Token:
     def __init__(self, token_type, token_value=''):
         self.type = token_type
@@ -51,6 +52,7 @@ class Tokeniser:
         'then': 'THEN',
         'back': 'BACK',
         'define': 'DEFINE',
+        'env': 'ENV'
     }
 
     regexes = {
@@ -70,6 +72,7 @@ class Tokeniser:
         '[', ']',
         ';',
         '=',
+        '.'
     )
 
     def __init__(self, stream: io.StringIO):
@@ -136,62 +139,82 @@ class Tokeniser:
 
 class Reader:
     """
-        statement : expression ';'
-                  | IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'
-                  | FN symbol '(' formals ')' '{' statements '}'
+        top : expression ';'
+            | definition ';'
+            | construct
+            | EOF
 
-        statements : multi_statement
+        construct : IF '(' expression ')' nest ELSE nest
+                  | FN symbol formals body
+                  | ENV symbol body
+                  | nest
 
-        multi_statement : statement
-                        | statement multi_statement
+        nest : body
 
-        expression : binop_then
+        body : '{' statements '}'
 
-        binop_then : binop_and THEN binop_then
-               | binop_and
+        statements : expression
+                   | expression ';' statements
+                   | definition
+                   | definition ';' statements
+                   | construct
+                   | construct statements
 
-        binop_and : unop_not {AND unop_not}
-               | unop_not {OR unop_not}
-               | unop_not {XOR unop_not}
-               | unop_not
+        expression : binop_and THEN expression
+                   | binop_and
+
+        definition : DEFINE symbol '=' expression
+
+        binop_and : unop_not {AND binop_and}
+                  | unop_not {OR binop_and}
+                  | unop_not {XOR binop_and}
+                  | unop_not
 
         unop_not : NOT unop_not
-               | binop_compare
+                 | binop_compare
 
         binop_compare : binop_cons EQ binop_cons
-               | binop_cons NE binop_cons
-               | binop_cons GT binop_cons
-               | binop_cons LT binop_cons
-               | binop_cons GE binop_cons
-               | binop_cons LE binop_cons
-               | binop_cons
+                      | binop_cons NE binop_cons
+                      | binop_cons GT binop_cons
+                      | binop_cons LT binop_cons
+                      | binop_cons GE binop_cons
+                      | binop_cons LE binop_cons
+                      | binop_cons
 
         binop_cons : binop_add CONS binop_cons
-               | binop_add APPEND binop_cons
-               | binop_add
+                   | binop_add APPEND binop_cons
+                   | binop_add
 
         binop_add : binop_mul {'+' binop_mul}
-               | binop_mul {'-' binop_mul}
-               | binop_mul
+                  | binop_mul {'-' binop_mul}
+                  | binop_mul
 
         binop_mul : op_funcall {'*' op_funcall}
-               | op_funcall {'/' op_funcall}
-               | op_funcall {'%' op_funcall}
-               | op_funcall
+                  | op_funcall {'/' op_funcall}
+                  | op_funcall {'%' op_funcall}
+                  | op_funcall
 
-        op_funcall : atom {'(' actuals ')'}
+        op_funcall : env_access {'(' actuals ')'}
+                   | env_access
+
+        env_access : atom {'.' env_access}
                    | atom
 
         atom : symbol
-               | number
-               | string
-               | char
-               | boolean
-               | lst
-               | FN '(' formals ')' '{' statements '}'
-               | DEFINE symbol '=' expression
-               | BACK
-               | '(' expression ')'
+             | number
+             | string
+             | char
+             | boolean
+             | lst
+             | FN formals body
+             | ENV body
+             | BACK
+             | '(' expression ')'
+
+        formals : '(' symbols ')'
+
+        symbols : empty
+                | symbol {',' symbols}
     """
 
     debugging = False
@@ -205,29 +228,50 @@ class Reader:
         if self.debugging:
             self.depth=len(inspect.stack())
         self.debug("*******************************************************")
-        result = self.statement()
+        result = self.top()
         self.debug("read", result=result)
         return result
 
-    def statement(self, fail=True) -> expr.Expr:
+    def top(self, fail=True) -> Maybe[expr.Expr]:
         """
-            statement : expression ';'
-                      | IF '(' expression ')' '{' statements '}' ELSE '{' statements '}'
-                      | FN symbol '(' formals ')' '{' statements '}'
+            statement : definition ';'
+                      | construct
+                      | expression ';'
                       | EOF
         """
-        self.debug("statement", fail=fail)
+        self.debug("top", fail=fail)
         if self.swallow('EOF'):
             return None
 
+        definition =  self.definition(False)
+        if definition is not None:
+            self.consume(';')
+            return definition
+
+        construct = self.construct(False)
+        if construct is not None:
+            return construct
+
+        expression = self.expression(fail)
+        if expression is not None:
+            self.consume(';')
+        return expression
+
+    def construct(self, fail=True):
+        """
+            construct : IF '(' expression ')' nest ELSE nest
+                      | FN symbol '(' formals ')' body
+                      | ENV symbol body
+                      | nest
+        """
+        self.debug("construct", fail=fail)
         if self.swallow('IF'):
             self.consume('(')
             test = self.expression()
-            self.consume(')', '{')
-            consequent = self.statements()
-            self.consume('}', 'ELSE', '{')
-            alternative = self.statements()
-            self.consume('}')
+            self.consume(')')
+            consequent = self.nest()
+            self.consume('ELSE')
+            alternative = self.nest()
             return expr.Conditional(test, consequent, alternative)
 
         fn = self.swallow('FN')
@@ -235,54 +279,99 @@ class Reader:
             symbol = self.symbol(False)
             if symbol is None:
                 self.pushback(fn)
+                return None
             else:
-                self.consume('(')
                 formals = self.formals()
-                self.consume(')', '{')
-                body = self.statements()
-                self.consume('}')
+                body = self.body()
                 return self.apply_string('define', symbol, expr.Lambda(formals, body))
 
-        expression = self.expression(fail)
-        if expression is not None:
-            self.consume(';')
-        return expression
+        env = self.swallow('ENV')
+        if env is not None:
+            symbol = self.symbol(False)
+            if symbol is None:
+                self.pushback(env)
+                return None
+            else:
+                body = self.body()
+                return self.apply_string('define', symbol, expr.Env(body))
 
+        return self.nest(fail)
 
+    def nest(self, fail=True):
+        self.debug("nest", fail=fail)
+        body = self.body(fail)
+        if body is None:
+            return None
+        return expr.Nest(body)
 
-    def statements(self) -> expr.Sequence:
+    def body(self, fail=True):
         """
-            statements : multi_statement
+            body : '{' statements '}'
+        """
+        self.debug("body", fail=fail)
+        if self.swallow('{'):
+            statements = self.statements()
+            self.consume('}')
+            return expr.Sequence(statements)
+        else:
+            if fail:
+                self.error("expected '{'")
+            else:
+                return None
+
+    def statements(self) -> expr.List:
+        """
+            statements : expression
+                       | expression ';' statements
+                       | definition
+                       | definition ';' statements
+                       | construct
+                       | construct statements
         """
         self.debug("statements")
-        return expr.Sequence(self.multi_statement())
+        definition = self.definition(False)
+        if definition is not None:
+            if self.swallow(';'):
+                return expr.Pair(definition, self.statements())
+            else:
+                return expr.Pair(definition, expr.Null())
 
-    def multi_statement(self, fail=True) -> expr.List:
+        construct = self.construct(False)
+        if construct is not None:
+            return expr.Pair(construct, self.statements())
+
+        expression = self.expression(False)
+        if expression is not None:
+            if self.swallow(';'):
+                return expr.Pair(expression, self.statements())
+            else:
+                return expr.Pair(expression, expr.Null())
+
+        return expr.Null()
+
+    def definition(self, fail=True):
         """
-            multi_statement : statement
-                            | statement multi_statement
+            definition : DEFINE symbol '=' expression
         """
-        self.debug("multi_statement", fail=fail)
-        statement = self.statement(fail)
-        if statement is None:
-            return expr.Null()
+        self.debug("definition", fail=fail)
+        if self.swallow('DEFINE'):
+            symbol = self.symbol()
+            self.consume('=')
+            expression = self.expression()
+            return self.apply_string('define', symbol, expression)
         else:
-            multi_statement = self.multi_statement(False)  # may return empty list
-            return expr.Pair(statement, multi_statement)
+            if fail:
+                self.error("expected 'define'")
+            else:
+                return None
 
-    def expression(self, fail=True):
+    def expression(self, fail=True) -> Maybe[expr.Expr]:
         """
-            expression : binop_then
-        """
-        return self.binop_then(fail)
-
-    def binop_then(self, fail=True) -> Maybe[expr.Expr]:
-        """
-            binop_then : binop_and THEN binop_then
+            expression : binop_and THEN expression
                    | binop_and
         """
-        self.debug("binop_then", fail=fail)
-        return self.rassoc_binop(self.binop_and, ['THEN'], self.binop_then, fail)
+        self.debug("expression", fail=fail)
+        return self.rassoc_binop(self.binop_and, ['THEN'], self.expression, fail)
 
     def binop_and(self, fail=True) -> Maybe[expr.Expr]:
         """
@@ -349,20 +438,28 @@ class Reader:
 
     def op_funcall(self, fail=True) -> Maybe[expr.Expr]:
         """
-            op_funcall : atom {'(' actuals ')'}
-                       | atom
+            op_funcall : env_access {'(' actuals ')'}
+                       | env_access
         """
         self.debug("op_funcall", fail=fail)
-        atom = self.atom(fail)
-        if atom is None:
+        env_access = self.env_access(fail)
+        if env_access is None:
             return None
         while True:
             if self.swallow('('):
                 actuals = self.exprs()
                 self.consume(')')
-                atom = expr.Application(atom, actuals)
+                env_access = expr.Application(env_access, actuals)
             else:
-                return atom
+                return env_access
+
+    def env_access(self, fail=True):
+        """
+             env_access : atom {'.' env_access}
+                        | atom
+        """
+        self.debug("env_access", fail=fail)
+        return self.lassoc_binop(self.atom, ['.'], fail)
 
     def atom(self, fail=True) -> Maybe[expr.Expr]:
         """
@@ -373,7 +470,6 @@ class Reader:
                    | boolean
                    | lst
                    | FN '(' formals ')' '{' statements '}'
-                   | DEFINE symbol '=' expression
                    | BACK
                    | '(' expression ')'
         """
@@ -403,19 +499,9 @@ class Reader:
             return lst
 
         if self.swallow('FN'):
-            self.consume('(')
             formals = self.formals()
-            self.consume(')', '{')
-            statements = self.statements()
-            self.consume('}')
-            return expr.Lambda(formals, statements)
-
-        token = self.swallow('DEFINE')
-        if token:
-            symbol = self.symbol()
-            self.consume('=')
-            expression = self.expression()
-            return self.apply_token(token, symbol, expression)
+            body = self.body()
+            return expr.Lambda(formals, body)
 
         token = self.swallow('BACK')
         if token:
@@ -429,6 +515,13 @@ class Reader:
             self.error("expected '('")
         else:
             return None
+
+    def formals(self):
+        self.debug("formals")
+        self.consume('(')
+        symbols = self.symbols()
+        self.consume(')')
+        return symbols
 
     def symbol(self, fail=True) -> Maybe[expr.Symbol]:
         """
@@ -520,18 +613,18 @@ class Reader:
         else:
             return None
 
-    def formals(self) -> expr.List:
+    def symbols(self) -> expr.List:
         """
-            formals : empty
-            formals : symbol
-            formals : symbol ',' nfargs
+            symbols : empty
+            symbols : symbol
+            symbols : symbol ',' nfargs
         """
-        self.debug("formals")
+        self.debug("symbols")
         symbol = self.symbol(False)
         if symbol is None:
             return expr.Null()
         if self.swallow(','):
-            fargs = self.formals()
+            fargs = self.symbols()
             return expr.Pair(symbol, fargs)
         else:
             return expr.List.list([symbol])

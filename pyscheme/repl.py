@@ -59,6 +59,7 @@ class Repl:
                     "length": expr.Length(),
                     "print": expr.Print(self.output),
                     "here": expr.CallCC(),
+                    ".": expr.EvaluateInEnv(),
                     "exit": expr.Exit(),
                     "error": expr.Error(lambda val, amb: lambda: self.repl(lambda: None))
                 }.items()

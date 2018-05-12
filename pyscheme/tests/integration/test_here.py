@@ -28,9 +28,9 @@ class TestHere(Base):
             here(
                 fn (ret) {
                     if (ret(1)) {
-                        2;
+                        2
                     } else {
-                        3;
+                        3
                     }
                 }
             );
