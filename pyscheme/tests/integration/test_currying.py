@@ -44,3 +44,23 @@ class TestCurrying(Base):
                 adder(5, 5);
             '''
         )
+
+    def test_map_curried(self):
+        self.assertEval(
+            '[2, 3, 4, 5]',
+            '''
+                fn map(fun, lst) {
+                    if (lst == []) {
+                        []
+                    } else {
+                        fun(head(lst)) @ map(fun, tail(lst))
+                    }
+                }
+                
+                fn add(x, y) {
+                    x + y
+                }
+                
+                map(add(1), [1, 2, 3, 4]);
+            '''
+        )
