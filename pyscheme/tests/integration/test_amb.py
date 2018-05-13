@@ -21,7 +21,7 @@ from .base import Base
 class TestAmb(Base):
     """
     "amb" adds chronological backtracking by doing three things:
-    1. A binary operator "binop_then" which:
+    1. A binary operator "then" which:
         a. evaluates and returns its lhs.
         b. if backtracked to once evaluates and returns its rhs.
         c. if backtracked to a second time backtracks further.
