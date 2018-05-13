@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from typing import List
-from pyscheme import types
+from . import types
 import pyscheme.environment as environment
 import pyscheme.expr as expr
 from io import StringIO

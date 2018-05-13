@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from pyscheme.tests.integration.base import Base
+from .base import Base
 
 
 class TestEnv(Base):

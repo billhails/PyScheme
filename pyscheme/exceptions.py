@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 class PySchemeError(Exception):
     pass
 
@@ -38,13 +39,13 @@ class NonBooleanExpressionError(PySchemeError):
     pass
 
 
-class SyntaxError(Exception):
-    def __init__(self, msg: str, line: int, next):
+class PySchemeSyntaxError(Exception):
+    def __init__(self, msg: str, line: int, next_token):
         self.msg = msg
         self.line = line
-        self.next = next
+        self.next_token = next_token
 
     def __str__(self) -> str:
-        return str(self.msg) + ", line: " + str(self.line) + ", next token: " + str(self.next)
+        return str(self.msg) + ", line: " + str(self.line) + ", next token: " + str(self.next_token)
 
     __repr__ = __str__

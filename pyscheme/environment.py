@@ -17,10 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pyscheme.exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError
-from typing import Callable
-from pyscheme import expr
-from pyscheme import types
+from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError
+from . import expr
+from . import types
 
 
 class Environment:
@@ -52,11 +51,15 @@ class Frame(Environment):
         else:
             return lambda: self._parent.lookup(symbol, ret, amb)
 
-    def define(self, symbol: 'expr.Symbol', value: 'expr.Expr', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def define(self, symbol: 'expr.Symbol',
+               value: 'expr.Expr',
+               ret: 'types.Continuation',
+               amb: 'types.Amb') -> 'types.Promise':
         if symbol in self._dictionary.keys():
             raise SymbolAlreadyDefinedError
         else:
             self._dictionary[symbol] = value
+
             def undo_continuation() -> 'types.Promise':
                 del self._dictionary[symbol]
                 return lambda: amb()

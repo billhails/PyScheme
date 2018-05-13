@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from typing import Callable, Union, TypeVar
-from pyscheme import expr
+from . import expr
 
 S = TypeVar('S')
 Maybe = Union[S, None]

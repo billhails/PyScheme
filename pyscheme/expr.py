@@ -17,11 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pyscheme import environment
-from typing import Callable
-from pyscheme.exceptions import NonBooleanExpressionError
-from pyscheme.singleton import Singleton, FlyWeight
-from pyscheme import types
+from . import environment
+from .exceptions import NonBooleanExpressionError
+from .singleton import Singleton, FlyWeight
+from . import types
+
 
 class Expr:
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
@@ -80,10 +80,6 @@ class Expr:
 
     def is_null(self) -> bool:
         return False
-
-
-class List(Expr):
-    pass
 
 
 class Constant(Expr):
@@ -224,7 +220,7 @@ class F(Boolean, metaclass=Singleton):
     def __str__(self) -> str:
         return "false"
 
-    def eq(self, other) -> Boolean:
+    def eq(self, other: Boolean) -> Boolean:
         if self == other:
             return T()
         elif other == U():
@@ -302,7 +298,7 @@ class List(Expr):
     def car(self) -> Expr:
         pass
 
-    def cdr(self) -> List:
+    def cdr(self) -> 'List':
         pass
 
     def __len__(self) -> int:
@@ -322,13 +318,13 @@ class List(Expr):
     def trailing_str(self, sep: str, end: str) -> str:
         pass
 
-    def append(self, other: List) -> List:
+    def append(self, other: 'List') -> 'List':
         pass
 
     def last(self: Expr) -> Expr:
         pass
 
-    def __iter__(self) -> 'ListIerator':
+    def __iter__(self) -> 'ListIterator':
         return ListIterator(self)
 
 
@@ -346,7 +342,7 @@ class Pair(List):
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         def car_continuation(evaluated_car: Expr, amb: 'types.Amb') -> 'types.Promise':
-            def cdr_continuation(evaluated_cdr: List, amb: Callable) -> 'types.Promise':
+            def cdr_continuation(evaluated_cdr: List, amb: 'types.Amb') -> 'types.Promise':
                 return lambda: ret(Pair(evaluated_car, evaluated_cdr), amb)
             return lambda: self._cdr.eval(env, cdr_continuation, amb)
         return self._car.eval(env, car_continuation, amb)
@@ -520,6 +516,7 @@ class Nest(Expr):
     def __str__(self):
         return str(self._body)
 
+
 class EnvironmentWrapper(Expr):
     def __init__(self, env: 'environment.Environment'):
         self._env = env
@@ -534,6 +531,7 @@ class Env(Expr):
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         new_env = env.extend({})
+
         def eval_continuation(val: Expr, amb: 'types.Amb') -> 'types.Promise':
             return ret(EnvironmentWrapper(new_env), amb)
         return self._body.eval(new_env, eval_continuation, amb)
@@ -569,6 +567,7 @@ class Closure(Primitive):
 
     def __str__(self) -> str:
         return "Closure(" + str(self._args) + ": " + str(self._body) + ")"
+
 
 class Addition(Primitive, metaclass=Singleton):
     def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
@@ -626,7 +625,11 @@ class NE(Primitive, metaclass=Singleton):
 
 
 class And(SpecialForm, metaclass=Singleton):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply(self, args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
+
         def cont(lhs: Expr, amb: 'types.Amb') -> 'types.Promise':
             if lhs.is_true():
                 return lambda: args[1].eval(env, ret, amb)
@@ -638,13 +641,18 @@ class And(SpecialForm, metaclass=Singleton):
                         return lambda: ret(rhs, amb)
                     else:
                         return lambda: ret(lhs, amb)
+
                 return lambda: args[1].eval(env, cont2, amb)
 
         return lambda: args[0].eval(env, cont, amb)
 
 
 class Or(SpecialForm, metaclass=Singleton):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply(self, args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
+
         def cont(lhs: Expr, amb: 'types.Amb') -> 'types.Promise':
             if lhs.is_true():
                 return lambda: ret(lhs, amb)
@@ -656,19 +664,29 @@ class Or(SpecialForm, metaclass=Singleton):
                         return lambda: ret(rhs, amb)
                     else:
                         return lambda: ret(lhs, amb)
+
                 return lambda: args[1].eval(env, cont2, amb)
+
         return lambda: args[0].eval(env, cont, amb)
 
 
 class Then(SpecialForm, metaclass=Singleton):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply(self, args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
+
         def amb2() -> 'types.Promise':
             return lambda: args[1].eval(env, ret, amb)
+
         return lambda: args[0].eval(env, ret, amb2)
 
 
 class Back(SpecialForm, metaclass=Singleton):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply(self, args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
         return lambda: amb()
 
 
@@ -703,11 +721,19 @@ class Tail(Primitive, metaclass=Singleton):
 
 
 class Define(SpecialForm, metaclass=Singleton):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply(self,
+              args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
+
         def define_continuation(value: Expr, amb: 'types.Amb') -> 'types.Promise':
+
             def ret_none(value: Expr, amb: 'types.Amb') -> 'types.Promise':
                 return lambda: ret(None, amb)
+
             return lambda: env.define(args[0], value, ret_none, amb)
+
         return lambda: args[1].eval(env, define_continuation, amb)
 
 
@@ -739,10 +765,15 @@ class Cont(Primitive):
 
 
 class CallCC(SpecialForm, metaclass=Singleton):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        from pyscheme.expr import List
+    def apply(self,
+              args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
+
         def do_apply(closure: Closure, amb: 'types.Amb') -> 'types.Promise':
             return lambda: closure.apply(List.list([Cont(ret)]), env, ret, amb)
+
         return args[0].eval(env, do_apply, amb)
 
 
@@ -750,12 +781,16 @@ class Exit(Primitive):
     def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return None
 
+
 class Error(SpecialForm):
     def __init__(self, cont):
         self.cont = cont
 
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        from pyscheme.expr import Symbol
+    def apply(self,
+              args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
 
         def print_continuation(printer: Print, amb: 'types.Amb') -> 'types.Promise':
             return lambda: printer.apply(args, env, self.cont, amb)
@@ -764,7 +799,13 @@ class Error(SpecialForm):
 
 
 class EvaluateInEnv(SpecialForm):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply(self,
+              args: List,
+              env: 'environment.Environment',
+              ret: 'types.Continuation',
+              amb: 'types.Amb') -> 'types.Promise':
+
         def env_continuation(new_env: EnvironmentWrapper, amb: 'types.Amb') -> 'types.Promise':
             return lambda: args[1].eval(new_env.env(), ret, amb)
+
         return args[0].eval(env, env_continuation, amb)

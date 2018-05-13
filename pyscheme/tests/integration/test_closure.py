@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pyscheme.tests.integration.base import Base
+from .base import Base
 
 
 class TestClosure(Base):
@@ -73,4 +73,29 @@ class TestClosure(Base):
                     }
                 };
             """
+        )
+
+    def test_nested_fn(self):
+        self.assertEval(
+            '12',
+            '''
+            fn add(n) {
+                fn (m) { n + m }
+            }
+            add(10)(2);
+            '''
+        )
+
+    def test_internal_fn(self):
+        self.assertEval(
+            '11',
+            '''
+            fn a (n) {
+                fn b(o) {
+                    n + o
+                }
+                b(5)
+            }
+            a(6);
+            '''
         )

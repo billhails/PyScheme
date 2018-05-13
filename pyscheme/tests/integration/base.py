@@ -21,13 +21,15 @@ import io
 
 
 class Base(TestCase):
-    def eval(self, text: str) -> str:
-        input = io.StringIO(text)
-        output = io.StringIO()
-        error = io.StringIO()
-        repl = Repl(input, output, error)
+
+    @classmethod
+    def eval(cls, text: str) -> str:
+        in_file = io.StringIO(text)
+        out_file = io.StringIO()
+        error_file = io.StringIO()
+        repl = Repl(in_file, out_file, error_file)
         repl.run()
-        return output.getvalue()
+        return out_file.getvalue()
 
     def assertEval(self, expected: str, text: str, msg: str = ''):
         result = self.eval(text)

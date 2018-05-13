@@ -15,9 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pyscheme.exceptions import SyntaxError
+from .exceptions import PySchemeSyntaxError
 import pyscheme.expr as expr
-from pyscheme.types import Maybe
+from .types import Maybe
 import re
 import inspect
 import io
@@ -710,10 +710,10 @@ class Reader:
 
     def error(self, msg):
         self.stderr.write(msg + "\n")
-        raise SyntaxError(
+        raise PySchemeSyntaxError(
             msg,
             line=self.tokeniser.line_number(),
-            next=self.tokeniser.peek().value
+            next_token=self.tokeniser.peek().value
         )
 
     def debug(self, *args, **kwargs):
