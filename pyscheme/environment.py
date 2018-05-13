@@ -20,12 +20,13 @@
 from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError
 from . import expr
 from . import types
+from typing import Dict
 
 
 class Environment:
     counter = [0]
 
-    def extend(self, dictionary) -> 'Frame':
+    def extend(self, dictionary: 'types.Maybe[Dict]'=None) -> 'Frame':
         return Frame(self, dictionary)
 
     def lookup(self, symbol, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
@@ -34,13 +35,15 @@ class Environment:
     def define(self, symbol, value, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         pass
 
-    def __str__(self):
-        return '<0>'
+    def __str__(self) -> str:
+        return '[0]'
 
 
 class Frame(Environment):
-    def __init__(self, parent: Environment, dictionary):
+    def __init__(self, parent: Environment, dictionary: 'types.Maybe[Dict]'):
         self._parent = parent
+        if dictionary is None:
+            dictionary = {}
         self._dictionary = dictionary
         self.counter[0] += 1
         self._number = self.counter[0]
@@ -60,10 +63,10 @@ class Frame(Environment):
         else:
             self._dictionary[symbol] = value
 
-            def undo_continuation() -> 'types.Promise':
+            def undo_amb() -> 'types.Promise':
                 del self._dictionary[symbol]
                 return lambda: amb()
-            return lambda: ret(symbol, undo_continuation)
+            return lambda: ret(symbol, undo_amb)
 
-    def __str__(self):
-        return '<' + str(self._number) + '> -> ' + str(self._parent)
+    def __str__(self) -> str:
+        return '[' + str(self._number) + '] -> ' + str(self._parent)

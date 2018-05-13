@@ -485,9 +485,11 @@ class Application(Expr):
         self._operands = operands
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        def deferred_op(evaluated_op: 'Op', amb: 'types.Amb') -> 'types.Promise':
+
+        def evaluated_op_continuation(evaluated_op: 'Op', amb: 'types.Amb') -> 'types.Promise':
             return lambda: evaluated_op.apply(self._operands, env, ret, amb)
-        return self._operation.eval(env, deferred_op, amb)
+
+        return self._operation.eval(env, evaluated_op_continuation, amb)
 
     def __str__(self) -> str:
         return str(self._operation) + str(self._operands)
@@ -498,9 +500,9 @@ class Sequence(Expr):
         self._exprs = exprs
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        def take_last(expr: List, amb: 'types.Amb') -> 'types.Promise':
+        def take_last_continuation(expr: List, amb: 'types.Amb') -> 'types.Promise':
             return lambda: ret(expr.last(), amb)
-        return self._exprs.eval(env, take_last, amb)
+        return self._exprs.eval(env, take_last_continuation, amb)
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('', ' ; ', '')
@@ -511,13 +513,17 @@ class Nest(Expr):
         self._body = body
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return self._body.eval(env.extend({}), ret, amb)
+        """Evaluate the body in an extended environment
+        """
+        return self._body.eval(env.extend(), ret, amb)
 
     def __str__(self):
         return str(self._body)
 
 
 class EnvironmentWrapper(Expr):
+    """Wrapper for Environments to make them Exprs
+    """
     def __init__(self, env: 'environment.Environment'):
         self._env = env
 
@@ -526,14 +532,19 @@ class EnvironmentWrapper(Expr):
 
 
 class Env(Expr):
+    """Implements the 'env' construct
+    """
     def __init__(self, body: Sequence):
         self._body = body
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        new_env = env.extend({})
+        """evaluate the body in an extended env then return the extended env as the result
+        """
+        new_env = env.extend()
 
         def eval_continuation(val: Expr, amb: 'types.Amb') -> 'types.Promise':
             return ret(EnvironmentWrapper(new_env), amb)
+
         return self._body.eval(new_env, eval_continuation, amb)
 
 
@@ -545,10 +556,10 @@ class Op(Expr):
 class Primitive(Op):
     def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb'):
         def deferred_apply(evaluated_args: List, amb: 'types.Amb') -> 'types.Promise':
-            return lambda: self.apply_evaluated(evaluated_args, ret, amb)
+            return lambda: self.apply_evaluated_args(evaluated_args, ret, amb)
         return args.eval(env, deferred_apply, amb)
 
-    def apply_evaluated(self, args, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         pass
 
 
@@ -562,65 +573,81 @@ class Closure(Primitive):
         self._body = body
         self._env = env
 
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return lambda: self._body.eval(self._env.extend(dict(zip(self._args, args))), ret, amb)
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        formal_args = self._args
+        actual_args = args
+        dictionary = {}
+        while type(formal_args) is not Null and type(actual_args) is not Null:
+            dictionary[formal_args.car()] = actual_args.car()
+            formal_args = formal_args.cdr()
+            actual_args = actual_args.cdr()
+        if type(formal_args) is not Null:  # currying
+            return lambda: ret(Closure(formal_args, self._body, self._env.extend(dictionary)), amb)
+        elif type(actual_args) is not Null:  # over-complete function application
+
+            def re_apply_continuation(closure: Closure, amb: 'types.Amb') -> 'types.Promise':
+                return lambda: closure.apply_evaluated_args(actual_args, ret, amb)
+
+            return lambda: self._body.eval(self._env.extend(dictionary), re_apply_continuation, amb)
+        else:  # formal and actual args match
+            return lambda: self._body.eval(self._env.extend(dictionary), ret, amb)
 
     def __str__(self) -> str:
         return "Closure(" + str(self._args) + ": " + str(self._body) + ")"
 
 
 class Addition(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
         return lambda: ret(args[0] + args[1], amb)
 
 
 class Subtraction(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] - args[1], amb)
 
 
 class Multiplication(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] * args[1], amb)
 
 
 class Division(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] // args[1], amb)
 
 
 class Modulus(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] % args[1], amb)
 
 
 class Equality(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].eq(args[1]), amb)
 
 
 class GT(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].gt(args[1]), amb)
 
 
 class LT(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].lt(args[1]), amb)
 
 
 class GE(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].ge(args[1]), amb)
 
 
 class LE(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].le(args[1]), amb)
 
 
 class NE(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].ne(args[1]), amb)
 
 
@@ -691,32 +718,32 @@ class Back(SpecialForm, metaclass=Singleton):
 
 
 class Not(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(~(args[0]), amb)
 
 
 class Xor(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] ^ args[1], amb)
 
 
 class Cons(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Pair(args[0], args[1]), amb)
 
 
 class Append(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].append(args[1]), amb)
 
 
 class Head(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].car(), amb)
 
 
 class Tail(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].cdr(), amb)
 
 
@@ -738,7 +765,7 @@ class Define(SpecialForm, metaclass=Singleton):
 
 
 class Length(Primitive, metaclass=Singleton):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Constant(len(args[0])), amb)
 
 
@@ -746,7 +773,7 @@ class Print(Primitive):
     def __init__(self, output):
         self._output = output
 
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         for arg in args:
             self._output.write(str(arg))
         self._output.write("\n")
@@ -757,7 +784,7 @@ class Cont(Primitive):
     def __init__(self, ret: callable):
         self._ret = ret
 
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: self._ret(args[0], amb)
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
@@ -778,7 +805,7 @@ class CallCC(SpecialForm, metaclass=Singleton):
 
 
 class Exit(Primitive):
-    def apply_evaluated(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return None
 
 
