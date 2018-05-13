@@ -49,3 +49,9 @@ class PySchemeSyntaxError(Exception):
         return str(self.msg) + ", line: " + str(self.line) + ", next token: " + str(self.next_token)
 
     __repr__ = __str__
+
+
+class PySchemeTypeError(PySchemeError):
+    def __init__(self, type1, type2):
+        self.type1 = type1
+        self.type2 = type2

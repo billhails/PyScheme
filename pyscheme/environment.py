@@ -49,7 +49,7 @@ class Frame(Environment):
         self._number = self.counter[0]
 
     def lookup(self, symbol, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        if symbol in self._dictionary.keys():
+        if symbol in self._dictionary:
             return lambda: ret(self._dictionary.get(symbol), amb)
         else:
             return lambda: self._parent.lookup(symbol, ret, amb)
@@ -58,7 +58,7 @@ class Frame(Environment):
                value: 'expr.Expr',
                ret: 'types.Continuation',
                amb: 'types.Amb') -> 'types.Promise':
-        if symbol in self._dictionary.keys():
+        if symbol in self._dictionary:
             raise SymbolAlreadyDefinedError
         else:
             self._dictionary[symbol] = value
