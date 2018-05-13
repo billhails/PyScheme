@@ -50,7 +50,6 @@ class Repl:
                     "xor": expr.Xor(),
                     "@": expr.Cons(),
                     "@@": expr.Append(),
-                    "binop_then": expr.Then(),
                     "back": expr.Back(),
                     "then": expr.Then(),
                     "head": expr.Head(),
