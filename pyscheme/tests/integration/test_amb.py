@@ -26,7 +26,7 @@ class TestAmb(Base):
         b. if backtracked to once evaluates and returns its rhs.
         c. if backtracked to a second time backtracks further.
     2. A keyword "back" that backtracks immediately.
-    3. A change to "define" which undoes its definition before backtracking further.
+    3. A change to "define" which undoes its definition (side-effect) before backtracking further.
     """
 
     def test_then_back(self):
