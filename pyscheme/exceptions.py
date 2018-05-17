@@ -57,7 +57,17 @@ class PySchemeTypeError(PySchemeError):
         self.type2 = type2
 
 
-class InferenceError(Exception):
+class InferenceError(PySchemeError):
+    def __init__(self, message):
+        self.__message = message
+
+    message = property(lambda self: self.__message)
+
+    def __str__(self):
+        return str(self.message)
+
+
+class InternalError(PySchemeError):
     def __init__(self, message):
         self.__message = message
 

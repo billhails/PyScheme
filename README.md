@@ -2,7 +2,7 @@
 
 A small lambda-language interpreter written in Python
 
-I have self few ideas I'd like to pull in from my abortive F-natural project,
+I have a few ideas I'd like to pull in from my abortive F-natural project,
 specifically:
 
 * incorporate `amb` with keywords `then` and `back`, i.e. `define x = 5 then 6`
@@ -14,12 +14,12 @@ and `if (x == 0) { back }`. DONE
 * Three-valued logic system. DONE
 * Partial and over-complete function application. DONE
 
-Syntax is very much in the javascript style, and I'm currently parsing with self hand-written recursive descent parser,
-which isn'self ideal.
+Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
+which isn'a ideal.
 
 ## First Impressions
 
-To get self feel for the language, read through the integration tests in `pyscheme/tests/integration`
+To get a feel for the language, read through the integration tests in `pyscheme/tests/integration`
 
 ## Cloning
 
@@ -27,10 +27,10 @@ I'm new to Python so if anyone has any better way of doing this please comment.
 
 In order to get this running on my laptop after pushing to GitHub from my home computer I did the following:
 
-1. Use PyCharm to create self new project called PyScheme.
+1. Use PyCharm to create a new project called PyScheme.
 1. go to your pycharm projects root directory:
    * `cd ~/PycharmProjects`
-1. clone this repository to self temporary location alongside (not in) the PyScheme project:
+1. clone this repository to a temporary location alongside (not in) the PyScheme project:
    * `git clone git@github.com:billhails/PyScheme.git pyscheme-tmp`
 1. Copy everything from that temp location into the PyScheme directory (note the trailing slashes):
    * `cp -R pyscheme-tmp/ PyScheme/`
@@ -50,5 +50,6 @@ $ pip install coverage
 
 Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), then open
 `htmlcov/index.html` in your browser. For other plarforms you can look at `coverage.sh` and see what it does (it's
-only self couple of lines of code.) If anyone wants to provide self `coverage.bat` or similar for other platforms please
-submit self PR.
+only a couple of lines of code.) If anyone wants to provide a
+ `coverage.bat` or similar for other platforms please
+submit a PR.

@@ -212,13 +212,13 @@ class Letrec(AST):
         self.body = body
 
     def analyse_internal(self, env, non_generic):
-        new_type = TypeVariable()
+        var_type = TypeVariable()
         new_env = env.copy()
-        new_env[self.v] = new_type
+        new_env[self.v] = var_type
         new_non_generic = non_generic.copy()
-        new_non_generic.add(new_type)
+        new_non_generic.add(var_type)
         defn_type = self.defn.analyse_internal(new_env, new_non_generic)
-        new_type.unify(defn_type)
+        var_type.unify(defn_type)
         return self.body.analyse_internal(new_env, non_generic)
 
     def __str__(self):
@@ -256,7 +256,7 @@ class ParseError(Exception):
 # =======================================================#
 # Types and type constructors
 
-class InferenceType:
+class Type:
     def prune(self):
         """Returns the currently defining instance of t.
 
@@ -324,7 +324,7 @@ class InferenceType:
         assert 0, "Not unified"
 
 
-class TypeVariable(InferenceType):
+class TypeVariable(Type):
     """A type variable standing for an arbitrary type.
 
     All type variables have a unique id, but names are only assigned lazily,
@@ -373,7 +373,7 @@ class TypeVariable(InferenceType):
         return "TypeVariable(id = {0})".format(self.id)
 
 
-class TypeOperator(InferenceType):
+class TypeOperator(Type):
     """An n-ary type constructor which builds a new type from old"""
 
     def __init__(self, name, *types):

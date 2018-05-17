@@ -1,4 +1,9 @@
-from .exceptions import InferenceError, SymbolNotFoundError
+from typing import Dict
+from . import expr
+from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError, InferenceError
+from typing import Union
+
+TypeOrVar = Union['TypeVariable', 'Type']
 
 
 class AST:
@@ -9,85 +14,6 @@ class AST:
 
     def analyse_internal(self, env, non_generic):
         pass
-
-
-class Lambda(AST):
-    def __init__(self, v, body):
-        self.arg = v
-        self.body = body
-
-    def analyse_internal(self, env, non_generic):
-        arg_type = TypeVariable()
-        new_env = env.copy()
-        new_env[self.arg] = arg_type
-        new_non_generic = non_generic.copy()
-        new_non_generic.add(arg_type)
-        result_type = self.body.analyse_internal(new_env, new_non_generic)
-        return Function(arg_type, result_type)
-
-
-class Literal(AST):
-    def __init__(self, value):
-        self.value = value
-
-
-class Number(Literal):
-    def analyse_internal(self, env, non_generic):
-        return Integer
-
-
-class Boolean(Literal):
-    def analyse_internal(self, env, non_generic):
-        return Bool
-
-
-class Identifier(AST):
-    def __init__(self, name):
-        self.name = name
-
-    def analyse_internal(self, env, non_generic):
-        return self.get_type(env, non_generic)
-
-    def get_type(self, env, non_generic):
-        if self.name in env:
-            return self.fresh(env[self.name], non_generic)
-        else:
-            raise SymbolNotFoundError(self.name)
-
-    @classmethod
-    def fresh(cls, t, non_generics):
-        mappings = {}
-
-        def freshrec(tp):
-            def is_generic(v, non_generic):
-                return not v.occurs_in(non_generic)
-
-            p = tp.prune()
-            if isinstance(p, TypeVariable):
-                if is_generic(p, non_generics):
-                    if p not in mappings:
-                        mappings[p] = TypeVariable()
-                    return mappings[p]
-                else:
-                    return p
-            elif isinstance(p, TypeOperator):
-                return TypeOperator(p.name, *[freshrec(x) for x in p.types])
-
-        return freshrec(t)
-
-
-class Apply(AST):
-    def __init__(self, fn, arg):
-        self.fn = fn
-        self.arg = arg
-
-    def analyse_internal(self, env, non_generic):
-        result_type = TypeVariable()
-        Function(
-            self.arg.analyse_internal(env, non_generic),
-            result_type
-        ).unify(self.fn.analyse_internal(env, non_generic))
-        return result_type
 
 
 class Let(AST):
@@ -120,7 +46,7 @@ class Letrec(AST):
         return self.body.analyse_internal(new_env, non_generic)
 
 
-class InferenceType:
+class Type:
     def prune(self):
         pass
 
@@ -142,7 +68,7 @@ class InferenceType:
         assert 0, "Not unified"
 
 
-class TypeVariable(InferenceType):
+class TypeVariable(Type):
     next_variable_id = 0
 
     def __init__(self):
@@ -182,7 +108,7 @@ class TypeVariable(InferenceType):
         return "TypeVariable(id = {0})".format(self.id)
 
 
-class TypeOperator(InferenceType):
+class TypeOperator(Type):
     def __init__(self, name, *types):
         self.name = name
         self.types = types
@@ -216,6 +142,38 @@ class Function(TypeOperator):
         super(Function, self).__init__("->", from_type, to_type)
 
 
-Integer = TypeOperator("int")
+class TypeEnvironment:
+    def extend(self, dictionary: Dict['expr.Symbol', Type]=None) -> 'TypeEnvironment':
+        if dictionary is None:
+            dictionary = {}
+        return TypeFrame(self, dictionary)
 
-Bool = TypeOperator("bool")
+    def __getitem__(self, symbol: 'expr.Symbol'):
+        raise SymbolNotFoundError(symbol)
+
+    def __contains__(self, symbol: 'expr.Symbol') -> bool:
+        return False
+
+    def __setitem__(self, symbol: 'expr.Symbol', typevar: Type):
+        pass
+
+
+class TypeFrame(TypeEnvironment):
+    def __init__(self, parent: TypeEnvironment, dictionary: Dict['expr.Symbol', Type]):
+        self._parent = parent
+        self._dictionary = dictionary
+
+    def __getitem__(self, symbol: 'expr.Symbol') -> Type:
+        if symbol in self._dictionary:
+            return self._dictionary[symbol]
+        else:
+            return self._parent[symbol]
+
+    def __contains__(self, symbol: 'expr.Symbol'):
+        return symbol in self._dictionary or symbol in self._parent
+
+    def __setitem__(self, symbol: 'expr.Symbol', typevar: Type):
+        if symbol in self._dictionary:
+            raise SymbolAlreadyDefinedError(symbol)
+        else:
+            self._dictionary[symbol] = typevar

@@ -18,9 +18,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from . import environment
-from .exceptions import NonBooleanExpressionError
+from .exceptions import NonBooleanExpressionError, InternalError
 from .singleton import Singleton, FlyWeight
 from . import types
+from . import inference
 
 
 class Expr:
@@ -81,6 +82,14 @@ class Expr:
     def is_null(self) -> bool:
         return False
 
+    def analyse(self, env: inference.TypeEnvironment, non_generic=None) -> inference.Type:
+        if non_generic is None:
+            non_generic = set()
+        return self.analyse_internal(env, non_generic)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        return self.type
+
 
 class Constant(Expr):
     def __init__(self, value):
@@ -135,21 +144,21 @@ class Constant(Expr):
 
 
 class Char(Constant):
-    type = 'char'
+    type = inference.TypeOperator('char')
 
     def __str__(self) -> str:
         return str(self._value)
 
 
 class String(Constant):
-    type = 'string'
+    type = inference.TypeOperator('string')
 
     def __str__(self) -> str:
         return str(self._value)
 
 
 class Number(Constant):
-    type = 'int'
+    type = inference.TypeOperator("int")
 
     def __str__(self) -> str:
         return str(self._value)
@@ -171,7 +180,7 @@ class Number(Constant):
 
 
 class Boolean(Constant):
-    type = 'bool'
+    type = inference.TypeOperator("bool")
 
     def __and__(self, other: 'Boolean') -> 'Boolean':
         pass
@@ -306,10 +315,35 @@ class Symbol(Expr, metaclass=FlyWeight):
 
     __repr__ = __str__
 
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        return self.get_type(env, non_generic)
+
+    def get_type(self, env: inference.TypeEnvironment, non_generic: set):
+        return self.fresh(env[self], non_generic)
+
+    @classmethod
+    def fresh(cls, t, non_generics):
+        mappings = {}
+
+        def freshrec(tp):
+            def is_generic(v, non_generic):
+                return not v.occurs_in(non_generic)
+
+            p = tp.prune()
+            if isinstance(p, inference.TypeVariable):
+                if is_generic(p, non_generics):
+                    if p not in mappings:
+                        mappings[p] = inference.TypeVariable()
+                    return mappings[p]
+                else:
+                    return p
+            elif isinstance(p, inference.TypeOperator):
+                return inference.TypeOperator(p.name, *[freshrec(x) for x in p.types])
+
+        return freshrec(t)
+
 
 class List(Expr):
-    type = 'list(#t)'
-
     @classmethod
     def list(cls, args, index=0) -> 'List':
         if index == len(args):
@@ -354,7 +388,6 @@ class List(Expr):
 
 
 class Pair(List):
-    type = 'list(#t)'
 
     def __init__(self, car: Expr, cdr: List):
         self._car = car
@@ -411,9 +444,15 @@ class Pair(List):
             raise KeyError
         return val.car()
 
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        self_type = inference.TypeOperator('list', self._car.analyse_internal(env, non_generic))
+        rest_type = self.cdr().analyse_internal(env, non_generic)
+        self_type.unify(rest_type)
+        return self_type
+
 
 class Null(List, metaclass=Singleton):
-    type = 'list(#t)'
+    type = property(lambda self: inference.TypeOperator('list', inference.TypeVariable()))
 
     def is_null(self) -> bool:
         return True
@@ -465,8 +504,6 @@ class ListIterator:
 
 
 class Conditional(Expr):
-    type = 'bool -> #t -> #t -> #t'
-
     def __init__(self, test: Expr, consequent: Expr, alternative: Expr):
         self._test = test
         self._consequent = consequent
@@ -479,6 +516,14 @@ class Conditional(Expr):
             else:
                 return lambda: self._alternative.eval(env, ret, amb)
         return self._test.eval(env, test_continuation, amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        boolean_type = Boolean.type
+        test_type = self._test.analyse_internal(env, non_generic)
+        boolean_type.unify(test_type)
+        consequent_type = self._consequent.analyse_internal(env, non_generic)
+        consequent_type.unify(self._alternative.analyse_internal(env, non_generic))
+        return consequent_type
 
     def __str__(self) -> str:
         return "if (" + str(self._test) + \
@@ -495,6 +540,22 @@ class Lambda(Expr):
 
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Closure(self._args, self._body, env), amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
+        new_env = env.extend()
+        new_non_generic = non_generic.copy()
+
+        def analyse_recursive(args: List) -> inference.Type:
+            if type(args) is Null:
+                return self._body.analyse_internal(new_env, new_non_generic)
+            else:
+                arg_type = inference.TypeVariable()
+                new_env[args.car()] = arg_type
+                new_non_generic.add(arg_type)
+                result_type = analyse_recursive(args.cdr())
+                return inference.Function(arg_type, result_type)
+
+        return analyse_recursive(self._args)
 
     def __str__(self) -> str:
         return "Lambda " + str(self._args) + ": { " + str(self._body) + " }"
@@ -514,6 +575,23 @@ class Application(Expr):
 
         return self._operation.eval(env, evaluated_op_continuation, amb)
 
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        result_type = inference.TypeVariable()
+
+        def analyse_recursive(operands: List) -> inference.Type:
+            if type(operands) is Null:
+                return result_type
+            else:
+                return inference.Function(
+                    operands.car().analyse_internal(env, non_generic),
+                    analyse_recursive(operands.cdr())
+                )
+
+        analyse_recursive(self._operands).unify(
+            self._operation.analyse_internal(env, non_generic)
+        )
+        return result_type
+
     def __str__(self) -> str:
         return str(self._operation) + str(self._operands)
 
@@ -526,6 +604,9 @@ class Sequence(Expr):
         def take_last_continuation(expr: List, amb: 'types.Amb') -> 'types.Promise':
             return lambda: ret(expr.last(), amb)
         return self._exprs.eval(env, take_last_continuation, amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        pass
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('', ' ; ', '')

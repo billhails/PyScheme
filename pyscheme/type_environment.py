@@ -19,35 +19,13 @@ from typing import Dict
 from . import expr
 from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError, PySchemeTypeError
 from typing import Union
+from . import inference
 
 TypeOrVar = Union['TypeVariable', 'Type']
 
-
-class Type:
-    def unify(self, other: TypeOrVar):
-        if type(other) is Type:
-            self.match(other)
-        else:
-            other.unify(self)
-
-    def match(self, other: 'Type'):  # deep comparison with unification
-        pass
-
-
-class TypeVariable:
-    def __init__(self, value: TypeOrVar=None):
-        self._value = value
-
-    def unify(self, other: TypeOrVar):
-        if self._value is None:
-            self._value = other
-        else:
-            self._value.unify(other)
-
-
 class TypeEnvironment:
 
-    def extend(self, dictionary: Dict['expr.Symbol', TypeVariable]):
+    def extend(self, dictionary: Dict['expr.Symbol', inference.Type]):
         return TypeFrame(self, dictionary)
 
     def lookup(self, symbol: 'expr.Symbol'):
@@ -55,19 +33,18 @@ class TypeEnvironment:
 
 
 class TypeFrame(TypeEnvironment):
-    def __init__(self, parent: TypeEnvironment, dictionary: Dict['expr.Symbol', TypeVariable]):
+    def __init__(self, parent: TypeEnvironment, dictionary: Dict['expr.Symbol', inference.Type]):
         self._parent = parent
         self._dictionary = dictionary
 
-    def lookup(self, symbol: 'expr.Symbol') -> TypeVariable:
+    def lookup(self, symbol: 'expr.Symbol') -> inference.Type:
         if symbol in self._dictionary:
             return self._dictionary[symbol]
         else:
             return self._parent.lookup(symbol)
 
-    def define(self, symbol: 'expr.Symbol', typevar: TypeVariable):
+    def define(self, symbol: 'expr.Symbol', typevar: inference.Type):
         if symbol in self._dictionary:
             raise SymbolAlreadyDefinedError(symbol)
         else:
             self._dictionary[symbol] = typevar
-
