@@ -33,34 +33,37 @@ class Repl:
         self.env = environment.Environment().extend(
             { expr.Symbol(k): v for k, v in
                 {
-                    "+": expr.Addition(),
-                    "-": expr.Subtraction(),
-                    "*": expr.Multiplication(),
-                    "/": expr.Division(),
-                    "%": expr.Modulus(),
-                    "==": expr.Equality(),
-                    "<": expr.LT(),
-                    ">": expr.GT(),
-                    "<=": expr.LE(),
-                    ">=": expr.GE(),
-                    "!=": expr.NE(),
-                    "and": expr.And(),
-                    "or": expr.Or(),
-                    "not": expr.Not(),
-                    "xor": expr.Xor(),
-                    "@": expr.Cons(),
-                    "@@": expr.Append(),
-                    "back": expr.Back(),
-                    "then": expr.Then(),
-                    "head": expr.Head(),
-                    "tail": expr.Tail(),
-                    "define": expr.Define(),
-                    "length": expr.Length(),
-                    "print": expr.Print(self.output),
-                    "here": expr.CallCC(),
-                    ".": expr.EvaluateInEnv(),
-                    "exit": expr.Exit(),
-                    "error": expr.Error(lambda val, amb: lambda: self.repl(lambda: None))
+                    "+": expr.Addition(),             # int -> int -> int
+                    "-": expr.Subtraction(),          # int -> int -> int
+                    "*": expr.Multiplication(),       # int -> int -> int
+                    "/": expr.Division(),             # int -> int -> int
+                    "%": expr.Modulus(),              # int -> int -> int
+                    "==": expr.Equality(),            # a -> a -> bool
+                    "<": expr.LT(),                   # a -> a -> bool
+                    ">": expr.GT(),                   # a -> a -> bool
+                    "<=": expr.LE(),                  # a -> a -> bool
+                    ">=": expr.GE(),                  # a -> a -> bool
+                    "!=": expr.NE(),                  # a -> a -> bool
+                    "and": expr.And(),                # bool -> bool -> bool
+                    "or": expr.Or(),                  # bool -> bool -> bool
+                    "not": expr.Not(),                # bool -> bool
+                    "xor": expr.Xor(),                # bool -> bool -> bool
+                    "@": expr.Cons(),                 # a -> list(a) -> list(a)
+                    "@@": expr.Append(),              # list(a) -> list(a) -> list(a)
+                    "back": expr.Back(),              # _
+                    "then": expr.Then(),              # a -> a -> a
+                    "head": expr.Head(),              # list(a) -> a
+                    "tail": expr.Tail(),              # list(a) -> list(a)
+                    "define": expr.Define(),          # a -> a
+                    "length": expr.Length(),          # list(a) -> int
+                    "print": expr.Print(self.output), # a -> a
+                    "here": expr.CallCC(),            # ((a -> _) -> a) -> a ?
+                    ".": expr.EvaluateInEnv(),        # env -> a -> (env |- a) ; the type of a according to env
+                    "exit": expr.Exit(),              # _
+                    "error": expr.Error(
+                        lambda val, amb:
+                        lambda: self.repl(lambda:
+                                          None))      # _
                 }.items()
             }
         )

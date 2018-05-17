@@ -93,55 +93,40 @@ class Constant(Expr):
         return self._value
 
     def __eq__(self, other: Expr) -> bool:
-        if type(other) is Constant:
+        if type(self) == type(other):
             return self._value == other.value()
         else:
             return False
 
     def __gt__(self, other: Expr) -> bool:
-        if type(other) is Constant:
+        if type(self) == type(other):
             return self._value > other.value()
         else:
             return False
 
     def __lt__(self, other: Expr) -> bool:
-        if type(other) is Constant:
+        if type(self) == type(other):
             return self._value < other.value()
         else:
             return False
 
     def __ge__(self, other: Expr) -> bool:
-        if type(other) is Constant:
+        if type(self) == type(other):
             return self._value >= other.value()
         else:
             return False
 
     def __le__(self, other: Expr) -> bool:
-        if type(other) is Constant:
+        if type(self) == type(other):
             return self._value <= other.value()
         else:
             return False
 
     def __ne__(self, other: Expr) -> bool:
-        if type(other) is Constant:
+        if type(self) == type(other):
             return self._value != other.value()
         else:
             return False
-
-    def __add__(self, other: Expr):
-        return Constant(self._value + other.value())
-
-    def __sub__(self, other: Expr):
-        return Constant(self._value - other.value())
-
-    def __mul__(self, other: Expr):
-        return Constant(self._value * other.value())
-
-    def __floordiv__(self, other: Expr):
-        return Constant(self._value // other.value())
-
-    def __mod__(self, other: Expr):
-        return Constant(self._value % other.value())
 
     def __str__(self) -> str:
         return str(self._value)
@@ -149,7 +134,44 @@ class Constant(Expr):
     __repr__ = __str__
 
 
+class Char(Constant):
+    type = 'char'
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+
+class String(Constant):
+    type = 'string'
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+
+class Number(Constant):
+    type = 'int'
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def __add__(self, other: Expr):
+        return Number(self._value + other.value())
+
+    def __sub__(self, other: Expr):
+        return Number(self._value - other.value())
+
+    def __mul__(self, other: Expr):
+        return Number(self._value * other.value())
+
+    def __floordiv__(self, other: Expr):
+        return Number(self._value // other.value())
+
+    def __mod__(self, other: Expr):
+        return Number(self._value % other.value())
+
+
 class Boolean(Constant):
+    type = 'bool'
 
     def __and__(self, other: 'Boolean') -> 'Boolean':
         pass
@@ -196,7 +218,7 @@ class T(Boolean, metaclass=Singleton):
         if self == other:
             return self
         else:
-            return other
+            return F()
 
     def is_true(self) -> bool:
         return True
@@ -223,8 +245,6 @@ class F(Boolean, metaclass=Singleton):
     def eq(self, other: Boolean) -> Boolean:
         if self == other:
             return T()
-        elif other == U():
-            return other
         else:
             return self
 
@@ -254,7 +274,10 @@ class U(Boolean, metaclass=Singleton):
         return self
 
     def eq(self, other: Boolean) -> Boolean:
-        return self
+        if self == other:
+            return T()
+        else:
+            return F()
 
     def __str__(self) -> str:
         return "unknown"
@@ -285,6 +308,8 @@ class Symbol(Expr, metaclass=FlyWeight):
 
 
 class List(Expr):
+    type = 'list(#t)'
+
     @classmethod
     def list(cls, args, index=0) -> 'List':
         if index == len(args):
@@ -329,6 +354,8 @@ class List(Expr):
 
 
 class Pair(List):
+    type = 'list(#t)'
+
     def __init__(self, car: Expr, cdr: List):
         self._car = car
         self._cdr = cdr
@@ -386,6 +413,8 @@ class Pair(List):
 
 
 class Null(List, metaclass=Singleton):
+    type = 'list(#t)'
+
     def is_null(self) -> bool:
         return True
 
@@ -435,15 +464,9 @@ class ListIterator:
             return val
 
 
-class Char(Expr, metaclass=FlyWeight):
-    def __init__(self, value: str):
-        self._value = value
-
-    def __str__(self) -> str:
-        return "'" + str(self._value) + "'"
-
-
 class Conditional(Expr):
+    type = 'bool -> #t -> #t -> #t'
+
     def __init__(self, test: Expr, consequent: Expr, alternative: Expr):
         self._test = test
         self._consequent = consequent
@@ -597,61 +620,85 @@ class Closure(Primitive):
 
 
 class Addition(Primitive, metaclass=Singleton):
+    type = 'int -> int -> int'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
         return lambda: ret(args[0] + args[1], amb)
 
 
 class Subtraction(Primitive, metaclass=Singleton):
+    type = 'int -> int -> int'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] - args[1], amb)
 
 
 class Multiplication(Primitive, metaclass=Singleton):
+    type = 'int -> int -> int'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] * args[1], amb)
 
 
 class Division(Primitive, metaclass=Singleton):
+    type = 'int -> int -> int'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] // args[1], amb)
 
 
 class Modulus(Primitive, metaclass=Singleton):
+    type = 'int -> int -> int'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] % args[1], amb)
 
 
 class Equality(Primitive, metaclass=Singleton):
+    type = '#t -> #t -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].eq(args[1]), amb)
 
 
 class GT(Primitive, metaclass=Singleton):
+    type = '#t -> #t -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].gt(args[1]), amb)
 
 
 class LT(Primitive, metaclass=Singleton):
+    type = '#t -> #t -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].lt(args[1]), amb)
 
 
 class GE(Primitive, metaclass=Singleton):
+    type = '#t -> #t -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].ge(args[1]), amb)
 
 
 class LE(Primitive, metaclass=Singleton):
+    type = '#t -> #t -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].le(args[1]), amb)
 
 
 class NE(Primitive, metaclass=Singleton):
+    type = '#t -> #t -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].ne(args[1]), amb)
 
 
 class And(SpecialForm, metaclass=Singleton):
+    type = 'bool -> bool -> bool'
+
     def apply(self, args: List,
               env: 'environment.Environment',
               ret: 'types.Continuation',
@@ -675,6 +722,8 @@ class And(SpecialForm, metaclass=Singleton):
 
 
 class Or(SpecialForm, metaclass=Singleton):
+    type = 'bool -> bool -> bool'
+
     def apply(self, args: List,
               env: 'environment.Environment',
               ret: 'types.Continuation',
@@ -698,6 +747,8 @@ class Or(SpecialForm, metaclass=Singleton):
 
 
 class Then(SpecialForm, metaclass=Singleton):
+    type = '#t -> #t -> #t'
+
     def apply(self, args: List,
               env: 'environment.Environment',
               ret: 'types.Continuation',
@@ -710,6 +761,8 @@ class Then(SpecialForm, metaclass=Singleton):
 
 
 class Back(SpecialForm, metaclass=Singleton):
+    type = '#t'
+
     def apply(self, args: List,
               env: 'environment.Environment',
               ret: 'types.Continuation',
@@ -718,31 +771,43 @@ class Back(SpecialForm, metaclass=Singleton):
 
 
 class Not(Primitive, metaclass=Singleton):
+    type = 'bool -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(~(args[0]), amb)
 
 
 class Xor(Primitive, metaclass=Singleton):
+    type = 'bool -> bool -> bool'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] ^ args[1], amb)
 
 
 class Cons(Primitive, metaclass=Singleton):
+    type = '#t -> list(#t) -> list(#t)'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Pair(args[0], args[1]), amb)
 
 
 class Append(Primitive, metaclass=Singleton):
+    type = 'list(#t) -> list(#t) -> list(#t)'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].append(args[1]), amb)
 
 
 class Head(Primitive, metaclass=Singleton):
+    type = 'list(#t) -> #t'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].car(), amb)
 
 
 class Tail(Primitive, metaclass=Singleton):
+    type = 'list(#t) -> list(#t)'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].cdr(), amb)
 
@@ -765,11 +830,14 @@ class Define(SpecialForm, metaclass=Singleton):
 
 
 class Length(Primitive, metaclass=Singleton):
+    type = 'list(#t) -> int'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return lambda: ret(Constant(len(args[0])), amb)
+        return lambda: ret(Number(len(args[0])), amb)
 
 
 class Print(Primitive):
+    type = '#t -> #t'
     def __init__(self, output):
         self._output = output
 
@@ -781,6 +849,8 @@ class Print(Primitive):
 
 
 class Cont(Primitive):
+    type = '#t'
+
     def __init__(self, ret: callable):
         self._ret = ret
 
@@ -792,6 +862,8 @@ class Cont(Primitive):
 
 
 class CallCC(SpecialForm, metaclass=Singleton):
+    type = '(#t -> #u) -> #u'
+
     def apply(self,
               args: List,
               env: 'environment.Environment',
@@ -805,11 +877,15 @@ class CallCC(SpecialForm, metaclass=Singleton):
 
 
 class Exit(Primitive):
+    type = '#t'
+
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return None
 
 
 class Error(SpecialForm):
+    type = '#t'
+
     def __init__(self, cont):
         self.cont = cont
 

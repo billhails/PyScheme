@@ -24,7 +24,9 @@ import io
 
 
 class Token:
-    def __init__(self, token_type, token_value=''):
+    def __init__(self, line: int, char: int, token_type, token_value=''):
+        self.line = line
+        self.char = char
         self.type = token_type
         self.value = token_value
 
@@ -78,10 +80,11 @@ class Tokeniser:
     def __init__(self, stream: io.StringIO):
         self._stream = stream
         self._line_number = 0
+        self._character_position = 0
         self._tokens = []
         self._line = ''
 
-    def swallow(self, name: str) -> Maybe[Token]:
+    def match(self, name: str) -> Maybe[Token]:
         token = self.next_token()
         if token.type == name:
             return token
@@ -107,29 +110,39 @@ class Tokeniser:
             while self._line == '':
                 self._line = self._stream.readline()
                 if self._line == '':  # EOF
-                    return Token('EOF', 'EOF')
+                    return self.new_token('EOF', 'EOF')
                 self._line_number += 1
-                self._line = self._line.strip()
-                self._line = re.sub(r'^//.*', '', self._line, 1)
+                self._character_position = 0
+
+                self._line = self._line.rstrip()
+                self._line = re.sub(r'^\s*//.*', '', self._line, 1)
+            length = len(self._line)
+            self._line = self._line.lstrip()
+            self._character_position += length - len(self._line)
             for rex in self.regexes.keys():
+                length = len(self._line)
                 match = re.match(rex, self._line)
                 if match:
                     self._line = re.sub(rex, '', self._line, 1).strip()
+                    self._character_position += length - len(self._line)
                     self._line = re.sub(r'^//.*', '', self._line, 1)
                     text = match.group(1)
                     if self.regexes[rex] == 'ID':
                         if text in self.reserved:
-                            return Token(self.reserved[text], text)
+                            return self.new_token(self.reserved[text], text)
                         else:
-                            return Token('ID', text)
+                            return self.new_token('ID', text)
                     else:
-                        return Token(self.regexes[rex], text)
+                        return self.new_token(self.regexes[rex], text)
             for literal in self.literals:
                 if self._line.startswith(literal):
                     self._line = self._line[len(literal):].lstrip()
                     self._line = re.sub(r'^//.*', '', self._line, 1)
-                    return Token(literal, literal)
-            return Token('ERROR', self._line)
+                    return self.new_token(literal, literal)
+            return self.new_token('ERROR', self._line)
+
+    def new_token(self, name, value=''):
+        return Token(self._line_number, self._character_position, name, value)
 
     def __str__(self) -> str:
         return "<tokens: " + str(self._tokens) + ' remaining: "' + self._line + '">'
@@ -548,7 +561,7 @@ class Reader:
         self.debug("number", fail=fail)
         number = self.swallow('NUMBER')
         if number:
-            return expr.Constant(int(number.value))
+            return expr.Number(int(number.value))
         elif fail:
             self.error("expected number")
         else:
@@ -561,7 +574,7 @@ class Reader:
         self.debug("string", fail=fail)
         string = self.swallow('STRING')
         if string:
-            return expr.Constant(string.value)
+            return expr.String(string.value)
         elif fail:
             self.error("expected string")
         else:
@@ -684,12 +697,10 @@ class Reader:
         """
         if the next token in the input matches one of the argument types, consume it and return the token
         otherwise leave it in the input stream and return None
-        :param args: array
-        :return: bool
         """
         self.debug("swallow", args=args, caller=inspect.stack()[1][3])
         for token_type in args:
-            token = self.tokeniser.swallow(token_type)
+            token = self.tokeniser.match(token_type)
             if token is not None:
                 return token
         return None
@@ -702,14 +713,13 @@ class Reader:
         """
         self.debug("consume", args=args, caller=inspect.stack()[1][3])
         for name in args:
-            if self.tokeniser.swallow(name) is None:
+            if self.tokeniser.match(name) is None:
                 self.error("expected " + name)
 
     def pushback(self, token: Token):
         self.tokeniser.pushback(token)
 
     def error(self, msg):
-        self.stderr.write(msg + "\n")
         raise PySchemeSyntaxError(
             msg,
             line=self.tokeniser.line_number(),
