@@ -67,12 +67,12 @@ class TestEnv(Base):
             '10',
             '''
             env a {
+                fn bar() { 10 }
                 env b {
                     fn foo() {
                         bar()
                     }
                 }
-                fn bar() { 10 }
             }
             
             a.b.foo();

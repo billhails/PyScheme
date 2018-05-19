@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from . import environment
-from .exceptions import NonBooleanExpressionError, InternalError
+from .exceptions import NonBooleanExpressionError, PySchemeInternalError
 from .singleton import Singleton, FlyWeight
 from . import types
 from . import inference
@@ -316,28 +316,10 @@ class Symbol(Expr, metaclass=FlyWeight):
         return self.get_type(env, non_generic)
 
     def get_type(self, env: inference.TypeEnvironment, non_generic: set):
-        return self.fresh(env[self], non_generic)
-
-    @classmethod
-    def fresh(cls, t, non_generics):
-        mappings = {}
-
-        def freshrec(tp):
-            def is_generic(v, non_generic):
-                return not v.occurs_in(non_generic)
-
-            p = tp.prune()
-            if isinstance(p, inference.TypeVariable):
-                if is_generic(p, non_generics):
-                    if p not in mappings:
-                        mappings[p] = inference.TypeVariable()
-                    return mappings[p]
-                else:
-                    return p
-            elif isinstance(p, inference.TypeOperator):
-                return inference.TypeOperator(p.name, *[freshrec(x) for x in p.types])
-
-        return freshrec(t)
+        if self in env:
+            return env[self].fresh(non_generic)
+        else:
+            return env.note_missing(self)
 
 
 class List(Expr):
@@ -651,6 +633,8 @@ class EnvironmentWrapper(Expr):
     def env(self):
         return self._env
 
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        return inference.EnvironmentType()
 
 class Env(Expr):
     """Implements the 'env' construct
@@ -710,7 +694,7 @@ class EnvContext(Expr):
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         lhs = self._env.analyse_internal(env, non_generic)
         lhs.unify(inference.EnvironmentType())
-        return self._expr.analyse_internal(lhs.env(), non_generic)
+        return self._expr.analyse_internal(lhs.prune().env(), non_generic)
 
 
 class Op(Expr):

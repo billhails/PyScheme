@@ -88,7 +88,7 @@ class Repl:
         try:
             result.analyse(self.type_env)
         except PySchemeError as e:
-            self.error.write(' '.join(e.args))
+            self.error.write(str(e))
             return None
         return lambda: ret(result, amb)
 

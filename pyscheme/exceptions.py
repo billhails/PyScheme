@@ -28,15 +28,18 @@ class SymbolError(PySchemeError):
 
 
 class SymbolNotFoundError(SymbolError):
-    pass
+    def __str__(self):
+        return 'SymbolNotFoundError: ' + str(self._symbol)
 
 
 class SymbolAlreadyDefinedError(SymbolError):
-    pass
+    def __str__(self):
+        return 'SymbolAlreadyDefinedError: ' + str(self._symbol)
 
 
 class NonBooleanExpressionError(PySchemeError):
-    pass
+    def __str__(self):
+        return 'NonBooleanExpressionError'
 
 
 class PySchemeSyntaxError(Exception):
@@ -56,22 +59,25 @@ class PySchemeTypeError(PySchemeError):
         self.type1 = type1
         self.type2 = type2
 
+    def __str__(self):
+        return 'PySchemeTypeError: ' + str(self.type1) + " != " + str(self.type2)
 
-class InferenceError(PySchemeError):
+
+class PySchemeInferenceError(PySchemeError):
     def __init__(self, message):
         self.__message = message
 
     message = property(lambda self: self.__message)
 
     def __str__(self):
-        return str(self.message)
+        return 'PySchemeInferenceError: ' + str(self.message)
 
 
-class InternalError(PySchemeError):
+class PySchemeInternalError(PySchemeError):
     def __init__(self, message):
         self.__message = message
 
     message = property(lambda self: self.__message)
 
     def __str__(self):
-        return str(self.message)
+        return 'PySchemeInternalError: ' + str(self.message)

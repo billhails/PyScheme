@@ -47,7 +47,7 @@ class TestOperations(Base):
 
     def test_inequality(self):
         self.assertEval("false", "5 == 6;")
-        self.assertError("Type mismatch: bool != int", "5 == unknown;")
+        self.assertError("PySchemeTypeError: bool != int", "5 == unknown;")
 
     def test_list_equality(self):
         self.assertEval("true", "[5, 5] == [5, 5];")
