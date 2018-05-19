@@ -86,18 +86,6 @@ class TestAmb(Base):
                 head(list) then one_of(tail(list))
             }
             
-            fn exclude(items, list) {
-                if (length(list) > 0) {
-                    if (member(head(list), items)) {
-                        exclude(items, tail(list))
-                    } else {
-                        head(list) @ exclude(items, tail(list))
-                    }
-                } else {
-                    []
-                }
-            }
-            
             fn member(item, list) {
                 if (length(list) > 0) {
                     if (item == (head(list))) {
@@ -110,6 +98,18 @@ class TestAmb(Base):
                 }
             }
 
+            fn exclude(items, list) {
+                if (length(list) > 0) {
+                    if (member(head(list), items)) {
+                        exclude(items, tail(list))
+                    } else {
+                        head(list) @ exclude(items, tail(list))
+                    }
+                } else {
+                    []
+                }
+            }
+            
             fn some_of(list) {
                 require(length(list) > 0);
                 [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list));

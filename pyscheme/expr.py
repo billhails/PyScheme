@@ -88,7 +88,10 @@ class Expr:
         return self.analyse_internal(env, non_generic)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        return self.type
+        return self.type()
+
+    def static_type(self) -> bool:
+        return False
 
 
 class Constant(Expr):
@@ -101,41 +104,27 @@ class Constant(Expr):
     def value(self):
         return self._value
 
+    def static_type(self) -> bool:
+        return True
+
     def __eq__(self, other: Expr) -> bool:
-        if type(self) == type(other):
-            return self._value == other.value()
-        else:
-            return False
+        return self._value == other.value()
 
     def __gt__(self, other: Expr) -> bool:
-        if type(self) == type(other):
-            return self._value > other.value()
-        else:
-            return False
+        return self._value > other.value()
 
     def __lt__(self, other: Expr) -> bool:
-        if type(self) == type(other):
-            return self._value < other.value()
-        else:
-            return False
+        return self._value < other.value()
+
 
     def __ge__(self, other: Expr) -> bool:
-        if type(self) == type(other):
-            return self._value >= other.value()
-        else:
-            return False
+        return self._value >= other.value()
 
     def __le__(self, other: Expr) -> bool:
-        if type(self) == type(other):
-            return self._value <= other.value()
-        else:
-            return False
+        return self._value <= other.value()
 
     def __ne__(self, other: Expr) -> bool:
-        if type(self) == type(other):
-            return self._value != other.value()
-        else:
-            return False
+        return self._value != other.value()
 
     def __str__(self) -> str:
         return str(self._value)
@@ -144,21 +133,27 @@ class Constant(Expr):
 
 
 class Char(Constant):
-    type = inference.TypeOperator('char')
+    @classmethod
+    def type(self):
+        return inference.TypeOperator('char')
 
     def __str__(self) -> str:
         return str(self._value)
 
 
 class String(Constant):
-    type = inference.TypeOperator('string')
+    @classmethod
+    def type(self):
+        return inference.TypeOperator('string')
 
     def __str__(self) -> str:
         return str(self._value)
 
 
 class Number(Constant):
-    type = inference.TypeOperator("int")
+    @classmethod
+    def type(self):
+        return inference.TypeOperator("int")
 
     def __str__(self) -> str:
         return str(self._value)
@@ -180,7 +175,9 @@ class Number(Constant):
 
 
 class Boolean(Constant):
-    type = inference.TypeOperator("bool")
+    @classmethod
+    def type(self):
+        return inference.TypeOperator("bool")
 
     def __and__(self, other: 'Boolean') -> 'Boolean':
         pass
@@ -391,7 +388,6 @@ class List(Expr):
 
 
 class Pair(List):
-
     def __init__(self, car: Expr, cdr: List):
         self._car = car
         self._cdr = cdr
@@ -458,7 +454,9 @@ class Pair(List):
 
 
 class Null(List, metaclass=Singleton):
-    type = property(lambda self: inference.TypeOperator('list', inference.TypeVariable()))
+    @classmethod
+    def type(self):
+        return inference.TypeOperator('list', inference.TypeVariable())
 
     def is_null(self) -> bool:
         return True
@@ -498,6 +496,9 @@ class Null(List, metaclass=Singleton):
             raise TypeError
         raise KeyError
 
+    def static_type(self) -> bool:
+        return True
+
 
 class ListIterator:
     def __init__(self, lst: List):
@@ -527,7 +528,7 @@ class Conditional(Expr):
         return self._test.eval(env, test_continuation, amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        boolean_type = Boolean.type
+        boolean_type = Boolean.type()
         test_type = self._test.analyse_internal(env, non_generic)
         boolean_type.unify(test_type)
         consequent_type = self._consequent.analyse_internal(env, non_generic)
@@ -619,7 +620,7 @@ class Sequence(Expr):
             types = self._exprs.map(lambda expr: expr.analyse_internal(env, non_generic))
             return types.last()
         else:
-            return Null.type
+            return Null.type()
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('', ' ; ', '')
@@ -761,10 +762,15 @@ class Closure(Primitive):
 
 
 class BinaryArithmetic(Primitive):
-    type = inference.Function(
-        Number.type,
-        inference.Function(Number.type, Number.type)
-    )
+    @classmethod
+    def type(self):
+        return inference.Function(
+            Number.type(),
+            inference.Function(Number.type(), Number.type())
+        )
+
+    def static_type(self) -> bool:
+        return True
 
 
 class Addition(BinaryArithmetic, metaclass=Singleton):
@@ -793,13 +799,16 @@ class Modulus(BinaryArithmetic, metaclass=Singleton):
 
 
 class BinaryComparison(Primitive):
-    @property
+    @classmethod
     def type(self):
         typeVar = inference.TypeVariable()
         return inference.Function(
             typeVar,
-            inference.Function(typeVar, Boolean.type)
+            inference.Function(typeVar, Boolean.type())
         )
+
+    def static_type(self) -> bool:
+        return True
 
 
 class Equality(BinaryComparison, metaclass=Singleton):
@@ -833,14 +842,18 @@ class NE(BinaryComparison, metaclass=Singleton):
 
 
 class BinaryLogic(SpecialForm):
-    type = inference.Function(
-        Boolean.type,
-        inference.Function(Boolean.type, Boolean.type)
-    )
+    @classmethod
+    def type(self):
+        return inference.Function(
+            Boolean.type(),
+            inference.Function(Boolean.type(), Boolean.type())
+        )
+
+    def static_type(self) -> bool:
+        return True
 
 
 class And(BinaryLogic, metaclass=Singleton):
-    type = 'bool -> bool -> bool'
 
     def apply(self, args: List,
               env: 'environment.Environment',
@@ -865,7 +878,6 @@ class And(BinaryLogic, metaclass=Singleton):
 
 
 class Or(BinaryLogic, metaclass=Singleton):
-    type = 'bool -> bool -> bool'
 
     def apply(self, args: List,
               env: 'environment.Environment',
@@ -890,14 +902,31 @@ class Or(BinaryLogic, metaclass=Singleton):
 
 
 class Xor(Primitive, metaclass=Singleton):
-    type = BinaryLogic.type
+    @classmethod
+    def type(self):
+        return BinaryLogic.type()
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] ^ args[1], amb)
 
+    def static_type(self):
+        return True
+
+
+class Not(Primitive, metaclass=Singleton):
+    @classmethod
+    def type(self):
+        return inference.Function(Boolean.type(), Boolean.type())
+
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        return lambda: ret(~(args[0]), amb)
+
+    def static_type(self) -> bool:
+        return True
+
 
 class Then(SpecialForm, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         typevar = inference.TypeVariable()
         return inference.Function(
@@ -915,9 +944,14 @@ class Then(SpecialForm, metaclass=Singleton):
 
         return lambda: args[0].eval(env, ret, amb2)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Back(SpecialForm, metaclass=Singleton):
-    type = property(lambda self: inference.TypeVariable())
+    @classmethod
+    def type(self):
+        return inference.TypeVariable()
 
     def apply(self, args: List,
               env: 'environment.Environment',
@@ -925,16 +959,12 @@ class Back(SpecialForm, metaclass=Singleton):
               amb: 'types.Amb') -> 'types.Promise':
         return lambda: amb()
 
-
-class Not(Primitive, metaclass=Singleton):
-    type = inference.Function(Boolean.type, Boolean.type)
-
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return lambda: ret(~(args[0]), amb)
+    def static_type(self) -> bool:
+        return True
 
 
 class Cons(Primitive, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         '#t -> list(#t) -> list(#t)'
         t = inference.TypeVariable()
@@ -944,20 +974,26 @@ class Cons(Primitive, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Pair(args[0], args[1]), amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Append(Primitive, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         'list(#t) -> list(#t) -> list(#t)'
-        list_t = Null.type
+        list_t = Null.type()
         return inference.Function(list_t, inference.Function(list_t, list_t))
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].append(args[1]), amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Head(Primitive, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         'list(#t) -> #t'
         t = inference.TypeVariable()
@@ -967,35 +1003,44 @@ class Head(Primitive, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].car(), amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Tail(Primitive, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         'list(#t) -> list(#t)'
-        list_t = Null.type
+        list_t = Null.type()
         return inference.Function(list_t, list_t)
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].cdr(), amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Length(Primitive, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         'list(#t) -> int'
-        return inference.Function(Null.type, Number.type)
+        return inference.Function(Null.type(), Number.type())
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Number(len(args[0])), amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Print(Primitive):
-    @property
+    @classmethod
     def type(self):
-        'list(string) -> list(string)'
+        'string -> string'
         return inference.Function(
-            inference.TypeOperator('list', String.type),
-            inference.TypeOperator('list', String.type)
+            String.type(),
+            String.type()
         )
 
     def __init__(self, output):
@@ -1007,9 +1052,12 @@ class Print(Primitive):
         self._output.write("\n")
         return lambda: ret(args, amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Cont(Primitive):
-    @property
+    @classmethod
     def type(self):
         '#t'
         return inference.TypeVariable()
@@ -1023,9 +1071,12 @@ class Cont(Primitive):
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(self, amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class CallCC(SpecialForm, metaclass=Singleton):
-    @property
+    @classmethod
     def type(self):
         '(#t -> #u) -> #u'
         t = inference.TypeVariable()
@@ -1046,9 +1097,12 @@ class CallCC(SpecialForm, metaclass=Singleton):
 
         return args[0].eval(env, do_apply, amb)
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Exit(Primitive):
-    @property
+    @classmethod
     def type(self):
         '#t'
         return inference.TypeVariable()
@@ -1056,9 +1110,12 @@ class Exit(Primitive):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return None
 
+    def static_type(self) -> bool:
+        return True
+
 
 class Error(SpecialForm):
-    @property
+    @classmethod
     def type(self):
         '#t'
         return inference.TypeVariable()
@@ -1076,3 +1133,6 @@ class Error(SpecialForm):
             return lambda: printer.apply(args, env, self.cont, amb)
 
         return env.lookup(Symbol("print"), print_continuation, amb)
+
+    def static_type(self) -> bool:
+        return True

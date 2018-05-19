@@ -24,16 +24,16 @@ import pyscheme.expr as expr
 from io import StringIO
 import pyscheme.reader as reader
 from .inference import TypeEnvironment
+from .exceptions import PySchemeError
 
 class Repl:
     def __init__(self, input: StringIO, output: StringIO, error: StringIO):
         self.input = input
         self.output = output
+        self.error = error
         self.tokeniser = reader.Tokeniser(input)
         self.reader = reader.Reader(self.tokeniser, error)
-        self.env = environment.Environment().extend(
-            { expr.Symbol(k): v for k, v in
-                {
+        operators = {
                     "+": expr.Addition(),             # int -> int -> int
                     "-": expr.Subtraction(),          # int -> int -> int
                     "*": expr.Multiplication(),       # int -> int -> int
@@ -63,11 +63,16 @@ class Repl:
                         lambda val, amb:
                         lambda: self.repl(lambda:
                                           None))      # _
-                }.items()
-            }
+                }
+        self.env = environment.Environment().extend(
+            { expr.Symbol(k): v for k, v in operators.items() }
         )
 
         self.type_env = TypeEnvironment().extend()
+
+        for k, v in operators.items():
+            if v.static_type():
+                self.type_env[expr.Symbol(k)] = v.type()
 
     def trampoline(self, threads: List['types.Promise']):
         while len(threads) > 0:
@@ -78,9 +83,13 @@ class Repl:
 
     def read(self, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         result = self.reader.read()
-        result.analyse(self.type_env)
         if result is None:
             return None  # stop the trampoline
+        try:
+            result.analyse(self.type_env)
+        except PySchemeError as e:
+            self.error.write(' '.join(e.args))
+            return None
         return lambda: ret(result, amb)
 
     def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
