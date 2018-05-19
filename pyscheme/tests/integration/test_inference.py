@@ -20,10 +20,80 @@ from pyscheme.tests.integration.base import Base
 
 
 class TestInference(Base):
-    def test_inference(self):
-        self.assertEval(
-            '',
+    def test_inference_1(self):
+        self.assertError(
+            'PySchemeTypeError: bool != int',
             '''
+            1 == true;
             '''
         )
 
+    def test_inference_2(self):
+        self.assertError(
+            'PySchemeTypeError: bool != int',
+            '''
+            fn (x) {
+                x * 2
+            }(true);
+            '''
+        )
+
+    def test_inference_3(self):
+        self.assertEval(
+            "3\n3",
+            '''
+            fn len(l) {
+                if (l == []) {
+                    0
+                } else {
+                    1 + len(tail(l))
+                }
+            }
+            
+            len([1, 2, 3]);
+            
+            len([true, true, false]);
+            '''
+        )
+
+    def test_inference_4(self):
+        self.assertError(
+            "PySchemeTypeError: int != bool",
+            '''
+            [1, 2, false];
+            '''
+        )
+
+    def test_inference_5(self):
+        self.assertError(
+            "PySchemeTypeError: string != int",
+            '''
+            (0 @ []) @@ ("hello" @ []);
+            '''
+        )
+
+    def test_inference_6(self):
+        self.assertError(
+            "PySchemeInferenceError: recursive unification",
+            '''
+            fn (f) { f(f) };
+            '''
+        )
+
+    def test_inference_7(self):
+        self.assertEval(
+            "5",
+            '''
+            fn g (f) { 5 }
+
+            g(g);
+            '''
+        )
+
+    def test_inference_8(self):
+        self.assertEval(
+            "Closure([f]: Lambda [g]: { Lambda [arg]: { g[f[arg]] } })",
+            '''
+            fn (f) { fn (g) { fn (arg) { g(f(arg)) } } };
+            '''
+        )
