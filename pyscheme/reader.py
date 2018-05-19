@@ -296,7 +296,7 @@ class Reader:
             else:
                 formals = self.formals()
                 body = self.body()
-                return self.apply_string('define', symbol, expr.Lambda(formals, body))
+                return expr.Definition(symbol, expr.Lambda(formals, body))
 
         env = self.swallow('ENV')
         if env is not None:
@@ -306,7 +306,7 @@ class Reader:
                 return None
             else:
                 body = self.body()
-                return self.apply_string('define', symbol, expr.Env(body))
+                return expr.Definition(symbol, expr.Env(body))
 
         return self.nest(fail)
 
@@ -371,7 +371,7 @@ class Reader:
             symbol = self.symbol()
             self.consume('=')
             expression = self.expression()
-            return self.apply_string('define', symbol, expression)
+            return expr.Definition(symbol, expression)
         else:
             if fail:
                 self.error("expected 'define'")
@@ -472,7 +472,17 @@ class Reader:
                         | atom
         """
         self.debug("env_access", fail=fail)
-        return self.lassoc_binop(self.atom, ['.'], fail)
+
+        lhs = self.atom(fail)
+        if lhs is None:
+            return None
+        while True:
+            op = self.swallow('.')
+            if op:
+                rhs = self.atom()
+                lhs = expr.EnvContext(lhs, rhs)
+            else:
+                return lhs
 
     def atom(self, fail=True) -> Maybe[expr.Expr]:
         """

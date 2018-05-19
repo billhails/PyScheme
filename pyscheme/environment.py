@@ -38,6 +38,9 @@ class Environment:
     def __str__(self) -> str:
         return '[0]'
 
+    def contents(self):
+        return {}
+
 
 class Frame(Environment):
     def __init__(self, parent: Environment, dictionary: 'types.Maybe[Dict]'):
@@ -70,3 +73,6 @@ class Frame(Environment):
 
     def __str__(self) -> str:
         return '[' + str(self._number) + '] -> ' + str(self._parent)
+
+    def contents(self):
+        return self._dictionary.copy()

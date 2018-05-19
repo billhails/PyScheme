@@ -383,6 +383,9 @@ class List(Expr):
     def last(self: Expr) -> Expr:
         pass
 
+    def map(self, fn: callable) -> 'List':
+        pass
+
     def __iter__(self) -> 'ListIterator':
         return ListIterator(self)
 
@@ -425,6 +428,15 @@ class Pair(List):
     def append(self, other: List) -> List:
         return Pair(self._car, self._cdr.append(other))
 
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        self_type = inference.TypeOperator('list', self._car.analyse_internal(env, non_generic))
+        rest_type = self.cdr().analyse_internal(env, non_generic)
+        self_type.unify(rest_type)
+        return self_type
+
+    def map(self, fn: callable) -> List:
+        return Pair(fn(self._car), self._cdr.map(fn))
+
     def __eq__(self, other: List) -> bool:
         if type(other) is Pair:
             return self._car == other.car() and self._cdr == other.cdr()
@@ -443,12 +455,6 @@ class Pair(List):
         if val.is_null():
             raise KeyError
         return val.car()
-
-    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        self_type = inference.TypeOperator('list', self._car.analyse_internal(env, non_generic))
-        rest_type = self.cdr().analyse_internal(env, non_generic)
-        self_type.unify(rest_type)
-        return self_type
 
 
 class Null(List, metaclass=Singleton):
@@ -469,9 +475,6 @@ class Null(List, metaclass=Singleton):
     def last(self) -> Expr:
         return self
 
-    def __len__(self) -> int:
-        return 0
-
     def qualified_str(self, start: str, sep: str, end: str) -> str:
         return start + end
 
@@ -480,6 +483,12 @@ class Null(List, metaclass=Singleton):
 
     def append(self, other: List) -> List:
         return other
+
+    def map(self, fn: callable) -> List:
+        return self
+
+    def __len__(self) -> int:
+        return 0
 
     def __eq__(self, other: Expr) -> bool:
         return other.is_null()
@@ -606,7 +615,11 @@ class Sequence(Expr):
         return self._exprs.eval(env, take_last_continuation, amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        pass
+        if len(self._exprs) > 0:
+            types = self._exprs.map(lambda expr: expr.analyse_internal(env, non_generic))
+            return types.last()
+        else:
+            return Null.type
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('', ' ; ', '')
@@ -620,6 +633,9 @@ class Nest(Expr):
         """Evaluate the body in an extended environment
         """
         return self._body.eval(env.extend(), ret, amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        return self._body.analyse_internal(env.extend(), non_generic.copy())
 
     def __str__(self):
         return str(self._body)
@@ -650,6 +666,50 @@ class Env(Expr):
             return ret(EnvironmentWrapper(new_env), amb)
 
         return self._body.eval(new_env, eval_continuation, amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        new_env = env.extend()
+        self._body.analyse_internal(new_env, non_generic.copy())
+        return inference.EnvironmentType(new_env)
+
+
+class Definition(Expr):
+    def __init__(self, symbol: Symbol, value: Expr):
+        self._symbol = symbol
+        self._value = value
+
+    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> types.Promise:
+        def define_continuation(value: Expr, amb: 'types.Amb') -> 'types.Promise':
+
+            def ret_none(_: Expr, amb: 'types.Amb') -> 'types.Promise':
+                return lambda: ret(None, amb)
+
+            return lambda: env.define(self._symbol, value, ret_none, amb)
+
+        return lambda: self._value.eval(env, define_continuation, amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        env[self._symbol] = inference.TypeVariable()
+        defn_type = self._value.analyse_internal(env, non_generic)
+        env[self._symbol].unify(defn_type)
+        return env[self._symbol]
+
+
+class EnvContext(Expr):
+    def __init__(self, env: EnvironmentWrapper, expr: Expr):
+        self._env = env
+        self._expr = expr
+
+    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb'):
+        def env_continuation(new_env: EnvironmentWrapper, amb: 'types.Amb') -> 'types.Promise':
+            return lambda: self._expr.eval(new_env.env(), ret, amb)
+
+        return self._env.eval(env, env_continuation, amb)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        lhs = self._env.analyse_internal(env, non_generic)
+        lhs.unify(inference.EnvironmentType())
+        return self._expr.analyse_internal(lhs.env(), non_generic)
 
 
 class Op(Expr):
@@ -700,84 +760,86 @@ class Closure(Primitive):
         return "Closure(" + str(self._args) + ": " + str(self._body) + ")"
 
 
-class Addition(Primitive, metaclass=Singleton):
-    type = 'int -> int -> int'
+class BinaryArithmetic(Primitive):
+    type = inference.Function(
+        Number.type,
+        inference.Function(Number.type, Number.type)
+    )
 
+
+class Addition(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
         return lambda: ret(args[0] + args[1], amb)
 
 
-class Subtraction(Primitive, metaclass=Singleton):
-    type = 'int -> int -> int'
-
+class Subtraction(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] - args[1], amb)
 
 
-class Multiplication(Primitive, metaclass=Singleton):
-    type = 'int -> int -> int'
-
+class Multiplication(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] * args[1], amb)
 
 
-class Division(Primitive, metaclass=Singleton):
-    type = 'int -> int -> int'
-
+class Division(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] // args[1], amb)
 
 
-class Modulus(Primitive, metaclass=Singleton):
-    type = 'int -> int -> int'
-
+class Modulus(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] % args[1], amb)
 
 
-class Equality(Primitive, metaclass=Singleton):
-    type = '#t -> #t -> bool'
+class BinaryComparison(Primitive):
+    @property
+    def type(self):
+        typeVar = inference.TypeVariable()
+        return inference.Function(
+            typeVar,
+            inference.Function(typeVar, Boolean.type)
+        )
 
+
+class Equality(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].eq(args[1]), amb)
 
 
-class GT(Primitive, metaclass=Singleton):
-    type = '#t -> #t -> bool'
-
+class GT(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].gt(args[1]), amb)
 
 
-class LT(Primitive, metaclass=Singleton):
-    type = '#t -> #t -> bool'
-
+class LT(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].lt(args[1]), amb)
 
 
-class GE(Primitive, metaclass=Singleton):
-    type = '#t -> #t -> bool'
-
+class GE(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].ge(args[1]), amb)
 
 
-class LE(Primitive, metaclass=Singleton):
-    type = '#t -> #t -> bool'
-
+class LE(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].le(args[1]), amb)
 
 
-class NE(Primitive, metaclass=Singleton):
-    type = '#t -> #t -> bool'
-
+class NE(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].ne(args[1]), amb)
 
 
-class And(SpecialForm, metaclass=Singleton):
+class BinaryLogic(SpecialForm):
+    type = inference.Function(
+        Boolean.type,
+        inference.Function(Boolean.type, Boolean.type)
+    )
+
+
+class And(BinaryLogic, metaclass=Singleton):
     type = 'bool -> bool -> bool'
 
     def apply(self, args: List,
@@ -802,7 +864,7 @@ class And(SpecialForm, metaclass=Singleton):
         return lambda: args[0].eval(env, cont, amb)
 
 
-class Or(SpecialForm, metaclass=Singleton):
+class Or(BinaryLogic, metaclass=Singleton):
     type = 'bool -> bool -> bool'
 
     def apply(self, args: List,
@@ -827,8 +889,21 @@ class Or(SpecialForm, metaclass=Singleton):
         return lambda: args[0].eval(env, cont, amb)
 
 
+class Xor(Primitive, metaclass=Singleton):
+    type = BinaryLogic.type
+
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        return lambda: ret(args[0] ^ args[1], amb)
+
+
 class Then(SpecialForm, metaclass=Singleton):
-    type = '#t -> #t -> #t'
+    @property
+    def type(self):
+        typevar = inference.TypeVariable()
+        return inference.Function(
+            typevar,
+            inference.Function(typevar, typevar)
+        )
 
     def apply(self, args: List,
               env: 'environment.Environment',
@@ -842,7 +917,7 @@ class Then(SpecialForm, metaclass=Singleton):
 
 
 class Back(SpecialForm, metaclass=Singleton):
-    type = '#t'
+    type = property(lambda self: inference.TypeVariable())
 
     def apply(self, args: List,
               env: 'environment.Environment',
@@ -852,73 +927,77 @@ class Back(SpecialForm, metaclass=Singleton):
 
 
 class Not(Primitive, metaclass=Singleton):
-    type = 'bool -> bool'
+    type = inference.Function(Boolean.type, Boolean.type)
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(~(args[0]), amb)
 
 
-class Xor(Primitive, metaclass=Singleton):
-    type = 'bool -> bool -> bool'
-
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return lambda: ret(args[0] ^ args[1], amb)
-
-
 class Cons(Primitive, metaclass=Singleton):
-    type = '#t -> list(#t) -> list(#t)'
+    @property
+    def type(self):
+        '#t -> list(#t) -> list(#t)'
+        t = inference.TypeVariable()
+        list_t = inference.TypeOperator('list', t)
+        return inference.Function(t, inference.Function(list_t, list_t))
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Pair(args[0], args[1]), amb)
 
 
 class Append(Primitive, metaclass=Singleton):
-    type = 'list(#t) -> list(#t) -> list(#t)'
+    @property
+    def type(self):
+        'list(#t) -> list(#t) -> list(#t)'
+        list_t = Null.type
+        return inference.Function(list_t, inference.Function(list_t, list_t))
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].append(args[1]), amb)
 
 
 class Head(Primitive, metaclass=Singleton):
-    type = 'list(#t) -> #t'
+    @property
+    def type(self):
+        'list(#t) -> #t'
+        t = inference.TypeVariable()
+        list_t = inference.TypeOperator('list', t)
+        return inference.Function(list_t, t)
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].car(), amb)
 
 
 class Tail(Primitive, metaclass=Singleton):
-    type = 'list(#t) -> list(#t)'
+    @property
+    def type(self):
+        'list(#t) -> list(#t)'
+        list_t = Null.type
+        return inference.Function(list_t, list_t)
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0].cdr(), amb)
 
 
-class Define(SpecialForm, metaclass=Singleton):
-    def apply(self,
-              args: List,
-              env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
-
-        def define_continuation(value: Expr, amb: 'types.Amb') -> 'types.Promise':
-
-            def ret_none(value: Expr, amb: 'types.Amb') -> 'types.Promise':
-                return lambda: ret(None, amb)
-
-            return lambda: env.define(args[0], value, ret_none, amb)
-
-        return lambda: args[1].eval(env, define_continuation, amb)
-
-
 class Length(Primitive, metaclass=Singleton):
-    type = 'list(#t) -> int'
+    @property
+    def type(self):
+        'list(#t) -> int'
+        return inference.Function(Null.type, Number.type)
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(Number(len(args[0])), amb)
 
 
 class Print(Primitive):
-    type = '#t -> #t'
+    @property
+    def type(self):
+        'list(string) -> list(string)'
+        return inference.Function(
+            inference.TypeOperator('list', String.type),
+            inference.TypeOperator('list', String.type)
+        )
+
     def __init__(self, output):
         self._output = output
 
@@ -930,7 +1009,10 @@ class Print(Primitive):
 
 
 class Cont(Primitive):
-    type = '#t'
+    @property
+    def type(self):
+        '#t'
+        return inference.TypeVariable()
 
     def __init__(self, ret: callable):
         self._ret = ret
@@ -943,7 +1025,15 @@ class Cont(Primitive):
 
 
 class CallCC(SpecialForm, metaclass=Singleton):
-    type = '(#t -> #u) -> #u'
+    @property
+    def type(self):
+        '(#t -> #u) -> #u'
+        t = inference.TypeVariable()
+        u = inference.TypeVariable()
+        return inference.Function(
+            inference.Function(t, u),
+            u
+        )
 
     def apply(self,
               args: List,
@@ -958,14 +1048,20 @@ class CallCC(SpecialForm, metaclass=Singleton):
 
 
 class Exit(Primitive):
-    type = '#t'
+    @property
+    def type(self):
+        '#t'
+        return inference.TypeVariable()
 
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return None
 
 
 class Error(SpecialForm):
-    type = '#t'
+    @property
+    def type(self):
+        '#t'
+        return inference.TypeVariable()
 
     def __init__(self, cont):
         self.cont = cont
@@ -980,16 +1076,3 @@ class Error(SpecialForm):
             return lambda: printer.apply(args, env, self.cont, amb)
 
         return env.lookup(Symbol("print"), print_continuation, amb)
-
-
-class EvaluateInEnv(SpecialForm):
-    def apply(self,
-              args: List,
-              env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
-
-        def env_continuation(new_env: EnvironmentWrapper, amb: 'types.Amb') -> 'types.Promise':
-            return lambda: args[1].eval(new_env.env(), ret, amb)
-
-        return args[0].eval(env, env_continuation, amb)

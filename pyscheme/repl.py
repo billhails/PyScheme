@@ -23,6 +23,7 @@ import pyscheme.environment as environment
 import pyscheme.expr as expr
 from io import StringIO
 import pyscheme.reader as reader
+from .inference import TypeEnvironment
 
 class Repl:
     def __init__(self, input: StringIO, output: StringIO, error: StringIO):
@@ -54,11 +55,9 @@ class Repl:
                     "then": expr.Then(),              # a -> a -> a
                     "head": expr.Head(),              # list(a) -> a
                     "tail": expr.Tail(),              # list(a) -> list(a)
-                    "define": expr.Define(),          # a -> a
                     "length": expr.Length(),          # list(a) -> int
                     "print": expr.Print(self.output), # a -> a
                     "here": expr.CallCC(),            # ((a -> _) -> a) -> a ?
-                    ".": expr.EvaluateInEnv(),        # env -> a -> (env |- a) ; the type of a according to env
                     "exit": expr.Exit(),              # _
                     "error": expr.Error(
                         lambda val, amb:
@@ -67,6 +66,8 @@ class Repl:
                 }.items()
             }
         )
+
+        self.type_env = TypeEnvironment().extend()
 
     def trampoline(self, threads: List['types.Promise']):
         while len(threads) > 0:
@@ -77,6 +78,7 @@ class Repl:
 
     def read(self, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         result = self.reader.read()
+        result.analyse(self.type_env)
         if result is None:
             return None  # stop the trampoline
         return lambda: ret(result, amb)

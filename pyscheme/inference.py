@@ -108,6 +108,19 @@ class TypeVariable(Type):
         return "TypeVariable(id = {0})".format(self.id)
 
 
+class EnvironmentType(Type):
+    def __init__(self, env: 'TypeEnvironment'=None):
+        if env is None:
+            env = TypeEnvironment();
+        self._env = env
+
+    def prune(self):
+        return self
+
+    def env(self) -> 'TypeEnvironment':
+        return self._env
+
+
 class TypeOperator(Type):
     def __init__(self, name, *types):
         self.name = name

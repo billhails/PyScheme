@@ -77,17 +77,10 @@ class TestAmb(Base):
             "40",
             """
             
-            fn barrels_of_fun() {
-                define barrels = [30, 32, 36, 38, 40, 62];
-                define beer = one_of(barrels);
-                define wine = exclude([beer], barrels);
-                define barrel_1 = one_of(wine);
-                define barrel_2 = one_of(exclude([barrel_1], wine));
-                define purchase = some_of(exclude([barrel_1, barrel_2], wine));
-                require((barrel_1 + barrel_2) * 2 == sum(purchase));
-                beer;
+            fn require(condition) {
+                condition or back
             }
-            
+
             fn one_of(list) {
                 require(length(list) > 0);
                 head(list) then one_of(tail(list))
@@ -122,10 +115,6 @@ class TestAmb(Base):
                 [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list));
             }
 
-            fn require(condition) {
-                condition or back
-            }
-
             fn sum(list) {
                 if (length(list) == 0) {
                     0
@@ -134,6 +123,17 @@ class TestAmb(Base):
                 }
             }
 
+            fn barrels_of_fun() {
+                define barrels = [30, 32, 36, 38, 40, 62];
+                define beer = one_of(barrels);
+                define wine = exclude([beer], barrels);
+                define barrel_1 = one_of(wine);
+                define barrel_2 = one_of(exclude([barrel_1], wine));
+                define purchase = some_of(exclude([barrel_1, barrel_2], wine));
+                require((barrel_1 + barrel_2) * 2 == sum(purchase));
+                beer;
+            }
+            
             barrels_of_fun();
             """
         )
