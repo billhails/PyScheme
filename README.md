@@ -7,7 +7,7 @@ specifically:
 
 * incorporate `amb` with keywords `then` and `back`, i.e. `define x = 5 then 6`
 and `if (x == 0) { back }`. DONE
-* strong implicit type checking.
+* strong implicit type checking. DONE (still on a branch)
 * first-class environments. DONE
 * built-in linked lists with `@` (cons) and `@@` (append) operators. DONE
 * strings are linked lists of char.
