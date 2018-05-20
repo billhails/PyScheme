@@ -26,6 +26,10 @@ from typing import Union
 
 TypeOrVar = Union['TypeVariable', 'Type']
 
+def debug(*args, **kwargs):
+    if False:
+        print(*args, **kwargs)
+
 
 class Type:
     def prune(self):
@@ -45,10 +49,10 @@ class Type:
             return self.occurs_in(pruned_other.types)
         return False
 
-    def unify(self, other):
-        self.prune().unify_internal(other.prune())
+    def unify(self, other, seen=set()):
+        self.prune().unify_internal(other.prune(), seen)
 
-    def unify_internal(self, other):
+    def unify_internal(self, other, seen):
         raise PySchemeTypeError(self, other)
 
     def fresh(self, non_generics):
@@ -90,7 +94,7 @@ class TypeVariable(Type):
             return self.instance
         return self
 
-    def unify_internal(self, other):
+    def unify_internal(self, other, seen):
         if self != other:
             if self.occurs_in_type(other):
                 raise PySchemeInferenceError("recursive unification")
@@ -107,9 +111,7 @@ class TypeVariable(Type):
 
 
 class EnvironmentType(Type):
-    def __init__(self, env: 'TypeEnvironment'=None):
-        if env is None:
-            env = TypeEnvironment().extend()
+    def __init__(self, env: 'TypeEnvironment'):
         self._env = env
 
     def prune(self):
@@ -119,21 +121,18 @@ class EnvironmentType(Type):
         return self._env
 
     def make_fresh(self, non_generics, mapping):
-        if self.is_generic(non_generics):
-            if self not in mapping:
-                mapping[self] = TypeVariable()
-            return mapping[self]
-        else:
-            return self
+        return self
 
-    def unify_internal(self, other):
+    def unify_internal(self, other, seen):
         if isinstance(other, TypeVariable):
-            other.unify_internal(self)
+            other.unify_internal(self, seen)
         elif isinstance(other, EnvironmentType):
-            self.env().unify_internal(other.env())
+            self.env().unify_internal(other.env(), seen)
         else:
             raise PySchemeTypeError(self, other)
 
+    def __str__(self):
+        return "EnvironmentType " + str(self._env) + self._env.dump_dict()
 
 class TypeOperator(Type):
     def __init__(self, name, *types):
@@ -143,14 +142,14 @@ class TypeOperator(Type):
     def prune(self):
         return self
 
-    def unify_internal(self, other):
+    def unify_internal(self, other, seen):
         if isinstance(other, TypeVariable):
-            other.unify_internal(self)
+            other.unify_internal(self, seen)
         elif isinstance(other, TypeOperator):
             if self.name != other.name or len(self.types) != len(other.types):
                 raise PySchemeTypeError(self, other)
             for p, q in zip(self.types, other.types):
-                p.unify(q)
+                p.unify(q, seen)
         else:
             raise PySchemeTypeError(self, other)
 
@@ -177,6 +176,7 @@ class EnvironmentTracker:
         self.missing = {}
 
     def note_missing(self, symbol, path):
+        debug("note_missing", symbol, path)
         if symbol not in self.missing:
             self.missing[symbol] = {}
         if path not in self.missing[symbol]:
@@ -184,6 +184,7 @@ class EnvironmentTracker:
         return self.missing[symbol][path]
 
     def note_added(self, symbol, value, path: str):
+        debug("note_added", symbol, path)
         if symbol in self.missing:
             for location in self.missing[symbol].keys():
                 if location.startswith(path):
@@ -197,15 +198,17 @@ class TypeEnvironment:
     def extend(self, dictionary: Dict['expr.Symbol', Type]=None) -> 'TypeEnvironment':
         if dictionary is None:
             dictionary = {}
-        return TypeFrame(self, dictionary)
+        result = TypeFrame(self, dictionary)
+        debug("extend -> ", str(result))
+        return result
 
-    def unify_internal(self, other):
+    def unify_internal(self, other, seen):
         pass
 
-    def note_missing(self, symbol, path):
+    def note_missing(self, symbol, path='.'):
         return TypeEnvironment.missing.note_missing(symbol, path)
 
-    def note_added(self, symbol, value, path):
+    def note_added(self, symbol, value, path='.'):
         self.missing.note_added(symbol, value, path)
 
     @classmethod
@@ -229,13 +232,16 @@ class TypeEnvironment:
     def __str__(self):
         return '<0>'
 
+    def __repr__(self):
+        return "Root"
+
 
 class TypeFrame(TypeEnvironment):
     def __init__(self, parent: TypeEnvironment, dictionary: Dict['expr.Symbol', Type]):
         self._parent = parent
         self._dictionary = dictionary
-        self._id = TypeEnvironment.counter
         TypeEnvironment.counter += 1
+        self._id = TypeEnvironment.counter
 
     def extend_path(self, path):
         return '.' + str(self._id) + path
@@ -245,22 +251,39 @@ class TypeFrame(TypeEnvironment):
 
     def note_added(self, symbol, value, path='.'):
         self._parent.note_added(symbol, value, self.extend_path(path))
+        debug(repr(self))
 
-    def unify_internal(self, other):
+    def unify_internal(self, other, seen):
+        if self in seen or other in seen:
+            return
+        seen.add(self)
+        seen.add(other)
+        self.unify_half(other, seen)
+        other.unify_half(self, seen)
+
+    def unify_half(self, other, seen):
         definitions = {}
         self.flatten(definitions)
         for k in definitions.keys():
             if k in other:
-                definitions[k].unify(other[k])
+                definitions[k].unify(other[k], seen)
             else:
+                debug("[2]")
                 typevar = other.note_missing(k)
-                typevar.unify(definitions[k])
+                typevar.unify(definitions[k], seen)
 
     def flatten(self, definitions):
         for k in self._dictionary.keys():
             if k not in definitions:
                 definitions[k] = self[k]
         self._parent.flatten(definitions)
+
+    def dump_dict(self):
+        string = "{\n"
+        for k, v in self._dictionary.items():
+            string += ("    " + str(k) + ": " + str(v) + "\n")
+        string += "}\n"
+        return string
 
     def __getitem__(self, symbol: 'expr.Symbol') -> Type:
         if symbol in self._dictionary:
@@ -280,3 +303,9 @@ class TypeFrame(TypeEnvironment):
 
     def __str__(self):
         return '<' + str(self._id) + '>' + str(self._parent)
+
+    def __repr__(self):
+        return str(self) + self.dump_dict() + ' ---> ' + repr(self._parent)
+
+    def __hash__(self):
+        return id(self)

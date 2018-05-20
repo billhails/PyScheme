@@ -24,6 +24,10 @@ from . import types
 from . import inference
 
 
+def debug(*args, **kwargs):
+    if False:
+        print(*args, **kwargs)
+
 class Expr:
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         pass
@@ -319,7 +323,25 @@ class Symbol(Expr, metaclass=FlyWeight):
         if self in env:
             return env[self].fresh(non_generic)
         else:
+            debug("[1]", repr(env))
             return env.note_missing(self)
+
+
+class TypedSymbol(Expr):
+    def __init__(self, symbol: Symbol, type_symbol: Symbol):
+        self._symbol = symbol
+        self._type_symbol = type_symbol
+
+    def symbol(self):
+        return self._symbol
+
+    def type_symbol(self):
+        return self._type_symbol
+
+    def __str__(self):
+        return str(self._symbol) + ':' + str(self._type)
+
+    __repr__ = __str__
 
 
 class List(Expr):
@@ -541,9 +563,16 @@ class Lambda(Expr):
             if type(args) is Null:
                 return self._body.analyse_internal(new_env, new_non_generic)
             else:
-                arg_type = inference.TypeVariable()
-                new_env[args.car()] = arg_type
-                new_non_generic.add(arg_type)
+                arg = args.car()
+                if type(arg) is TypedSymbol:
+                    symbol = arg.symbol()
+                    arg_type = new_env[arg.type_symbol()]
+                    new_env[symbol] = arg_type
+                    debug("Lambda", symbol, ":", arg_type, "in", str(new_env))
+                else:
+                    arg_type = inference.TypeVariable()
+                    new_env[arg] = arg_type
+                    new_non_generic.add(arg_type)
                 result_type = analyse_recursive(args.cdr())
                 return inference.Function(arg_type, result_type)
 
@@ -681,6 +710,9 @@ class Definition(Expr):
 
 
 class EnvContext(Expr):
+    """
+    the '.' operator
+    """
     def __init__(self, env: EnvironmentWrapper, expr: Expr):
         self._env = env
         self._expr = expr
@@ -693,7 +725,8 @@ class EnvContext(Expr):
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         lhs = self._env.analyse_internal(env, non_generic)
-        lhs.unify(inference.EnvironmentType())
+        debug("EnvContext,", str(self._env), ":", str(lhs), "in", env)
+        lhs.unify(inference.EnvironmentType(env.extend()))
         return self._expr.analyse_internal(lhs.prune().env(), non_generic)
 
 
@@ -727,7 +760,10 @@ class Closure(Primitive):
         actual_args = args
         dictionary = {}
         while type(formal_args) is not Null and type(actual_args) is not Null:
-            dictionary[formal_args.car()] = actual_args.car()
+            farg = formal_args.car()
+            if type(farg) is TypedSymbol:
+                farg = farg.symbol()
+            dictionary[farg] = actual_args.car()
             formal_args = formal_args.cdr()
             actual_args = actual_args.cdr()
         if type(formal_args) is not Null:  # currying

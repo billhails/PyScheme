@@ -95,5 +95,49 @@ class TestInference(Base):
             "Closure([f]: Lambda [g]: { Lambda [arg]: { g[f[arg]] } })",
             '''
             fn (f) { fn (g) { fn (arg) { g(f(arg)) } } };
-            '''
+            ''',
+            'function composition'
+        )
+
+    def test_inference_101(self):
+        self.assertError(
+            "PySchemeTypeError: bool != int",
+            """
+            if (length([])) {
+                true
+            } else {
+                false
+            }
+            """,
+            "'if' requires a boolean"
+        )
+
+    def test_inference_115(self):
+        self.assertEval(
+            "9",
+            """
+            env e {
+                fn sum(x, y) { x + y }
+            }
+            fn g(x) {
+                x.sum(4, 5)
+            }
+            g(e);
+            """,
+            ""
+        )
+
+    def test_inference_130(self):
+        self.assertError(
+            "PySchemeTypeError: bool != int",
+            """
+            env e1 {
+                fn sum(x, y) { x + y }
+            }
+            fn g(e2:e1) {
+                e2.sum(4, true)
+            }
+            g(e1);
+            """,
+            "env type checking"
         )

@@ -23,6 +23,10 @@ import inspect
 import io
 
 
+class Config:
+    debugging = False
+
+
 class Token:
     def __init__(self, line: int, char: int, token_type, token_value=''):
         self.line = line
@@ -74,7 +78,8 @@ class Tokeniser:
         '[', ']',
         ';',
         '=',
-        '.'
+        '.',
+        ':',
     )
 
     def __init__(self, stream: io.StringIO):
@@ -230,15 +235,13 @@ class Reader:
                 | symbol {',' symbols}
     """
 
-    debugging = False
-
     def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
         self.tokeniser = tokeniser
         self.stderr = stderr
         self.depth = 0
 
     def read(self) -> expr.Expr:
-        if self.debugging:
+        if Config.debugging:
             self.depth = len(inspect.stack())
         self.debug("*******************************************************")
         result = self.top()
@@ -547,7 +550,7 @@ class Reader:
     def formals(self):
         self.debug("formals")
         self.consume('(')
-        symbols = self.symbols()
+        symbols = self.fargs()
         self.consume(')')
         return symbols
 
@@ -641,21 +644,36 @@ class Reader:
         else:
             return None
 
-    def symbols(self) -> expr.List:
+    def fargs(self) -> expr.List:
         """
-            symbols : empty
-            symbols : symbol
-            symbols : symbol ',' nfargs
+            fargs : empty
+            fargs : farg
+            fargs : farg ',' nfargs
         """
-        self.debug("symbols")
-        symbol = self.symbol(False)
-        if symbol is None:
+        self.debug("fargs")
+        farg = self.farg(False)
+        if farg is None:
             return expr.Null()
         if self.swallow(','):
-            fargs = self.symbols()
-            return expr.Pair(symbol, fargs)
+            fargs = self.fargs()
+            return expr.Pair(farg, fargs)
         else:
-            return expr.List.list([symbol])
+            return expr.List.list([farg])
+
+    def farg(self, fail=True):
+        """
+        farg : symbol
+        farg : symbol ':' symbol
+        """
+        self.debug("farg")
+        symbol = self.symbol(fail)
+        if symbol is None:
+            return None
+        if self.swallow(':'):
+            type = self.symbol()
+            return expr.TypedSymbol(symbol, type)
+        else:
+            return symbol
 
     def exprs(self) -> expr.List:
         """
@@ -737,7 +755,7 @@ class Reader:
         )
 
     def debug(self, *args, **kwargs):
-        if self.debugging:
+        if Config.debugging:
             depth = len(inspect.stack()) - self.depth
             print('   |' * (depth // 4), end='')
             print(' ' * (depth % 4), end='')
