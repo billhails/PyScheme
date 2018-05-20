@@ -5,14 +5,14 @@ A small lambda-language interpreter written in Python
 I have a few ideas I'd like to pull in from my abortive F-natural project,
 specifically:
 
-* incorporate `amb` with keywords `then` and `back`, i.e. `define x = 5 then 6`
-and `if (x == 0) { back }`. DONE
-* strong implicit type checking. DONE (still on a branch)
-* first-class environments. DONE
-* built-in linked lists with `@` (cons) and `@@` (append) operators. DONE
-* strings are linked lists of char.
-* Three-valued logic system. DONE
-* Partial and over-complete function application. DONE
+- [x] incorporate `amb` with keywords `then` and `back`, i.e. `define x = 5 then 6`
+and `if (x == 0) { back }`.
+- [x] strong implicit type checking.
+- [x] first-class environments.
+- [x] built-in linked lists with `@` (cons) and `@@` (append) operators.
+- [ ] strings are linked lists of char.
+- [x] Three-valued logic system.
+- [x] Partial and over-complete function application.
 
 Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
 which isn'a ideal.
