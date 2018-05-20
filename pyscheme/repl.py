@@ -23,47 +23,56 @@ import pyscheme.environment as environment
 import pyscheme.expr as expr
 from io import StringIO
 import pyscheme.reader as reader
+from .inference import TypeEnvironment
+from .exceptions import PySchemeError
 
 class Repl:
     def __init__(self, input: StringIO, output: StringIO, error: StringIO):
         self.input = input
         self.output = output
+        self.error = error
         self.tokeniser = reader.Tokeniser(input)
         self.reader = reader.Reader(self.tokeniser, error)
+        operators = {
+                    "+": expr.Addition(),             # int -> int -> int
+                    "-": expr.Subtraction(),          # int -> int -> int
+                    "*": expr.Multiplication(),       # int -> int -> int
+                    "/": expr.Division(),             # int -> int -> int
+                    "%": expr.Modulus(),              # int -> int -> int
+                    "==": expr.Equality(),            # a -> a -> bool
+                    "<": expr.LT(),                   # a -> a -> bool
+                    ">": expr.GT(),                   # a -> a -> bool
+                    "<=": expr.LE(),                  # a -> a -> bool
+                    ">=": expr.GE(),                  # a -> a -> bool
+                    "!=": expr.NE(),                  # a -> a -> bool
+                    "and": expr.And(),                # bool -> bool -> bool
+                    "or": expr.Or(),                  # bool -> bool -> bool
+                    "not": expr.Not(),                # bool -> bool
+                    "xor": expr.Xor(),                # bool -> bool -> bool
+                    "@": expr.Cons(),                 # a -> list(a) -> list(a)
+                    "@@": expr.Append(),              # list(a) -> list(a) -> list(a)
+                    "back": expr.Back(),              # _
+                    "then": expr.Then(),              # a -> a -> a
+                    "head": expr.Head(),              # list(a) -> a
+                    "tail": expr.Tail(),              # list(a) -> list(a)
+                    "length": expr.Length(),          # list(a) -> int
+                    "print": expr.Print(self.output), # a -> a
+                    "here": expr.CallCC(),            # ((a -> _) -> a) -> a ?
+                    "exit": expr.Exit(),              # _
+                    "error": expr.Error(
+                        lambda val, amb:
+                        lambda: self.repl(lambda:
+                                          None))      # _
+                }
         self.env = environment.Environment().extend(
-            { expr.Symbol(k): v for k, v in
-                {
-                    "+": expr.Addition(),
-                    "-": expr.Subtraction(),
-                    "*": expr.Multiplication(),
-                    "/": expr.Division(),
-                    "%": expr.Modulus(),
-                    "==": expr.Equality(),
-                    "<": expr.LT(),
-                    ">": expr.GT(),
-                    "<=": expr.LE(),
-                    ">=": expr.GE(),
-                    "!=": expr.NE(),
-                    "and": expr.And(),
-                    "or": expr.Or(),
-                    "not": expr.Not(),
-                    "xor": expr.Xor(),
-                    "@": expr.Cons(),
-                    "@@": expr.Append(),
-                    "back": expr.Back(),
-                    "then": expr.Then(),
-                    "head": expr.Head(),
-                    "tail": expr.Tail(),
-                    "define": expr.Define(),
-                    "length": expr.Length(),
-                    "print": expr.Print(self.output),
-                    "here": expr.CallCC(),
-                    ".": expr.EvaluateInEnv(),
-                    "exit": expr.Exit(),
-                    "error": expr.Error(lambda val, amb: lambda: self.repl(lambda: None))
-                }.items()
-            }
+            { expr.Symbol(k): v for k, v in operators.items() }
         )
+
+        self.type_env = TypeEnvironment().extend()
+
+        for k, v in operators.items():
+            if v.static_type():
+                self.type_env[expr.Symbol(k)] = v.type()
 
     def trampoline(self, threads: List['types.Promise']):
         while len(threads) > 0:
@@ -76,6 +85,11 @@ class Repl:
         result = self.reader.read()
         if result is None:
             return None  # stop the trampoline
+        try:
+            result.analyse(self.type_env)
+        except PySchemeError as e:
+            self.error.write(str(e))
+            return None
         return lambda: ret(result, amb)
 
     def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':

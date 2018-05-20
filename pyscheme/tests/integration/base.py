@@ -23,14 +23,19 @@ import io
 class Base(TestCase):
 
     @classmethod
-    def eval(cls, text: str) -> str:
+    def eval(cls, text: str, error_file: io.StringIO) -> str:
         in_file = io.StringIO(text)
         out_file = io.StringIO()
-        error_file = io.StringIO()
         repl = Repl(in_file, out_file, error_file)
         repl.run()
-        return out_file.getvalue()
+        return (out_file.getvalue(), error_file.getvalue())
 
-    def assertEval(self, expected: str, text: str, msg: str = ''):
-        result = self.eval(text)
-        self.assertEqual(expected, result.rstrip(), msg)
+    def assertEval(self, expected: str, text: str, msg: str=''):
+        error_file = io.StringIO()
+        result = self.eval(text, error_file)
+        self.assertEqual(expected, result[0].rstrip(), msg + ' (stderr: "' + result[1] + '")')
+
+    def assertError(self, expected: str, text: str, msg: str=''):
+        error_file = io.StringIO()
+        result = self.eval(text, error_file)
+        self.assertEqual(expected, result[1].rstrip(), msg)

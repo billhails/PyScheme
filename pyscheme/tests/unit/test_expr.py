@@ -154,13 +154,13 @@ class TestBoolean(TestCase):
         for args in [
             [t, t, t],
             [t, f, f],
-            [t, u, u],
+            [t, u, f],
             [f, t, f],
             [f, f, t],
-            [f, u, u],
-            [u, t, u],
-            [u, f, u],
-            [u, u, u]
+            [f, u, f],
+            [u, t, f],
+            [u, f, f],
+            [u, u, t]
         ]:
             with self.subTest(args=args):
                 self.assertEqual(args[2], args[0].eq(args[1]))

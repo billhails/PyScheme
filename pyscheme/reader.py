@@ -23,8 +23,14 @@ import inspect
 import io
 
 
+class Config:
+    debugging = False
+
+
 class Token:
-    def __init__(self, token_type, token_value=''):
+    def __init__(self, line: int, char: int, token_type, token_value=''):
+        self.line = line
+        self.char = char
         self.type = token_type
         self.value = token_value
 
@@ -72,16 +78,18 @@ class Tokeniser:
         '[', ']',
         ';',
         '=',
-        '.'
+        '.',
+        ':',
     )
 
     def __init__(self, stream: io.StringIO):
         self._stream = stream
         self._line_number = 0
+        self._character_position = 0
         self._tokens = []
         self._line = ''
 
-    def swallow(self, name: str) -> Maybe[Token]:
+    def match(self, name: str) -> Maybe[Token]:
         token = self.next_token()
         if token.type == name:
             return token
@@ -107,29 +115,39 @@ class Tokeniser:
             while self._line == '':
                 self._line = self._stream.readline()
                 if self._line == '':  # EOF
-                    return Token('EOF', 'EOF')
+                    return self.new_token('EOF', 'EOF')
                 self._line_number += 1
-                self._line = self._line.strip()
-                self._line = re.sub(r'^//.*', '', self._line, 1)
+                self._character_position = 0
+
+                self._line = self._line.rstrip()
+                self._line = re.sub(r'^\s*//.*', '', self._line, 1)
+            length = len(self._line)
+            self._line = self._line.lstrip()
+            self._character_position += length - len(self._line)
             for rex in self.regexes.keys():
+                length = len(self._line)
                 match = re.match(rex, self._line)
                 if match:
                     self._line = re.sub(rex, '', self._line, 1).strip()
+                    self._character_position += length - len(self._line)
                     self._line = re.sub(r'^//.*', '', self._line, 1)
                     text = match.group(1)
                     if self.regexes[rex] == 'ID':
                         if text in self.reserved:
-                            return Token(self.reserved[text], text)
+                            return self.new_token(self.reserved[text], text)
                         else:
-                            return Token('ID', text)
+                            return self.new_token('ID', text)
                     else:
-                        return Token(self.regexes[rex], text)
+                        return self.new_token(self.regexes[rex], text)
             for literal in self.literals:
                 if self._line.startswith(literal):
                     self._line = self._line[len(literal):].lstrip()
                     self._line = re.sub(r'^//.*', '', self._line, 1)
-                    return Token(literal, literal)
-            return Token('ERROR', self._line)
+                    return self.new_token(literal, literal)
+            return self.new_token('ERROR', self._line)
+
+    def new_token(self, name, value=''):
+        return Token(self._line_number, self._character_position, name, value)
 
     def __str__(self) -> str:
         return "<tokens: " + str(self._tokens) + ' remaining: "' + self._line + '">'
@@ -217,15 +235,13 @@ class Reader:
                 | symbol {',' symbols}
     """
 
-    debugging = False
-
     def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
         self.tokeniser = tokeniser
         self.stderr = stderr
         self.depth = 0
 
     def read(self) -> expr.Expr:
-        if self.debugging:
+        if Config.debugging:
             self.depth = len(inspect.stack())
         self.debug("*******************************************************")
         result = self.top()
@@ -283,7 +299,7 @@ class Reader:
             else:
                 formals = self.formals()
                 body = self.body()
-                return self.apply_string('define', symbol, expr.Lambda(formals, body))
+                return expr.Definition(symbol, expr.Lambda(formals, body))
 
         env = self.swallow('ENV')
         if env is not None:
@@ -293,7 +309,7 @@ class Reader:
                 return None
             else:
                 body = self.body()
-                return self.apply_string('define', symbol, expr.Env(body))
+                return expr.Definition(symbol, expr.Env(body))
 
         return self.nest(fail)
 
@@ -358,7 +374,7 @@ class Reader:
             symbol = self.symbol()
             self.consume('=')
             expression = self.expression()
-            return self.apply_string('define', symbol, expression)
+            return expr.Definition(symbol, expression)
         else:
             if fail:
                 self.error("expected 'define'")
@@ -459,7 +475,17 @@ class Reader:
                         | atom
         """
         self.debug("env_access", fail=fail)
-        return self.lassoc_binop(self.atom, ['.'], fail)
+
+        lhs = self.atom(fail)
+        if lhs is None:
+            return None
+        while True:
+            op = self.swallow('.')
+            if op:
+                rhs = self.atom()
+                lhs = expr.EnvContext(lhs, rhs)
+            else:
+                return lhs
 
     def atom(self, fail=True) -> Maybe[expr.Expr]:
         """
@@ -524,7 +550,7 @@ class Reader:
     def formals(self):
         self.debug("formals")
         self.consume('(')
-        symbols = self.symbols()
+        symbols = self.fargs()
         self.consume(')')
         return symbols
 
@@ -548,7 +574,7 @@ class Reader:
         self.debug("number", fail=fail)
         number = self.swallow('NUMBER')
         if number:
-            return expr.Constant(int(number.value))
+            return expr.Number(int(number.value))
         elif fail:
             self.error("expected number")
         else:
@@ -561,7 +587,7 @@ class Reader:
         self.debug("string", fail=fail)
         string = self.swallow('STRING')
         if string:
-            return expr.Constant(string.value)
+            return expr.String(string.value)
         elif fail:
             self.error("expected string")
         else:
@@ -618,21 +644,36 @@ class Reader:
         else:
             return None
 
-    def symbols(self) -> expr.List:
+    def fargs(self) -> expr.List:
         """
-            symbols : empty
-            symbols : symbol
-            symbols : symbol ',' nfargs
+            fargs : empty
+            fargs : farg
+            fargs : farg ',' nfargs
         """
-        self.debug("symbols")
-        symbol = self.symbol(False)
-        if symbol is None:
+        self.debug("fargs")
+        farg = self.farg(False)
+        if farg is None:
             return expr.Null()
         if self.swallow(','):
-            fargs = self.symbols()
-            return expr.Pair(symbol, fargs)
+            fargs = self.fargs()
+            return expr.Pair(farg, fargs)
         else:
-            return expr.List.list([symbol])
+            return expr.List.list([farg])
+
+    def farg(self, fail=True):
+        """
+        farg : symbol
+        farg : symbol ':' symbol
+        """
+        self.debug("farg")
+        symbol = self.symbol(fail)
+        if symbol is None:
+            return None
+        if self.swallow(':'):
+            type = self.symbol()
+            return expr.TypedSymbol(symbol, type)
+        else:
+            return symbol
 
     def exprs(self) -> expr.List:
         """
@@ -684,12 +725,10 @@ class Reader:
         """
         if the next token in the input matches one of the argument types, consume it and return the token
         otherwise leave it in the input stream and return None
-        :param args: array
-        :return: bool
         """
         self.debug("swallow", args=args, caller=inspect.stack()[1][3])
         for token_type in args:
-            token = self.tokeniser.swallow(token_type)
+            token = self.tokeniser.match(token_type)
             if token is not None:
                 return token
         return None
@@ -702,14 +741,13 @@ class Reader:
         """
         self.debug("consume", args=args, caller=inspect.stack()[1][3])
         for name in args:
-            if self.tokeniser.swallow(name) is None:
+            if self.tokeniser.match(name) is None:
                 self.error("expected " + name)
 
     def pushback(self, token: Token):
         self.tokeniser.pushback(token)
 
     def error(self, msg):
-        self.stderr.write(msg + "\n")
         raise PySchemeSyntaxError(
             msg,
             line=self.tokeniser.line_number(),
@@ -717,7 +755,7 @@ class Reader:
         )
 
     def debug(self, *args, **kwargs):
-        if self.debugging:
+        if Config.debugging:
             depth = len(inspect.stack()) - self.depth
             print('   |' * (depth // 4), end='')
             print(' ' * (depth % 4), end='')
