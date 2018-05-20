@@ -25,7 +25,11 @@ class TestEnv(Base):
         self.assertEval(
             "5",
             '''
-            fn (a) {
+            env e { // need a prototype env
+                define x = 0;
+                define y = 0;
+            }
+            fn (a:e) {
                 a.x + a.y
             }(
                 env {

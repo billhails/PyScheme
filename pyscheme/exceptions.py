@@ -42,6 +42,11 @@ class NonBooleanExpressionError(PySchemeError):
         return 'NonBooleanExpressionError'
 
 
+class MissingPrototypeError(SymbolError):
+    def __str__(self):
+        return 'MissingPrototypeError: ' + str(self._symbol)
+
+
 class PySchemeSyntaxError(Exception):
     def __init__(self, msg: str, line: int, next_token):
         self.msg = msg

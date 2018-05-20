@@ -119,8 +119,23 @@ class TestInference(Base):
             env e {
                 fn sum(x, y) { x + y }
             }
-            fn g(x) {
+            fn g(x:e) {
                 x.sum(4, 5)
+            }
+            g(e);
+            """,
+            ""
+        )
+
+    def test_inference_116(self):
+        self.assertError(
+            "PySchemeTypeError: bool != int",
+            """
+            env e {
+                fn sum(x, y) { x + y }
+            }
+            fn g(x:e) {
+                x.sum(4, true)
             }
             g(e);
             """,
@@ -129,15 +144,34 @@ class TestInference(Base):
 
     def test_inference_130(self):
         self.assertError(
-            "PySchemeTypeError: bool != int",
+            "SymbolNotFoundError: nosumhere",
             """
             env e1 {
                 fn sum(x, y) { x + y }
             }
-            fn g(e2:e1) {
-                e2.sum(4, true)
+            env e2 {
+                fn nosumhere() { false }
             }
-            g(e1);
+            fn g(e3:e1) {
+                e3.sum(4, 5)
+            }
+            g(e2);
             """,
             "env type checking"
+        )
+
+    def test_inference_163(self):
+        self.assertError(
+            "MissingPrototypeError: a",
+            """
+            fn (a) {
+                a.x + a.y
+            }(
+                env {
+                    define x = 2;
+                    define y = 3
+                }
+            );
+            """,
+            ""
         )

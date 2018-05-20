@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from . import environment
-from .exceptions import NonBooleanExpressionError, PySchemeInternalError
+from .exceptions import NonBooleanExpressionError, PySchemeInternalError, MissingPrototypeError
 from .singleton import Singleton, FlyWeight
 from . import types
 from . import inference
@@ -42,6 +42,9 @@ class Expr:
         raise NonBooleanExpressionError()
 
     def value(self):
+        pass
+
+    def prepare_analysis(self, env: inference.TypeEnvironment):
         pass
 
     def __eq__(self, other: 'Expr') -> bool:
@@ -89,6 +92,7 @@ class Expr:
     def analyse(self, env: inference.TypeEnvironment, non_generic=None) -> inference.Type:
         if non_generic is None:
             non_generic = set()
+        self.prepare_analysis(env)
         return self.analyse_internal(env, non_generic)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
@@ -320,12 +324,7 @@ class Symbol(Expr, metaclass=FlyWeight):
         return self.get_type(env, non_generic)
 
     def get_type(self, env: inference.TypeEnvironment, non_generic: set):
-        if self in env:
-            return env[self].fresh(non_generic)
-        else:
-            debug("[1]", repr(env))
-            return env.note_missing(self)
-
+        return env[self].fresh(non_generic)
 
 class TypedSymbol(Expr):
     def __init__(self, symbol: Symbol, type_symbol: Symbol):
@@ -433,6 +432,10 @@ class Pair(List):
         rest_type = self.cdr().analyse_internal(env, non_generic)
         self_type.unify(rest_type)
         return self_type
+
+    def prepare_analysis(self, env: inference.TypeEnvironment):
+        self.car().prepare_analysis(env)
+        self.cdr().prepare_analysis(env)
 
     def map(self, fn: callable) -> List:
         return Pair(fn(self._car), self._cdr.map(fn))
@@ -561,6 +564,7 @@ class Lambda(Expr):
 
         def analyse_recursive(args: List) -> inference.Type:
             if type(args) is Null:
+                self._body.prepare_analysis(new_env)
                 return self._body.analyse_internal(new_env, new_non_generic)
             else:
                 arg = args.car()
@@ -628,6 +632,7 @@ class Sequence(Expr):
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         if len(self._exprs) > 0:
+            self._exprs.prepare_analysis(env)
             types = self._exprs.map(lambda expr: expr.analyse_internal(env, non_generic))
             return types.last()
         else:
@@ -647,7 +652,9 @@ class Nest(Expr):
         return self._body.eval(env.extend(), ret, amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        return self._body.analyse_internal(env.extend(), non_generic.copy())
+        new_env = env.extend()
+        self._body.prepare_analysis(new_env)
+        return self._body.analyse_internal(new_env, non_generic.copy())
 
     def __str__(self):
         return str(self._body)
@@ -664,6 +671,7 @@ class EnvironmentWrapper(Expr):
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return inference.EnvironmentType()
+
 
 class Env(Expr):
     """Implements the 'env' construct
@@ -702,8 +710,10 @@ class Definition(Expr):
 
         return lambda: self._value.eval(env, define_continuation, amb)
 
-    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+    def prepare_analysis(self, env: inference.TypeEnvironment):
         env[self._symbol] = inference.TypeVariable()
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         defn_type = self._value.analyse_internal(env, non_generic)
         env[self._symbol].unify(defn_type)
         return env[self._symbol]
@@ -726,7 +736,8 @@ class EnvContext(Expr):
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         lhs = self._env.analyse_internal(env, non_generic)
         debug("EnvContext,", str(self._env), ":", str(lhs), "in", env)
-        lhs.unify(inference.EnvironmentType(env.extend()))
+        if type(lhs) is inference.TypeVariable:
+            raise MissingPrototypeError(self._env)
         return self._expr.analyse_internal(lhs.prune().env(), non_generic)
 
 

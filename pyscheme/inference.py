@@ -18,13 +18,13 @@
 # Credit: Rob Smallshire wrote the original python implementation at
 # https://github.com/rob-smallshire/hindley-milner-python
 
-
 from typing import Dict
 from . import expr
 from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError, PySchemeInferenceError, PySchemeTypeError
 from typing import Union
 
 TypeOrVar = Union['TypeVariable', 'Type']
+
 
 def debug(*args, **kwargs):
     if False:
@@ -49,7 +49,9 @@ class Type:
             return self.occurs_in(pruned_other.types)
         return False
 
-    def unify(self, other, seen=set()):
+    def unify(self, other, seen=None):
+        if seen is None:
+            seen = set()
         self.prune().unify_internal(other.prune(), seen)
 
     def unify_internal(self, other, seen):
@@ -171,29 +173,8 @@ class Function(TypeOperator):
         super(Function, self).__init__("->", from_type, to_type)
 
 
-class EnvironmentTracker:
-    def __init__(self):
-        self.missing = {}
-
-    def note_missing(self, symbol, path):
-        debug("note_missing", symbol, path)
-        if symbol not in self.missing:
-            self.missing[symbol] = {}
-        if path not in self.missing[symbol]:
-            self.missing[symbol][path] = TypeVariable()
-        return self.missing[symbol][path]
-
-    def note_added(self, symbol, value, path: str):
-        debug("note_added", symbol, path)
-        if symbol in self.missing:
-            for location in self.missing[symbol].keys():
-                if location.startswith(path):
-                    self.missing[symbol][path].unify(value)
-
-
 class TypeEnvironment:
     counter = 0
-    missing = EnvironmentTracker()
 
     def extend(self, dictionary: Dict['expr.Symbol', Type]=None) -> 'TypeEnvironment':
         if dictionary is None:
@@ -204,12 +185,6 @@ class TypeEnvironment:
 
     def unify_internal(self, other, seen):
         pass
-
-    def note_missing(self, symbol, path='.'):
-        return TypeEnvironment.missing.note_missing(symbol, path)
-
-    def note_added(self, symbol, value, path='.'):
-        self.missing.note_added(symbol, value, path)
 
     @classmethod
     def next_id(cls):
@@ -243,16 +218,6 @@ class TypeFrame(TypeEnvironment):
         TypeEnvironment.counter += 1
         self._id = TypeEnvironment.counter
 
-    def extend_path(self, path):
-        return '.' + str(self._id) + path
-
-    def note_missing(self, symbol, path='.'):
-        return self._parent.note_missing(symbol, self.extend_path(path))
-
-    def note_added(self, symbol, value, path='.'):
-        self._parent.note_added(symbol, value, self.extend_path(path))
-        debug(repr(self))
-
     def unify_internal(self, other, seen):
         if self in seen or other in seen:
             return
@@ -262,21 +227,18 @@ class TypeFrame(TypeEnvironment):
         other.unify_half(self, seen)
 
     def unify_half(self, other, seen):
-        definitions = {}
-        self.flatten(definitions)
-        for k in definitions.keys():
-            if k in other:
-                definitions[k].unify(other[k], seen)
-            else:
-                debug("[2]")
-                typevar = other.note_missing(k)
-                typevar.unify(definitions[k], seen)
+        definitions =  self.flatten()
+        for k, v in definitions.items():
+            v.unify(other[k], seen)
 
-    def flatten(self, definitions):
+    def flatten(self, definitions=None):
+        if definitions is None:
+            definitions = {}
         for k in self._dictionary.keys():
             if k not in definitions:
                 definitions[k] = self[k]
         self._parent.flatten(definitions)
+        return definitions
 
     def dump_dict(self):
         string = "{\n"
@@ -299,7 +261,6 @@ class TypeFrame(TypeEnvironment):
             raise SymbolAlreadyDefinedError(symbol)
         else:
             self._dictionary[symbol] = typevar
-            self.note_added(symbol, typevar)
 
     def __str__(self):
         return '<' + str(self._id) + '>' + str(self._parent)
