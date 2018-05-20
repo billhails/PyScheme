@@ -19,7 +19,8 @@ which isn'a ideal.
 
 ## First Impressions
 
-To get a feel for the language, read through the integration tests in [`pyscheme/tests/integration`](https://github.com/billhails/PyScheme/tree/master/pyscheme/tests/integration)
+To get a feel for the language, first check out the [wiki](https://github.com/billhails/PyScheme/wiki), then
+read through the integration tests in [`pyscheme/tests/integration`](https://github.com/billhails/PyScheme/tree/master/pyscheme/tests/integration)
 
 ## Cloning
 
