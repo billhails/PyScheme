@@ -181,6 +181,9 @@ class Number(Constant):
     def __mod__(self, other: Expr):
         return Number(self._value % other.value())
 
+    def __pow__(self, power: Expr, modulo=None):
+        return Number(self._value ** power.value())
+
 
 class Boolean(Constant):
     @classmethod
@@ -325,6 +328,7 @@ class Symbol(Expr, metaclass=FlyWeight):
 
     def get_type(self, env: inference.TypeEnvironment, non_generic: set):
         return env[self].fresh(non_generic)
+
 
 class TypedSymbol(Expr):
     def __init__(self, symbol: Symbol, type_symbol: Symbol):
@@ -827,6 +831,12 @@ class Division(BinaryArithmetic, metaclass=Singleton):
 class Modulus(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: ret(args[0] % args[1], amb)
+
+
+class Exponentiation(BinaryArithmetic, metaclass=Singleton):
+    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        return lambda: ret(args[0] ** args[1], amb)
+
 
 
 class BinaryComparison(Primitive):

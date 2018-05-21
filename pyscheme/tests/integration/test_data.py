@@ -38,12 +38,18 @@ class TestOperations(Base):
 
     def test_division(self):
         self.assertEval("3", "10 / 3;")
+        self.assertEval("2", "10 / 2 / 2;")
+        self.assertEval("10", "10 / (2 / 2);")
 
     def test_modulus(self):
         self.assertEval("1", "10 % 3;")
 
     def test_equality(self):
         self.assertEval("true", "5 == 5;")
+
+    def test_pow(self):
+        self.assertEval("64", "(2 ** 2) ** 3;")
+        self.assertEval("256", "2 ** 2 ** 3;")
 
     def test_inequality(self):
         self.assertEval("false", "5 == 6;")

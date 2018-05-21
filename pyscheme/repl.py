@@ -39,25 +39,26 @@ class Repl:
                     "*": expr.Multiplication(),       # int -> int -> int
                     "/": expr.Division(),             # int -> int -> int
                     "%": expr.Modulus(),              # int -> int -> int
-                    "==": expr.Equality(),            # a -> a -> bool
-                    "<": expr.LT(),                   # a -> a -> bool
-                    ">": expr.GT(),                   # a -> a -> bool
-                    "<=": expr.LE(),                  # a -> a -> bool
-                    ">=": expr.GE(),                  # a -> a -> bool
-                    "!=": expr.NE(),                  # a -> a -> bool
+                    "**": expr.Exponentiation(),      # int -> int -> int
+                    "==": expr.Equality(),            # t -> t -> bool
+                    "<": expr.LT(),                   # t -> t -> bool
+                    ">": expr.GT(),                   # t -> t -> bool
+                    "<=": expr.LE(),                  # t -> t -> bool
+                    ">=": expr.GE(),                  # t -> t -> bool
+                    "!=": expr.NE(),                  # t -> t -> bool
                     "and": expr.And(),                # bool -> bool -> bool
                     "or": expr.Or(),                  # bool -> bool -> bool
                     "not": expr.Not(),                # bool -> bool
                     "xor": expr.Xor(),                # bool -> bool -> bool
-                    "@": expr.Cons(),                 # a -> list(a) -> list(a)
-                    "@@": expr.Append(),              # list(a) -> list(a) -> list(a)
+                    "@": expr.Cons(),                 # t -> list(t) -> list(t)
+                    "@@": expr.Append(),              # list(t) -> list(t) -> list(t)
                     "back": expr.Back(),              # _
-                    "then": expr.Then(),              # a -> a -> a
-                    "head": expr.Head(),              # list(a) -> a
-                    "tail": expr.Tail(),              # list(a) -> list(a)
-                    "length": expr.Length(),          # list(a) -> int
-                    "print": expr.Print(self.output), # a -> a
-                    "here": expr.CallCC(),            # ((a -> _) -> a) -> a ?
+                    "then": expr.Then(),              # t -> t -> t
+                    "head": expr.Head(),              # list(t) -> t
+                    "tail": expr.Tail(),              # list(t) -> list(t)
+                    "length": expr.Length(),          # list(t) -> int
+                    "print": expr.Print(self.output), # t -> t
+                    "here": expr.CallCC(),            # ((t -> _) -> t) -> a ?
                     "exit": expr.Exit(),              # _
                     "error": expr.Error(
                         lambda val, amb:

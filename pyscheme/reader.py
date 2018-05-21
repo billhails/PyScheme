@@ -71,7 +71,7 @@ class Tokeniser:
     literals = (
         '@@', '@',
         '==', '>=', '<=', '>', '<', '!=',
-        '+', '-', '*', '/', '%',
+        '**', '+', '-', '*', '/', '%',
         '{', '}',
         '(', ')',
         ',',
@@ -444,13 +444,21 @@ class Reader:
 
     def binop_mul(self, fail=True) -> Maybe[expr.Expr]:
         """
-            binop_mul : op_funcall {'*' op_funcall}
-                   | op_funcall {'/' op_funcall}
-                   | op_funcall {'%' op_funcall}
-                   | op_funcall
+            binop_mul : binop_pow {'*' binop_pow}
+                   | binop_pow {'/' binop_pow}
+                   | binop_pow {'%' binop_pow}
+                   | binop_pow
         """
         self.debug("binop_mul", fail=fail)
-        return self.lassoc_binop(self.op_funcall, ['*', '/', '%'], fail)
+        return self.lassoc_binop(self.binop_pow, ['*', '/', '%'], fail)
+
+    def binop_pow(self, fail=True) -> Maybe[expr.Expr]:
+        """
+            binop_pow : op_funcall '**' binop_pow
+                      | op_funcall
+        """
+        self.debug("binop_pow")
+        return self.rassoc_binop(self.op_funcall, ['**'], self.binop_pow, fail)
 
     def op_funcall(self, fail=True) -> Maybe[expr.Expr]:
         """
