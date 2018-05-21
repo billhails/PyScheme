@@ -94,6 +94,21 @@ class TestOperations(Base):
         self.assertEval("true", "not false;")
         self.assertEval("unknown", "not unknown;")
 
+    def test_boolean_equality(self):
+        for args in [
+            ["true",    "true",    "true"],
+            ["true",    "false",   "false"],
+            ["true",    "unknown", "false"],
+            ["false",   "true",    "false"],
+            ["false",   "false",   "true"],
+            ["false",   "unknown", "false"],
+            ["unknown", "true",    "false"],
+            ["unknown", "false",   "false"],
+            ["unknown", "unknown", "true"],
+        ]:
+            with self.subTest(args=args):
+                self.assertEval(args[2], args[0] + " == " + args[1] + ";")
+
     def test_cons(self):
         self.assertEval(
             "[8, 10, 12]",
