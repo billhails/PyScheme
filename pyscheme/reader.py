@@ -58,7 +58,8 @@ class Tokeniser:
         'then': 'THEN',
         'back': 'BACK',
         'define': 'DEFINE',
-        'env': 'ENV'
+        'env': 'ENV',
+        'typedef': 'TYPEDEF',
     }
 
     regexes = {
@@ -80,6 +81,7 @@ class Tokeniser:
         '=',
         '.',
         ':',
+        '|',
     )
 
     def __init__(self, stream: io.StringIO):
@@ -164,6 +166,7 @@ class Reader:
 
         construct : IF '(' expression ')' nest ELSE nest
                   | FN symbol formals body
+                  | typedef
                   | ENV symbol body
                   | nest
 
@@ -229,10 +232,28 @@ class Reader:
              | BACK
              | '(' expression ')'
 
-        formals : '(' symbols ')'
+        formals : '(' fargs ')'
+
+        fargs : empty
+              | farg { ',' fargs }
+
+        farg : symbol [ ':' symbol ]
 
         symbols : empty
                 | symbol {',' symbols}
+
+        typedef : TYPEDEF flat_type '{' type_body '}'
+
+        flat_type : symbol [ '(' symbols ')' ]
+
+        type_body : type_constructor { '|' type_body }
+
+        type_constructor : symbol [ '(' nested_types ')' ]
+
+        nested_types : nested_type { ',' nested_types }
+
+        nested_type : symbol [ '(' nested_types ')' ]
+
     """
 
     def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
@@ -277,6 +298,7 @@ class Reader:
         """
             construct : IF '(' expression ')' nest ELSE nest
                       | FN symbol '(' formals ')' body
+                      | TYPEDEF flat_type '{' type_body '}'
                       | ENV symbol body
                       | nest
         """
@@ -300,6 +322,10 @@ class Reader:
                 formals = self.formals()
                 body = self.body()
                 return expr.Definition(symbol, expr.Lambda(formals, body))
+
+        typedef = self.typedef(False)
+        if typedef is not None:
+            return typedef
 
         env = self.swallow('ENV')
         if env is not None:
@@ -555,12 +581,16 @@ class Reader:
         else:
             return None
 
-    def formals(self):
+    def formals(self, fail=True) -> Maybe[expr.List]:
         self.debug("formals")
-        self.consume('(')
-        symbols = self.fargs()
-        self.consume(')')
-        return symbols
+        if self.swallow('('):
+            symbols = self.fargs()
+            self.consume(')')
+            return symbols
+        elif fail:
+            self.error("expected '('")
+        else:
+            return None
 
     def symbol(self, fail=True) -> Maybe[expr.Symbol]:
         """
@@ -655,8 +685,7 @@ class Reader:
     def fargs(self) -> expr.List:
         """
             fargs : empty
-            fargs : farg
-            fargs : farg ',' nfargs
+            fargs : farg [ ',' nfargs ]
         """
         self.debug("fargs")
         farg = self.farg(False)
@@ -670,24 +699,22 @@ class Reader:
 
     def farg(self, fail=True):
         """
-        farg : symbol
-        farg : symbol ':' symbol
+        farg : symbol [ ':' symbol ]
         """
         self.debug("farg")
         symbol = self.symbol(fail)
         if symbol is None:
             return None
         if self.swallow(':'):
-            type = self.symbol()
-            return expr.TypedSymbol(symbol, type)
+            f_type = self.symbol()
+            return expr.TypedSymbol(symbol, f_type)
         else:
             return symbol
 
     def exprs(self) -> expr.List:
         """
             exprs : empty
-            exprs : expression
-            exprs : expression ',' exprs
+                  | expression { ',' exprs }
         """
         self.debug("exprs")
         expression = self.expression(False)
@@ -698,6 +725,87 @@ class Reader:
             return expr.Pair(expression, exprs)
         else:
             return expr.List.list([expression])
+
+    def symbols(self):
+        symbol = self.symbol()
+        if self.swallow(','):
+            return expr.Pair(symbol, self.symbols())
+        else:
+            return expr.Pair(symbol, expr.Null())
+
+    def typedef(self, fail=True) -> Maybe[expr.TypeDef]:
+        """
+        typedef : TYPEDEF flat_type '{' type_body '}'
+        """
+        if self.swallow('TYPEDEF'):
+            flat_type = self.flat_type()
+            self.consume('{')
+            type_body = self.type_body()
+            self.consume('}')
+            return expr.TypeDef(flat_type, type_body)
+        if fail:
+            self.error("expected typedef")
+        else:
+            return None
+
+    def flat_type(self) -> expr.FlatType:
+        """
+        flat_type :  symbol [ '(' symbols ')' ]
+        """
+        symbol = self.symbol()
+        if self.swallow('('):
+            symbols = self.symbols()
+            self.consume(')')
+            return expr.FlatType(symbol, symbols)
+        else:
+            return expr.FlatType(symbol, expr.Null())
+
+    def type_body(self) -> expr.List:
+        """
+        type_body : type_constructor { '|' type_body }
+        """
+        type_constructor = self.type_constructor()
+        if self.swallow('|'):
+            return expr.Pair(type_constructor, self.type_body())
+        else:
+            return expr.Pair(type_constructor, expr.Null())
+
+    def type_constructor(self) -> expr.TypeConstructor:
+        """
+        type_constructor :  symbol [ '(' nested_types ')' ]
+        """
+        symbol = self.symbol()
+        if self.swallow('('):
+            nested_types = self.nested_types()
+            self.swallow(')')
+        else:
+            nested_types = expr.Null()
+
+        return expr.TypeConstructor(symbol, nested_types)
+
+    def nested_types(self) -> expr.List:
+        """
+        nested_types : nested_type { ',' nested_types }
+        """
+        nested_type = self.nested_type()
+        if self.swallow(","):
+            return expr.Pair(nested_type, self.nested_types())
+        else:
+            return expr.Pair(nested_type, expr.Null())
+
+    def nested_type(self) -> expr.Type:
+        """
+        nested_type : symbol [ '(' nested_types ')' ]
+        """
+        symbol = self.symbol()
+        if self.swallow('('):
+            result = expr.Type(symbol, self.nested_types())
+            self.consume(')')
+            return result
+        else:
+            return expr.Type(symbol, expr.Null())
+
+    # utils
 
     def rassoc_binop(self, m_lhs, ops, m_rhs, fail) -> Maybe[expr.Expr]:
         lhs = m_lhs(fail)

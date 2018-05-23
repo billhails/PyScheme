@@ -110,3 +110,30 @@ class TestReader(TestCase):
             ["foo[a][b]"],
             "foo(a)(b);"
         )
+
+    def test_parse_typedef_1(self):
+        self.assertParse(
+            ['typedef(list[t] : [pair[t, list[t]], null])'],
+            "typedef list(t) { pair(t, list(t)) | null }"
+            #                  ----               ----    : type constructors
+            #        -------        -  -------            : types
+            #             -         -       -             : typevars
+        )
+
+    def test_parse_typedef_2(self):
+        self.assertParse(
+            ['typedef(colour : [red, green, blue])'],
+            "typedef colour { red | green | blue }"
+        )
+
+    def test_parse_typedef_3(self):
+        self.assertParse(
+            ['typedef(union[t, u] : [first[t], second[u]])'],
+            "typedef union(t, u) { first(t) | second(u) }"
+        )
+
+    def test_parse_typedef_4(self):
+        self.assertParse(
+            ['typedef(funny[t, u] : [pair[t, list[list[u]]]])'],
+            "typedef funny(t, u) { pair(t, list(list(u))) }"
+        )

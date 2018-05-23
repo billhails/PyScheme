@@ -75,6 +75,12 @@ class TypeVariable(Type):
 
     next_variable_name = 'a'
 
+    @classmethod
+    def reset_names(cls):
+        "used for consistency during testing"
+        cls.next_variable_name = 'a'
+
+
     @property
     def name(self):
         if self.__name is None:

@@ -1177,3 +1177,71 @@ class Error(SpecialForm):
 
     def static_type(self) -> bool:
         return True
+
+
+class TypeSystem(Expr):
+    """
+    classes in this group have specific behaviour and constitute the components of a typedef statement.
+    Plan:
+        1. analysis of the typedefs creates the type definitions
+           for the type constructors in the current type environment
+        2. evaluation of the typedef creates the actual type constructor
+           functions in the current execution environment
+    """
+    pass
+
+
+class FlatType(TypeSystem):
+    """
+    represents the type being defined in a typedef statement
+    """
+    def __init__(self, symbol: Symbol, type_components: List):
+        self.symbol = symbol
+        self.type_components = type_components
+
+    def __str__(self):
+        if type(self.type_components) is Null:
+            return str(self.symbol)
+        else:
+            return str(self.symbol) + str(self.type_components)
+
+
+class TypeDef(TypeSystem):
+    """
+    represents a typedef statement
+    """
+    def __init__(self, flat_type: FlatType, constructors: List):
+        self.flat_type = flat_type
+        self.constructors = constructors
+
+    def __str__(self):
+        return "typedef(" + str(self.flat_type) + " : " + str(self.constructors) + ")"
+
+
+class TypeConstructor(TypeSystem):
+    """
+    represents a type constructor definition in the body
+    of a typedef
+    """
+    def __init__(self, name: Symbol, arg_types: List):
+        self.name = name
+        self.arg_types = arg_types
+
+    def __str__(self):
+        if type(self.arg_types) is Null:
+            return str(self.name)
+        else:
+            return str(self.name) + str(self.arg_types)
+
+
+class Type(TypeSystem):
+    """
+    represents a type as argument to a type constructor
+    in the body of a typedef
+    """
+    def __init__(self, name: Symbol, components: List):
+        self.name = name
+        self.components = components
+
+    def __str__(self):
+        return str(self.name) + ('' if type(self.components) is Null else str(self.components))
