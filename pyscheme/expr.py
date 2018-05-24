@@ -312,6 +312,9 @@ class Symbol(Expr, metaclass=FlyWeight):
     def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: env.lookup(self, ret, amb)
 
+    def value(self):
+        return self._name
+
     def __hash__(self) -> int:
         return id(self)
 
@@ -1234,7 +1237,7 @@ class TypeDef(TypeSystem):
         return Null.type()
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        self.constructors.eval(env, lambda: ret(Null()), amb)
+        return self.constructors.eval(env, lambda _, amb: ret(None, amb), amb)
 
     def __str__(self):
         return "typedef(" + str(self.flat_type) + " : " + str(self.constructors) + ")"
@@ -1268,11 +1271,10 @@ class TypeConstructor(TypeSystem):
         return make_type_recursive(self.arg_types)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-
-        def ret_none(_: Expr, amb: 'types.Amb') -> 'types.Promise':
-            return lambda: ret(None, amb)
-
-        return lambda: env.define(self.name, TupleConstructor(self.name), ret_none, amb)
+        if len(self.arg_types) == 0:
+            return lambda: env.define(self.name, NamedTuple(self.name, Null()), ret, amb)
+        else:
+            return lambda: env.define(self.name, TupleConstructor(self.name), ret, amb)
 
 
     def __str__(self):

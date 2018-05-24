@@ -143,7 +143,7 @@ class EnvironmentType(Type):
         return "EnvironmentType " + str(self._env) + self._env.dump_dict()
 
 class TypeOperator(Type):
-    def __init__(self, name, *types):
+    def __init__(self, name: str, *types):
         self.name = name
         self.types = types
 
