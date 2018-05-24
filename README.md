@@ -15,7 +15,7 @@ and `if (x == 0) { back }`.
 - [x] Partial and over-complete function application.
 
 Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
-which isn'a ideal.
+which isn't ideal.
 
 ## First Impressions
 
