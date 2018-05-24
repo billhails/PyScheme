@@ -1183,7 +1183,7 @@ class TypeSystem(Expr):
     """
     classes in this group have specific behaviour and constitute the components of a typedef statement.
     Plan:
-        1. analysis of the typedefs creates the type definitions
+        1. prepare_analysis of the typedefs creates the type definitions
            for the type constructors in the current type environment
         2. evaluation of the typedef creates the actual type constructor
            functions in the current execution environment
@@ -1198,6 +1198,14 @@ class FlatType(TypeSystem):
     def __init__(self, symbol: Symbol, type_components: List):
         self.symbol = symbol
         self.type_components = type_components
+
+    def make_type(self, env: inference.TypeEnvironment, non_generic: set):
+        types = []
+        for var in self.type_components:
+            env[var] = inference.TypeVariable()
+            types += [env[var]]
+            non_generic.add(env[var])
+        return inference.TypeOperator(self.symbol.value(), *types)
 
     def __str__(self):
         if type(self.type_components) is Null:
@@ -1214,6 +1222,20 @@ class TypeDef(TypeSystem):
         self.flat_type = flat_type
         self.constructors = constructors
 
+    def prepare_analysis(self, env: inference.TypeEnvironment):
+        self.constructors.prepare_analysis(env)
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
+        new_env = env.extend()
+        new_non_generic = non_generic.copy()
+        return_type = self.flat_type.make_type(new_env, new_non_generic)
+        for constructor in self.constructors:
+            env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))
+        return Null.type()
+
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        self.constructors.eval(env, lambda: ret(Null()), amb)
+
     def __str__(self):
         return "typedef(" + str(self.flat_type) + " : " + str(self.constructors) + ")"
 
@@ -1226,6 +1248,32 @@ class TypeConstructor(TypeSystem):
     def __init__(self, name: Symbol, arg_types: List):
         self.name = name
         self.arg_types = arg_types
+
+    def prepare_analysis(self, env: inference.TypeEnvironment):
+        env[self.name] = inference.TypeVariable()
+
+    def make_type(self, env: inference.TypeEnvironment, return_type: inference.Type, non_generic: set) -> inference.Type:
+        """
+        We are given a return type, plus an environment where our argument type variables are defined
+        """
+        def make_type_recursive(arg_types: List) -> inference.Type:
+            if type(arg_types) is Null:
+                return return_type
+            else:
+                return inference.Function(
+                    arg_types.car().make_type(env, non_generic),
+                    make_type_recursive(arg_types.cdr())
+                )
+
+        return make_type_recursive(self.arg_types)
+
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+
+        def ret_none(_: Expr, amb: 'types.Amb') -> 'types.Promise':
+            return lambda: ret(None, amb)
+
+        return lambda: env.define(self.name, TupleConstructor(self.name), ret_none, amb)
+
 
     def __str__(self):
         if type(self.arg_types) is Null:
@@ -1243,5 +1291,39 @@ class Type(TypeSystem):
         self.name = name
         self.components = components
 
+    def make_type(self, env: inference.TypeEnvironment, non_generic: set):
+        components = self.components.map(lambda component: component.make_type(env, non_generic))
+        if type(components) is Null:
+            return env[self.name]
+        else:
+            return inference.TypeOperator(self.name.value(), *components)
+
     def __str__(self):
         return str(self.name) + ('' if type(self.components) is Null else str(self.components))
+
+
+class TupleConstructor(Primitive):
+    """
+    TypeConstructor is to TypeDef what Closure is to Lambda,
+    it's a function of n arguments that returns a Compound Data Structure
+    """
+    def __init__(self, name: Symbol):
+        self.name = name
+
+    def apply_evaluated_args(self, args, ret: 'types.Continuation', amb: 'types.Amb'):
+        return lambda: ret(NamedTuple(self.name, args), amb)
+
+
+class NamedTuple(Expr):
+    def __init__(self, name: Symbol, values: List):
+        self.name = name
+        self.values = values
+
+    def __str__(self):
+        if type(self.values) is Null:
+            return str(self.name)
+        else:
+            return str(self.name) + str(self.values)
+
+    def __eq__(self, other: 'NamedTuple'):
+        return self.name == other.name and self.values == other.values
