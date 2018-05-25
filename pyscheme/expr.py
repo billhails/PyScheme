@@ -319,6 +319,8 @@ class U(Boolean, metaclass=Singleton):
 
 
 class Symbol(Expr, metaclass=FlyWeight):
+    counter = 1;
+
     def __init__(self, name):
         self._name = name
 
@@ -344,6 +346,17 @@ class Symbol(Expr, metaclass=FlyWeight):
 
     def get_type(self, env: inference.TypeEnvironment, non_generic: set):
         return env[self].fresh(non_generic)
+
+    @classmethod
+    def generate(cls):
+        name = ''
+        counter = cls.counter
+        while counter > 0:
+            remainder = counter % 26
+            name += chr(ord('a') + remainder)
+            counter = counter // 26
+        cls.counter += 1
+        return cls('#' + name)
 
 
 class TypedSymbol(Expr):
@@ -1281,8 +1294,25 @@ class TypeConstructor(TypeSystem):
         if len(self.arg_types) == 0:
             return lambda: env.define(self.name, NamedTuple(self.name, Null()), ret, amb)
         else:
-            return lambda: env.define(self.name, TupleConstructor(self.name, len(self.arg_types)), ret, amb)
+            def make_args(num: int):
+                if num == 0:
+                    return Null()
+                else:
+                    return Pair(Symbol.generate(), make_args(num - 1))
 
+            args = make_args(len(self.arg_types))
+
+            def make_closure() -> Closure:
+                return Closure(
+                    args,
+                    Application(
+                        TupleConstructor(self.name, len(self.arg_types)),
+                        args
+                    ),
+                    env
+                )
+
+            return lambda: env.define(self.name, make_closure(), ret, amb)
 
     def __str__(self):
         if type(self.arg_types) is Null:

@@ -161,3 +161,16 @@ class TestTypedef(Base):
             """,
             "type inference works for user defined types"
         )
+
+    def test_curried_type(self):
+        self.assertEval(
+            'group[1, 2]',
+            '''
+            typedef some(n) { group(n, n) }
+            
+            define start = group(1);
+            
+            start(2);
+            ''',
+            'type constructors can be curried'
+        )
