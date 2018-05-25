@@ -149,7 +149,7 @@ class TestTypedef(Base):
             ""
         )
 
-    def test_typedef_151(self):
+    def test_typedef_152(self):
         self.assertError(
             "PySchemeTypeError: bool != colour",
             """

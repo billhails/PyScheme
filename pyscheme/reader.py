@@ -60,6 +60,7 @@ class Tokeniser:
         'define': 'DEFINE',
         'env': 'ENV',
         'typedef': 'TYPEDEF',
+        'nothing': 'NOTHING',
     }
 
     regexes = {
@@ -226,6 +227,7 @@ class Reader:
              | string
              | char
              | boolean
+             | NOTHING
              | lst
              | FN formals body
              | ENV body
@@ -528,6 +530,7 @@ class Reader:
                    | string
                    | char
                    | boolean
+                   | NOTHING
                    | lst
                    | FN  formals body
                    | ENV body
@@ -554,6 +557,9 @@ class Reader:
         boolean = self.boolean(False)
         if boolean is not None:
             return boolean
+
+        if self.swallow('NOTHING'):
+            return expr.Nothing()
 
         lst = self.lst(False)
         if lst is not None:

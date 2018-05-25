@@ -28,9 +28,10 @@ def debug(*args, **kwargs):
     if False:
         print(*args, **kwargs)
 
+
 class Expr:
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        pass
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        return lambda: ret(self, amb)
 
     def is_true(self) -> bool:
         raise NonBooleanExpressionError()
@@ -102,12 +103,24 @@ class Expr:
         return False
 
 
+class Nothing(Expr, metaclass=Singleton):
+    """
+    analogous to Python's 'None'
+    """
+    @classmethod
+    def type(cls):
+        return inference.TypeOperator("nothing")
+
+    def static_type(self) -> bool:
+        return True
+
+    def __str__(self):
+        return "nothing"
+
+
 class Constant(Expr):
     def __init__(self, value):
         self._value = value
-
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return lambda: ret(self, amb)
 
     def value(self):
         return self._value
@@ -187,7 +200,7 @@ class Number(Constant):
 
 class Boolean(Constant):
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.TypeOperator("bool")
 
     def __and__(self, other: 'Boolean') -> 'Boolean':
@@ -309,7 +322,7 @@ class Symbol(Expr, metaclass=FlyWeight):
     def __init__(self, name):
         self._name = name
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: env.lookup(self, ret, amb)
 
     def value(self):
@@ -409,7 +422,7 @@ class Pair(List):
     def cdr(self) -> List:
         return self._cdr
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def car_continuation(evaluated_car: Expr, amb: 'types.Amb') -> 'types.Promise':
             def cdr_continuation(evaluated_cdr: List, amb: 'types.Amb') -> 'types.Promise':
                 return lambda: ret(Pair(evaluated_car, evaluated_cdr), amb)
@@ -481,9 +494,6 @@ class Null(List, metaclass=Singleton):
     def cdr(self) -> List:
         return self
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return ret(self, amb)
-
     def last(self) -> Expr:
         return self
 
@@ -533,7 +543,7 @@ class Conditional(Expr):
         self._consequent = consequent
         self._alternative = alternative
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def test_continuation(result: Expr, amb: 'types.Amb') -> 'types.Promise':
             if result.is_true():
                 return lambda: self._consequent.eval(env, ret, amb)
@@ -562,7 +572,7 @@ class Lambda(Expr):
         self._args = args
         self._body = body
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(Closure(self._args, self._body, env), amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
@@ -600,7 +610,7 @@ class Application(Expr):
         self._operation = operation
         self._operands = operands
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
 
         def evaluated_op_continuation(evaluated_op: 'Op', amb: 'types.Amb') -> 'types.Promise':
             return lambda: evaluated_op.apply(self._operands, env, ret, amb)
@@ -632,7 +642,7 @@ class Sequence(Expr):
     def __init__(self, exprs: List):
         self._exprs = exprs
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def take_last_continuation(expr: List, amb: 'types.Amb') -> 'types.Promise':
             return lambda: ret(expr.last(), amb)
         return self._exprs.eval(env, take_last_continuation, amb)
@@ -653,7 +663,7 @@ class Nest(Expr):
     def __init__(self, body: Sequence):
         self._body = body
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         """Evaluate the body in an extended environment
         """
         return self._body.eval(env.extend(), ret, amb)
@@ -686,7 +696,7 @@ class Env(Expr):
     def __init__(self, body: Sequence):
         self._body = body
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         """evaluate the body in an extended env then return the extended env as the result
         """
         new_env = env.extend()
@@ -707,13 +717,13 @@ class Definition(Expr):
         self._symbol = symbol
         self._value = value
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> types.Promise:
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def define_continuation(value: Expr, amb: 'types.Amb') -> 'types.Promise':
 
-            def ret_none(_: Expr, amb: 'types.Amb') -> 'types.Promise':
-                return lambda: ret(None, amb)
+            def ret_nothing(_: Expr, amb: 'types.Amb') -> 'types.Promise':
+                return lambda: ret(Nothing(), amb)
 
-            return lambda: env.define(self._symbol, value, ret_none, amb)
+            return lambda: env.define(self._symbol, value, ret_nothing, amb)
 
         return lambda: self._value.eval(env, define_continuation, amb)
 
@@ -734,7 +744,7 @@ class EnvContext(Expr):
         self._env = env
         self._expr = expr
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb'):
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def env_continuation(new_env: EnvironmentWrapper, amb: 'types.Amb') -> 'types.Promise':
             return lambda: self._expr.eval(new_env.env(), ret, amb)
 
@@ -1112,9 +1122,6 @@ class Cont(Primitive):
     def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: self._ret(args[0], amb)
 
-    def eval(self, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        return lambda: ret(self, amb)
-
     def static_type(self) -> bool:
         return True
 
@@ -1237,7 +1244,7 @@ class TypeDef(TypeSystem):
         return Null.type()
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        return self.constructors.eval(env, lambda _, amb: ret(None, amb), amb)
+        return self.constructors.eval(env, lambda _, amb: ret(Nothing(), amb), amb)
 
     def __str__(self):
         return "typedef(" + str(self.flat_type) + " : " + str(self.constructors) + ")"
@@ -1274,7 +1281,7 @@ class TypeConstructor(TypeSystem):
         if len(self.arg_types) == 0:
             return lambda: env.define(self.name, NamedTuple(self.name, Null()), ret, amb)
         else:
-            return lambda: env.define(self.name, TupleConstructor(self.name), ret, amb)
+            return lambda: env.define(self.name, TupleConstructor(self.name, len(self.arg_types)), ret, amb)
 
 
     def __str__(self):
@@ -1309,10 +1316,11 @@ class TupleConstructor(Primitive):
     TypeConstructor is to TypeDef what Closure is to Lambda,
     it's a function of n arguments that returns a Compound Data Structure
     """
-    def __init__(self, name: Symbol):
+    def __init__(self, name: Symbol, num_args: int):
         self.name = name
+        self.num_args = num_args
 
-    def apply_evaluated_args(self, args, ret: 'types.Continuation', amb: 'types.Amb'):
+    def apply_evaluated_args(self, args, ret: types.Continuation, amb: types.Amb):
         return lambda: ret(NamedTuple(self.name, args), amb)
 
 

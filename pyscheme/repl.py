@@ -96,10 +96,10 @@ class Repl:
     def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: expr.eval(self.env, ret, amb)
 
-    def print(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
-        if expr is not None:
-            self.output.write(str(expr) + "\n")
-        return lambda: ret(expr, amb)
+    def print(self, exp: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+        if type(exp) is not expr.Nothing:
+            self.output.write(str(exp) + "\n")
+        return lambda: ret(exp, amb)
 
     def repl(self, amb: 'types.Amb') -> 'types.Promise':
         def print_continuation(expr, amb: 'types.Amb') -> 'types.Promise':

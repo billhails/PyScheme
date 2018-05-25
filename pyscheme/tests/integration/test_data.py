@@ -194,3 +194,17 @@ class TestConditional(Base):
                 }
             """
         )
+
+    def test_nothing(self):
+        self.assertEval(
+            '',
+            'nothing;',
+            'repl does not print nothing'
+        )
+
+    def test_nothing_comparison(self):
+        self.assertEval(
+            'true',
+            'nothing == nothing;',
+            'nothing is nothing'
+        )
