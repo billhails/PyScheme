@@ -78,3 +78,12 @@ class TestCurrying(Base):
             0 + x();    // also works, x() == x
             '''
         )
+
+    def test_noop_apply(self):
+        self.assertEval(
+            '12',
+            '''
+            12();
+            ''',
+            'application with no args is a no-op'
+        )
