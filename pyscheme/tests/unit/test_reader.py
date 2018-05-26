@@ -137,3 +137,14 @@ class TestReader(TestCase):
             ['typedef(funny[t, u] : [pair[t, list[list[u]]]])'],
             "typedef funny(t, u) { pair(t, list(list(u))) }"
         )
+
+    def test_parse_composite_1(self):
+        self.assertParse(
+            ['define map = fn {(f, null) { null } (f, pair(h, t)) { pair[f[h], map[f, t]] }}'],
+            """
+            fn map {
+                (f, null) { null }
+                (f, pair(h, t)) { pair(f(h), map(f, t)) }
+            }
+            """
+        )

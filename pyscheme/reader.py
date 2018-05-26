@@ -167,6 +167,7 @@ class Reader:
 
         construct : IF '(' expression ')' nest ELSE nest
                   | FN symbol formals body
+                  | FN symbol composite_body
                   | typedef
                   | ENV symbol body
                   | nest
@@ -174,6 +175,22 @@ class Reader:
         nest : body
 
         body : '{' statements '}'
+
+        composite_body : '{' sub_functions '}'
+
+        sub_functions : sub_function { sub_function }
+
+        sub_function : sub_function_arguments body
+
+        sub_function_arguments : '(' sub_function_arg_list ')'
+
+        sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
+
+        sub_function_arg : symbol [ '(' sub_function_arg_list ')' ]
+                         | number
+                         | string
+                         | char
+                         | boolean
 
         statements : expression
                    | expression ';' statements
@@ -230,6 +247,7 @@ class Reader:
              | NOTHING
              | lst
              | FN formals body
+             | FN composite_body
              | ENV body
              | BACK
              | '(' expression ')'
@@ -252,7 +270,7 @@ class Reader:
 
         type_constructor : symbol [ '(' nested_types ')' ]
 
-        nested_types : nested_type { ',' nested_types }
+        nested_types : nested_type { ',' nested_type }
 
         nested_type : symbol [ '(' nested_types ')' ]
 
@@ -300,7 +318,8 @@ class Reader:
         """
             construct : IF '(' expression ')' nest ELSE nest
                       | FN symbol '(' formals ')' body
-                      | TYPEDEF flat_type '{' type_body '}'
+                      | FN symbol composite_body
+                      | typedef
                       | ENV symbol body
                       | nest
         """
@@ -321,9 +340,13 @@ class Reader:
                 self.pushback(fn)
                 return None
             else:
-                formals = self.formals()
-                body = self.body()
-                return expr.Definition(symbol, expr.Lambda(formals, body))
+                formals = self.formals(False)
+                if formals is None:
+                    composite_body = self.composite_body()
+                    return expr.Definition(symbol, composite_body)
+                else:
+                    body = self.body()
+                    return expr.Definition(symbol, expr.Lambda(formals, body))
 
         typedef = self.typedef(False)
         if typedef is not None:
@@ -362,6 +385,93 @@ class Reader:
                 self.error("expected '{'")
             else:
                 return None
+
+    def composite_body(self) -> expr.Composite:
+        """
+        composite_body : '{' sub_functions '}'
+        """
+        self.consume('{')
+        sub_functions = self.sub_functions()
+        self.consume('}')
+        return expr.Composite(sub_functions)
+
+    def sub_functions(self) -> expr.List:
+        """
+        sub_functions : sub_function { sub_function }
+        """
+        sub_function = self.sub_function(False)
+        if sub_function is None:
+            return expr.Null()
+        else:
+            return expr.Pair(sub_function, self.sub_functions())
+
+    def sub_function(self, fail=True) -> Maybe[expr.CompositeComponent]:
+        """
+        sub_function : '(' sub_function_arguments ')' body
+        """
+        sub_function_arguments = self.sub_function_arguments(fail)
+        if sub_function_arguments is None:
+            return None
+        else:
+            body = self.body()
+            return expr.CompositeComponent(sub_function_arguments, body)
+
+    def sub_function_arguments(self, fail=True) -> Maybe[expr.List]:
+        """
+        sub_function_arguments : '(' sub_function_arg_list ')'
+
+        """
+        if self.swallow('('):
+            sub_function_arg_list = self.sub_function_arg_list()
+            self.consume(')')
+            return sub_function_arg_list
+        else:
+            if fail:
+                self.error("expected '('")
+            else:
+                return None
+
+    def sub_function_arg_list(self, fail=True) -> expr.List:
+        """
+        sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
+        """
+        sub_function_arg = self.sub_function_arg(fail)
+        if sub_function_arg is None:
+            return expr.Null()
+        if self.swallow(','):
+            return expr.Pair(sub_function_arg, self.sub_function_arg_list())
+        else:
+            return expr.Pair(sub_function_arg, expr.Null())
+
+    def sub_function_arg(self, fail=True):
+        number = self.number(False)
+        if number is not None:
+            return number
+
+        string = self.string(False)
+        if string is not None:
+            return string
+
+        char = self.char(False)
+        if char is not None:
+            return char
+
+        boolean = self.boolean(False)
+        if boolean is not None:
+            return boolean
+
+        symbol = self.symbol(False)
+        if symbol is not None:
+            arg_list = self.sub_function_arguments(False)
+            if arg_list is None:
+                return symbol
+            else:
+                return expr.CompositeArgument(symbol, arg_list)
+
+        if fail:
+            self.error("expecting symbol, constant or type constructor")
+        else:
+            return None
 
     def statements(self) -> expr.List:
         """
@@ -532,7 +642,8 @@ class Reader:
                    | boolean
                    | NOTHING
                    | lst
-                   | FN  formals body
+                   | FN formals body
+                   | FN composite_body
                    | ENV body
                    | BACK
                    | '(' expression ')'
@@ -566,9 +677,12 @@ class Reader:
             return lst
 
         if self.swallow('FN'):
-            formals = self.formals()
-            body = self.body()
-            return expr.Lambda(formals, body)
+            formals = self.formals(False)
+            if formals is None:
+                return self.composite_body()
+            else:
+                body = self.body()
+                return expr.Lambda(formals, body)
 
         if self.swallow('ENV'):
             body = self.body()

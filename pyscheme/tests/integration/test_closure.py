@@ -21,7 +21,7 @@ from .base import Base
 class TestClosure(Base):
     def test_simple_lambda(self):
         self.assertEval(
-            "Closure([x]: x)",
+            "Closure([x]: { x })",
             "fn (x) { x; };"
         )
 
@@ -61,7 +61,7 @@ class TestClosure(Base):
 
     def test_lambda_string(self):
         self.assertEval(
-            "Closure([a]: if (==[a, 2]) {12} else {Lambda []: { 14 }})",
+            "Closure([a]: { if (==[a, 2]) {{ 12 }} else {{ Lambda []: { { 14 } } }} })",
             """
                 fn (a) {
                     if (a == 2) {

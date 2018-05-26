@@ -678,7 +678,7 @@ class Sequence(Expr):
             return Null.type()
 
     def __str__(self) -> str:
-        return self._exprs.qualified_str('', ' ; ', '')
+        return self._exprs.qualified_str('{ ', ' ; ', ' }')
 
 
 class Nest(Expr):
@@ -757,12 +757,15 @@ class Definition(Expr):
         env[self._symbol].unify(defn_type)
         return env[self._symbol]
 
+    def __str__(self):
+        return "define " + str(self._symbol) + " = " + str(self._value)
+
 
 class EnvContext(Expr):
     """
     the '.' operator
     """
-    def __init__(self, env: EnvironmentWrapper, expr: Expr):
+    def __init__(self, env: Expr, expr: Expr):
         self._env = env
         self._expr = expr
 
@@ -1376,3 +1379,36 @@ class NamedTuple(Expr):
 
     def __eq__(self, other: 'NamedTuple'):
         return self.name == other.name and self.values == other.values
+
+class Composite(Expr):
+    """
+    represents the combined body of a composite function
+    """
+    def __init__(self, components: List):
+        self.components = components
+
+    def __str__(self):
+        return "fn " + self.components.qualified_str('{', ' ', '}')
+
+class CompositeComponent(Expr):
+    """
+    represents a single sub-function in a composite function body
+    """
+    def __init__(self, arguments: List, body: Sequence):
+        self.arguments = arguments
+        self.body = body
+
+    def __str__(self):
+        return self.arguments.qualified_str('(', ', ', ')') + " " + str(self.body)
+
+class CompositeArgument(Expr):
+    """
+    represents a single, possibly parameterised and nested, symbolic argument
+    to a CompositeComponent
+    """
+    def __init__(self, symbol: Symbol, args: List):
+        self.symbol = symbol
+        self.args = args
+
+    def __str__(self):
+        return str(self.symbol) + self.args.qualified_str('(', ', ', ')')
