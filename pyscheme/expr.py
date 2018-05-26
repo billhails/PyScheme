@@ -33,6 +33,12 @@ class Expr:
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(self, amb)
 
+    def apply(self, args: 'List', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        if len(args) == 0:
+            return lambda: ret(self, amb)
+        else:
+            raise PySchemeInternalError("non-op called with arguments")
+
     def is_true(self) -> bool:
         raise NonBooleanExpressionError()
 
@@ -586,7 +592,10 @@ class Lambda(Expr):
         self._body = body
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        return lambda: ret(Closure(self._args, self._body, env), amb)
+        if len(self._args) == 0:
+            return lambda: self._body.eval(env, ret, amb)   # conform to type-checker's expectations
+        else:
+            return lambda: ret(Closure(self._args, self._body, env), amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         new_env = env.extend()
@@ -777,7 +786,7 @@ class Op(Expr):
 
 
 class Primitive(Op):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb'):
+    def apply(self, args: List, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def deferred_apply(evaluated_args: List, amb: 'types.Amb') -> 'types.Promise':
             return lambda: self.apply_evaluated_args(evaluated_args, ret, amb)
         return args.eval(env, deferred_apply, amb)

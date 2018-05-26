@@ -64,3 +64,17 @@ class TestCurrying(Base):
                 map(add(1), [1, 2, 3, 4]);
             '''
         )
+
+    def test_zero_arguments(self):
+        self.assertEval(
+            '12\n12',
+            '''
+            fn x() {    // type of x is int, not (() -> int)
+                12
+            }
+            
+            0 + x;
+
+            0 + x();    // also works, x() == x
+            '''
+        )

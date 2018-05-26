@@ -187,9 +187,9 @@ class Reader:
 
         definition : DEFINE symbol '=' expression
 
-        binop_and : unop_not {AND binop_and}
-                  | unop_not {OR binop_and}
-                  | unop_not {XOR binop_and}
+        binop_and : unop_not { AND binop_and }
+                  | unop_not { OR binop_and }
+                  | unop_not { XOR binop_and }
                   | unop_not
 
         unop_not : NOT unop_not
@@ -207,19 +207,19 @@ class Reader:
                    | binop_add APPEND binop_cons
                    | binop_add
 
-        binop_add : binop_mul {'+' binop_mul}
-                  | binop_mul {'-' binop_mul}
+        binop_add : binop_mul { '+' binop_mul }
+                  | binop_mul { '-' binop_mul }
                   | binop_mul
 
-        binop_mul : op_funcall {'*' op_funcall}
-                  | op_funcall {'/' op_funcall}
-                  | op_funcall {'%' op_funcall}
+        binop_mul : op_funcall { '*' op_funcall }
+                  | op_funcall { '/' op_funcall }
+                  | op_funcall { '%' op_funcall }
                   | op_funcall
 
-        op_funcall : env_access {'(' actuals ')'}
+        op_funcall : env_access [ '(' actuals ')' ]
                    | env_access
 
-        env_access : atom {'.' env_access}
+        env_access : atom { '.' env_access }
                    | atom
 
         atom : symbol
@@ -242,7 +242,7 @@ class Reader:
         farg : symbol [ ':' symbol ]
 
         symbols : empty
-                | symbol {',' symbols}
+                | symbol { ',' symbols }
 
         typedef : TYPEDEF flat_type '{' type_body '}'
 
@@ -490,7 +490,7 @@ class Reader:
 
     def op_funcall(self, fail=True) -> Maybe[expr.Expr]:
         """
-            op_funcall : env_access {'(' actuals ')'}
+            op_funcall : env_access ['(' actuals ')']
                        | env_access
         """
         self.debug("op_funcall", fail=fail)
