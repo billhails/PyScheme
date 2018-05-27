@@ -42,7 +42,8 @@ In order to get this running on my laptop after pushing to GitHub from my home c
    * `cd PyScheme`
    * `git status`
 
-You'll additionally need to install `coverage`. To install `coverage` go to the root of the distro and do
+If, like me, you're using PyCharm CE, You'll additionally need to install `coverage`. To install `coverage`
+go to the root of the distro and do
 ```
 $ source ./venv/bin/activate
 $ pip install coverage
@@ -52,6 +53,7 @@ $ pip install coverage
 
 Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), then open
 `htmlcov/index.html` in your browser. For other plarforms you can look at `coverage.sh` and see what it does (it's
-only a couple of lines of code.) If anyone wants to provide a
- `coverage.bat` or similar for other platforms please
+only a couple of lines of code.) If anyone wants to provide a `coverage.bat` or similar for other platforms please
 submit a PR.
+
+I believe that the PyCharm Professional edition has built-in coverage support.
