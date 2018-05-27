@@ -14,6 +14,7 @@ and `if (x == 0) { back }`.
 - [x] Three-valued logic system.
 - [x] Partial and over-complete function application.
 - [x] `typedef`
+- [ ] composite (alternative) functions.
 
 Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
 which isn't ideal.
