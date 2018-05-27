@@ -166,3 +166,14 @@ class TestInference(TestCase):
             fn (f) { fn (g) { fn (arg) { f(g(arg)) } } };
             '''
         )
+
+    def test_builtin_type(self):
+        self.assertType(
+            '(string -> (list(a) -> named_list(a)))',
+            '''
+            {
+            typedef named_list(t) { named(string, list(t)) }
+            named;
+            }
+            '''
+        )

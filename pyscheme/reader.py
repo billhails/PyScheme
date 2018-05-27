@@ -61,11 +61,11 @@ class Tokeniser:
         'env': 'ENV',
         'typedef': 'TYPEDEF',
         'nothing': 'NOTHING',
-        'list': 'LIST',
-        'int': 'INT',
-        'char': 'CHAR',
-        'string': 'STRING',
-        'bool': 'BOOL',
+        'list': 'KW_LIST',
+        'int': 'KW_INT',
+        'char': 'KW_CHAR',
+        'string': 'KW_STRING',
+        'bool': 'KW_BOOL',
     }
 
     regexes = {
@@ -277,11 +277,11 @@ class Reader:
         type_constructor : symbol [ '(' type { ',' type } ')' ]
 
         type : 'NOTHING'
-             | 'LIST' '(' type ')'
-             | 'INT'
-             | 'CHAR'
-             | 'STRING'
-             | 'BOOL'
+             | 'KW_LIST' '(' type ')'
+             | 'KW_INT'
+             | 'KW_CHAR'
+             | 'KW_STRING'
+             | 'KW_BOOL'
              | symbol [ '(' type { ',' type } ')' ]
     """
 
@@ -850,10 +850,9 @@ class Reader:
         if expression is None:
             return expr.Null()
         if self.swallow(','):
-            exprs = self.exprs()
-            return expr.Pair(expression, exprs)
+            return expr.Pair(expression, self.exprs())
         else:
-            return expr.List.list([expression])
+            return expr.Pair(expression, expr.Null())
 
     def symbols(self):
         symbol = self.symbol()
@@ -912,33 +911,36 @@ class Reader:
         return expr.TypeConstructor(symbol, types)
 
     def types(self):
-        type = self.type()
+        the_type = self.type()
         if self.swallow(','):
-            return expr.Pair(type, self.types())
+            return expr.Pair(the_type, self.types())
         else:
-            return expr.Pair(type, expr.Null())
+            return expr.Pair(the_type, expr.Null())
 
     def type(self) -> expr.Type:
-        '''
+        """
         type : 'NOTHING'
-             | 'LIST' '(' type ')'
-             | 'INT'
-             | 'CHAR'
-             | 'STRING'
-             | 'BOOL'
+             | 'KW_LIST' '(' type ')'
+             | 'KW_INT'
+             | 'KW_CHAR'
+             | 'KW_STRING'
+             | 'KW_BOOL'
              | symbol [ '(' type { ',' type } ')' ]
-        '''
+        """
         if self.swallow('NOTHING'):
             return expr.NothingType()
-        if self.swallow('LIST'):
-            return expr.ListType(self.type())
-        if self.swallow('INT'):
+        if self.swallow('KW_LIST'):
+            self.consume('(')
+            type_of = self.type()
+            self.consume(')')
+            return expr.ListType(expr.Pair(type_of, expr.Null()))
+        if self.swallow('KW_INT'):
             return expr.IntType()
-        if self.swallow('CHAR'):
+        if self.swallow('KW_CHAR'):
             return expr.CharType()
-        if self.swallow('STRING'):
+        if self.swallow('KW_STRING'):
             return expr.StringType()
-        if self.swallow('BOOL'):
+        if self.swallow('KW_BOOL'):
             return expr.BoolType()
         symbol = self.symbol()
         if self.swallow('('):

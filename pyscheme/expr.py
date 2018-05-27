@@ -1355,9 +1355,12 @@ class Type(TypeSystem):
     def make_type(self, env: inference.TypeEnvironment, non_generic: set):
         components = self.components.map(lambda component: component.make_type(env, non_generic))
         if type(components) is Null:
-            return env[self.name]
+            return self.get_or_make_type(env)
         else:
             return inference.TypeOperator(self.name.value(), *components)
+
+    def get_or_make_type(self, env):
+        return env[self.name]
 
     def __str__(self):
         return str(self.name) + ('' if type(self.components) is Null else str(self.components))
@@ -1375,6 +1378,9 @@ class TupleConstructor(Primitive):
     def apply_evaluated_args(self, args, ret: types.Continuation, amb: types.Amb):
         return lambda: ret(NamedTuple(self.name, args), amb)
 
+    def __str__(self):
+        return "(TupleConstructor " + str(self.name) + ")"
+
 
 class NamedTuple(Expr):
     def __init__(self, name: Symbol, values: List):
@@ -1390,6 +1396,7 @@ class NamedTuple(Expr):
     def __eq__(self, other: 'NamedTuple'):
         return self.name == other.name and self.values == other.values
 
+
 class Composite(Expr):
     """
     represents the combined body of a composite function
@@ -1399,6 +1406,7 @@ class Composite(Expr):
 
     def __str__(self):
         return "fn " + self.components.qualified_str('{', ' ', '}')
+
 
 class CompositeComponent(Expr):
     """
@@ -1411,6 +1419,7 @@ class CompositeComponent(Expr):
     def __str__(self):
         return self.arguments.qualified_str('(', ', ', ')') + " " + str(self.body)
 
+
 class CompositeArgument(Expr):
     """
     represents a single, possibly parameterised and nested, symbolic argument
@@ -1422,3 +1431,48 @@ class CompositeArgument(Expr):
 
     def __str__(self):
         return str(self.symbol) + self.args.qualified_str('(', ', ', ')')
+
+
+class NothingType(Type):
+    def __init__(self):
+        Type.__init__(self, Symbol("nothing"), Null())
+
+    def get_or_make_type(self, env):
+        return Nothing.type()
+
+
+class ListType(Type):
+    def __init__(self, components: List):
+        Type.__init__(self, Symbol("list"), components)
+
+
+class IntType(Type):
+    def __init__(self):
+        Type.__init__(self, Symbol("int"), Null())
+
+    def get_or_make_type(self, env):
+        return Number.type()
+
+
+class CharType(Type):
+    def __init__(self):
+        Type.__init__(self, Symbol("char"), Null())
+
+    def get_or_make_type(self, env):
+        return Char.type()
+
+
+class StringType(Type):
+    def __init__(self):
+        Type.__init__(self, Symbol("string"), Null())
+
+    def get_or_make_type(self, env):
+        return String.type()
+
+
+class BoolType(Type):
+    def __init__(self):
+        Type.__init__(self, Symbol("bool"))
+
+    def get_or_make_type(self, env):
+        return Boolean.type()

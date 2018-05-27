@@ -20,6 +20,7 @@ from pyscheme.tests.integration.base import Base
 
 
 class TestInference(Base):
+
     def test_inference_1(self):
         self.assertError(
             'PySchemeTypeError: bool != int',
@@ -172,6 +173,54 @@ class TestInference(Base):
                     define y = 3
                 }
             );
+            """,
+            ""
+        )
+
+    def test_inference_179(self):
+        self.assertEval(
+            "true",
+            """
+            typedef named_list(t) { named(string, list(t)) }
+            fn (x) {
+                x == named("hello", [1, 2, 3])
+            }(named("hello", [1, 2, 3]));
+            """,
+            ""
+        )
+
+    def test_inference_191(self):
+        self.assertEval(
+            "false",
+            """
+            typedef named_list(t) { named(string, list(t)) }
+            fn (x) {
+                x == named("hello", [1, 2, 3])
+            }(named("goodbye", [1, 2, 3]));
+            """,
+            ""
+        )
+
+    def test_inference_204(self):
+        self.assertError(
+            "PySchemeTypeError: bool != string",
+            """
+            typedef named_list(t) { named(string, list(t)) }
+            fn (x) {
+                x == named("hello", [1, 2, 3])
+            }(named(false, [1, 2, 3]));
+            """,
+            ""
+        )
+
+    def test_inference_216(self):
+        self.assertError(
+            "PySchemeTypeError: bool != int",
+            """
+            typedef named_list(t) { named(string, list(t)) }
+            fn (x) {
+                x == named("hello", [1, 2, 3])
+            }(named("hello", [true, false]));
             """,
             ""
         )
