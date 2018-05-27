@@ -27,8 +27,12 @@ TypeOrVar = Union['TypeVariable', 'Type']
 
 
 def debug(*args, **kwargs):
-    if False:
+    if Config.debug:
         print(*args, **kwargs)
+
+
+class Config:
+    debug = False
 
 
 class Type:
@@ -77,9 +81,8 @@ class TypeVariable(Type):
 
     @classmethod
     def reset_names(cls):
-        "used for consistency during testing"
+        """used for consistency during testing"""
         cls.next_variable_name = 'a'
-
 
     @property
     def name(self):
@@ -142,6 +145,7 @@ class EnvironmentType(Type):
     def __str__(self):
         return "EnvironmentType " + str(self._env) + self._env.dump_dict()
 
+
 class TypeOperator(Type):
     def __init__(self, name: str, *types):
         self.name = name
@@ -201,6 +205,9 @@ class TypeEnvironment:
     def flatten(self, definitions):
         pass
 
+    def dump_dict(self):
+        return ''
+
     def __getitem__(self, symbol: 'expr.Symbol'):
         raise SymbolNotFoundError(symbol)
 
@@ -233,7 +240,7 @@ class TypeFrame(TypeEnvironment):
         other.unify_half(self, seen)
 
     def unify_half(self, other, seen):
-        definitions =  self.flatten()
+        definitions = self.flatten()
         for k, v in definitions.items():
             v.unify(other[k], seen)
 

@@ -25,19 +25,30 @@ from . import inference
 
 
 def debug(*args, **kwargs):
-    if False:
+    if Config.debug:
         print(*args, **kwargs)
+
+
+class Config:
+    debug = False
 
 
 class Expr:
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(self, amb)
 
-    def apply(self, args: 'List', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+    def apply(self,
+              args: 'List',
+              env: 'environment.Environment',
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
         if len(args) == 0:
             return lambda: ret(self, amb)
         else:
             raise PySchemeInternalError("non-op called with arguments")
+
+    def type(self):
+        pass
 
     def is_true(self) -> bool:
         raise NonBooleanExpressionError()
@@ -143,7 +154,6 @@ class Constant(Expr):
     def __lt__(self, other: Expr) -> bool:
         return self._value < other.value()
 
-
     def __ge__(self, other: Expr) -> bool:
         return self._value >= other.value()
 
@@ -161,7 +171,7 @@ class Constant(Expr):
 
 class Char(Constant):
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.TypeOperator('char')
 
     def __str__(self) -> str:
@@ -170,7 +180,7 @@ class Char(Constant):
 
 class String(Constant):
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.TypeOperator('string')
 
     def __str__(self) -> str:
@@ -179,7 +189,7 @@ class String(Constant):
 
 class Number(Constant):
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.TypeOperator("int")
 
     def __str__(self) -> str:
@@ -325,7 +335,7 @@ class U(Boolean, metaclass=Singleton):
 
 
 class Symbol(Expr, metaclass=FlyWeight):
-    counter = 1;
+    counter = 1
 
     def __init__(self, name):
         self._name = name
@@ -377,7 +387,7 @@ class TypedSymbol(Expr):
         return self._type_symbol
 
     def __str__(self):
-        return str(self._symbol) + ':' + str(self._type)
+        return str(self._symbol) + ':' + str(self._type_symbol)
 
     __repr__ = __str__
 
@@ -501,7 +511,7 @@ class Pair(List):
 
 class Null(List, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.TypeOperator('list', inference.TypeVariable())
 
     def is_null(self) -> bool:
