@@ -148,3 +148,25 @@ class TestReader(TestCase):
             }
             """
         )
+
+    def test_parse_composite_2(self):
+        self.assertParse(
+            ['define factorial = fn {(0) { 1 } (n) { *[n, factorial[-[n, 1]]] }}'],
+            """
+            fn factorial {
+                (0) { 1 }
+                (n) { n * factorial(n - 1) }
+            }
+            """
+        )
+
+    def test_parse_composite_3(self):
+        self.assertParse(
+            ['define len = fn {([]) { 0 } (@[_, t]) { +[1, len[t]] }}'],
+            """
+            fn len {
+                ([]) { 0 }
+                (_ @ t) { 1 + len(t) }
+            }
+            """
+        )

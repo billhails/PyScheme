@@ -192,11 +192,15 @@ class Reader:
 
         sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
 
-        sub_function_arg : symbol [ '(' sub_function_arg_list ')' ]
-                         | number
-                         | string
-                         | char
-                         | boolean
+        sub_function_arg : simple_subfunction_arg '@' sub_function_arg
+                         | simple_subfunction_arg
+
+        sub_function_arg_2 : symbol [ '(' sub_function_arg_list ')' ]
+                                | number
+                                | string
+                                | char
+                                | boolean
+                                | '(' sub_function_arg ')'
 
         statements : expression
                    | expression ';' statements
@@ -399,6 +403,7 @@ class Reader:
         """
         composite_body : '{' sub_functions '}'
         """
+        self.debug("composite_body")
         self.consume('{')
         sub_functions = self.sub_functions()
         self.consume('}')
@@ -408,6 +413,7 @@ class Reader:
         """
         sub_functions : sub_function { sub_function }
         """
+        self.debug("sub_functions")
         sub_function = self.sub_function(False)
         if sub_function is None:
             return expr.Null()
@@ -418,6 +424,7 @@ class Reader:
         """
         sub_function : '(' sub_function_arguments ')' body
         """
+        self.debug("sub_function", fail=fail)
         sub_function_arguments = self.sub_function_arguments(fail)
         if sub_function_arguments is None:
             return None
@@ -430,6 +437,7 @@ class Reader:
         sub_function_arguments : '(' sub_function_arg_list ')'
 
         """
+        self.debug("sub_function_arguments", fail=fail)
         if self.swallow('('):
             sub_function_arg_list = self.sub_function_arg_list()
             self.consume(')')
@@ -444,6 +452,7 @@ class Reader:
         """
         sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
         """
+        self.debug("sub_function_arg_list", fail=fail)
         sub_function_arg = self.sub_function_arg(fail)
         if sub_function_arg is None:
             return expr.Null()
@@ -453,6 +462,45 @@ class Reader:
             return expr.Pair(sub_function_arg, expr.Null())
 
     def sub_function_arg(self, fail=True):
+        """
+        sub_function_arg : subfunction_arg_2 '@' sub_function_arg
+                         | subfunction_arg_2
+        """
+        self.debug("sub_function_arg", fail=fail)
+        return self.rassoc_binop(self.sub_function_arg_2, ['@'], self.sub_function_arg, fail)
+
+    def sub_function_arg_2(self, fail=True):
+        """
+        sub_function_arg_2 : '[' [ sub_function_arg { ',' sub_function_arg } ] ']'
+                           | sub_function_arg_3
+        """
+        self.debug("sub_function_arg_2", fail=fail)
+        if self.swallow('['):
+            def list_items(do_fail):
+                list_item = self.sub_function_arg(do_fail)
+                if list_item is None:
+                    return expr.Null()
+                if self.swallow(','):
+                    return expr.Pair(list_item, list_items(True))
+                else:
+                    return expr.Pair(list_item, expr.Null())
+            items = list_items(False)
+            self.consume(']')
+            return items
+        else:
+            return self.sub_function_arg_3(fail)
+
+    def sub_function_arg_3(self, fail=True):
+        """
+        sub_function_arg_2 : symbol [ '(' sub_function_arg_list ')' ]
+                           | number
+                           | string
+                           | char
+                           | boolean
+                           | '(' sub_function_arg ')'
+        """
+        self.debug("sub_function_arg_3", fail=fail)
+
         number = self.number(False)
         if number is not None:
             return number
@@ -476,6 +524,11 @@ class Reader:
                 return symbol
             else:
                 return expr.CompositeArgument(symbol, arg_list)
+
+        if self.swallow('('):
+            sub_function_arg = self.sub_function_arg()
+            self.consume(')')
+            return sub_function_arg
 
         if fail:
             self.error("expecting symbol, constant or type constructor")
@@ -855,6 +908,10 @@ class Reader:
             return expr.Pair(expression, expr.Null())
 
     def symbols(self):
+        """
+        symbols : symbol {, symbol }
+        """
+        self.debug("symbols")
         symbol = self.symbol()
         if self.swallow(','):
             return expr.Pair(symbol, self.symbols())
@@ -865,6 +922,7 @@ class Reader:
         """
         typedef : TYPEDEF flat_type '{' type_body '}'
         """
+        self.debug("typedef", fail=fail)
         if self.swallow('TYPEDEF'):
             flat_type = self.flat_type()
             self.consume('{')
@@ -880,6 +938,7 @@ class Reader:
         """
         flat_type : symbol [ '(' symbol { ',' symbol } ')' ]
         """
+        self.debug("flat_type")
         type_name = self.symbol()
         if self.swallow('('):
             formals = self.symbols()
@@ -892,6 +951,7 @@ class Reader:
         """
         type_body : type_constructor { '|' type_constructor }
         """
+        self.debug("type_body")
         type_constructor = self.type_constructor()
         if self.swallow('|'):
             return expr.Pair(type_constructor, self.type_body())
@@ -902,6 +962,7 @@ class Reader:
         """
         type_constructor :  symbol [ '(' type { ',' type } ')' ]
         """
+        self.debug("type_constructor")
         symbol = self.symbol()
         if self.swallow('('):
             types = self.types()
@@ -911,6 +972,10 @@ class Reader:
         return expr.TypeConstructor(symbol, types)
 
     def types(self):
+        """
+        types : type { ',' type }
+        """
+        self.debug("types")
         the_type = self.type()
         if self.swallow(','):
             return expr.Pair(the_type, self.types())
@@ -927,6 +992,7 @@ class Reader:
              | 'KW_BOOL'
              | symbol [ '(' type { ',' type } ')' ]
         """
+        self.debug("type")
         if self.swallow('NOTHING'):
             return expr.NothingType()
         if self.swallow('KW_LIST'):
