@@ -102,11 +102,11 @@ class TestInference(TestCase):
             '(list(a) -> int)',
             '''
             {
-                fn len(list) {
-                    if (list == []) {
+                fn len(lst) {
+                    if (lst == []) {
                         0
                     } else {
-                        1 + len(tail(list))
+                        1 + len(tail(lst))
                     }
                 }
                 len
@@ -119,11 +119,11 @@ class TestInference(TestCase):
             '((a -> b) -> (list(a) -> list(b)))',
             '''
             {
-                fn map(func, list) {
-                    if (list == []) {
+                fn map(func, lst) {
+                    if (lst == []) {
                         []
                     } else {
-                        func(head(list)) @ map(func, tail(list))
+                        func(head(lst)) @ map(func, tail(lst))
                     }
                 }
                 map

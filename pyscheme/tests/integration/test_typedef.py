@@ -57,7 +57,7 @@ class TestTypedef(Base):
         self.assertEval(
             "pair[1, null]",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             
             pair(1, null);
             
@@ -69,7 +69,7 @@ class TestTypedef(Base):
         self.assertEval(
             "true",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             
             pair(1, null) == pair(1, null);
             """,
@@ -80,7 +80,7 @@ class TestTypedef(Base):
         self.assertEval(
             "ok",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             
             if (pair(1, null) == pair(2, null)) {
                 "nok"
@@ -95,7 +95,7 @@ class TestTypedef(Base):
         self.assertError(
             "PySchemeTypeError: bool != int",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             
             pair(1, null) == pair(true, null);
             """,
@@ -106,7 +106,7 @@ class TestTypedef(Base):
         self.assertEval(
             "pair[1, pair[2, null]]",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             
             pair(1, pair(2, null));
             """,
@@ -117,18 +117,18 @@ class TestTypedef(Base):
         self.assertError(
             "PySchemeTypeError: bool != int",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             
             pair(1, pair(true, null));
             """,
-            "list cannot contain mixed types"
+            "lst cannot contain mixed types"
         )
 
     def test_typedef_139(self):
         self.assertError(
-            "PySchemeTypeError: list(int) != colour",
+            "PySchemeTypeError: lst(int) != colour",
             """
-            typedef list(t) { pair(t, list(t)) | null }
+            typedef lst(t) { pair(t, lst(t)) | null }
             typedef colour { red | green }
 
             red == pair(1, null);

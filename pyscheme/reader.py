@@ -61,6 +61,11 @@ class Tokeniser:
         'env': 'ENV',
         'typedef': 'TYPEDEF',
         'nothing': 'NOTHING',
+        'list': 'LIST',
+        'int': 'INT',
+        'char': 'CHAR',
+        'string': 'STRING',
+        'bool': 'BOOL',
     }
 
     regexes = {
@@ -159,7 +164,8 @@ class Tokeniser:
 
 
 class Reader:
-    """
+    """Grammar
+
         top : expression ';'
             | definition ';'
             | construct
@@ -266,14 +272,17 @@ class Reader:
 
         flat_type : symbol [ '(' symbols ')' ]
 
-        type_body : type_constructor { '|' type_body }
+        type_body : type_constructor { '|' type_constructor }
 
-        type_constructor : symbol [ '(' nested_types ')' ]
+        type_constructor : symbol [ '(' type { ',' type } ')' ]
 
-        nested_types : nested_type { ',' nested_type }
-
-        nested_type : symbol [ '(' nested_types ')' ]
-
+        type : 'NOTHING'
+             | 'LIST' '(' type ')'
+             | 'INT'
+             | 'CHAR'
+             | 'STRING'
+             | 'BOOL'
+             | symbol [ '(' type { ',' type } ')' ]
     """
 
     def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
@@ -870,19 +879,19 @@ class Reader:
 
     def flat_type(self) -> expr.FlatType:
         """
-        flat_type :  symbol [ '(' symbols ')' ]
+        flat_type : symbol [ '(' symbol { ',' symbol } ')' ]
         """
-        symbol = self.symbol()
+        type_name = self.symbol()
         if self.swallow('('):
-            symbols = self.symbols()
+            formals = self.symbols()
             self.consume(')')
-            return expr.FlatType(symbol, symbols)
         else:
-            return expr.FlatType(symbol, expr.Null())
+            formals = expr.Null()
+        return expr.FlatType(type_name, formals)
 
     def type_body(self) -> expr.List:
         """
-        type_body : type_constructor { '|' type_body }
+        type_body : type_constructor { '|' type_constructor }
         """
         type_constructor = self.type_constructor()
         if self.swallow('|'):
@@ -892,38 +901,52 @@ class Reader:
 
     def type_constructor(self) -> expr.TypeConstructor:
         """
-        type_constructor :  symbol [ '(' nested_types ')' ]
+        type_constructor :  symbol [ '(' type { ',' type } ')' ]
         """
         symbol = self.symbol()
         if self.swallow('('):
-            nested_types = self.nested_types()
-            self.swallow(')')
-        else:
-            nested_types = expr.Null()
-
-        return expr.TypeConstructor(symbol, nested_types)
-
-    def nested_types(self) -> expr.List:
-        """
-        nested_types : nested_type { ',' nested_types }
-        """
-        nested_type = self.nested_type()
-        if self.swallow(","):
-            return expr.Pair(nested_type, self.nested_types())
-        else:
-            return expr.Pair(nested_type, expr.Null())
-
-    def nested_type(self) -> expr.Type:
-        """
-        nested_type : symbol [ '(' nested_types ')' ]
-        """
-        symbol = self.symbol()
-        if self.swallow('('):
-            result = expr.Type(symbol, self.nested_types())
+            types = self.types()
             self.consume(')')
-            return result
         else:
-            return expr.Type(symbol, expr.Null())
+            types = expr.Null()
+        return expr.TypeConstructor(symbol, types)
+
+    def types(self):
+        type = self.type()
+        if self.swallow(','):
+            return expr.Pair(type, self.types())
+        else:
+            return expr.Pair(type, expr.Null())
+
+    def type(self) -> expr.Type:
+        '''
+        type : 'NOTHING'
+             | 'LIST' '(' type ')'
+             | 'INT'
+             | 'CHAR'
+             | 'STRING'
+             | 'BOOL'
+             | symbol [ '(' type { ',' type } ')' ]
+        '''
+        if self.swallow('NOTHING'):
+            return expr.NothingType()
+        if self.swallow('LIST'):
+            return expr.ListType(self.type())
+        if self.swallow('INT'):
+            return expr.IntType()
+        if self.swallow('CHAR'):
+            return expr.CharType()
+        if self.swallow('STRING'):
+            return expr.StringType()
+        if self.swallow('BOOL'):
+            return expr.BoolType()
+        symbol = self.symbol()
+        if self.swallow('('):
+            types = self.types()
+            self.consume(')')
+        else:
+            types = expr.Null()
+        return expr.Type(symbol, types)
 
     # utils
 

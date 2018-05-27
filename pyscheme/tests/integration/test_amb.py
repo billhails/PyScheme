@@ -52,9 +52,9 @@ class TestAmb(Base):
                     x or back
                 }
                 
-                fn one_of(list) {
-                    require(length(list) > 0);
-                    head(list) then one_of(tail(list));
+                fn one_of(lst) {
+                    require(length(lst) > 0);
+                    head(lst) then one_of(tail(lst));
                 }
                 
                 {
@@ -81,45 +81,45 @@ class TestAmb(Base):
                 condition or back
             }
 
-            fn one_of(list) {
-                require(length(list) > 0);
-                head(list) then one_of(tail(list))
+            fn one_of(lst) {
+                require(length(lst) > 0);
+                head(lst) then one_of(tail(lst))
             }
             
-            fn member(item, list) {
-                if (length(list) > 0) {
-                    if (item == (head(list))) {
+            fn member(item, lst) {
+                if (length(lst) > 0) {
+                    if (item == (head(lst))) {
                         true
                     } else {
-                        member(item, tail(list));
+                        member(item, tail(lst));
                     }
                 } else {
                     false
                 }
             }
 
-            fn exclude(items, list) {
-                if (length(list) > 0) {
-                    if (member(head(list), items)) {
-                        exclude(items, tail(list))
+            fn exclude(items, lst) {
+                if (length(lst) > 0) {
+                    if (member(head(lst), items)) {
+                        exclude(items, tail(lst))
                     } else {
-                        head(list) @ exclude(items, tail(list))
+                        head(lst) @ exclude(items, tail(lst))
                     }
                 } else {
                     []
                 }
             }
             
-            fn some_of(list) {
-                require(length(list) > 0);
-                [head(list)] then some_of(tail(list)) then head(list) @ some_of(tail(list));
+            fn some_of(lst) {
+                require(length(lst) > 0);
+                [head(lst)] then some_of(tail(lst)) then head(lst) @ some_of(tail(lst));
             }
 
-            fn sum(list) {
-                if (length(list) == 0) {
+            fn sum(lst) {
+                if (length(lst) == 0) {
                     0
                 } else {
-                    head(list) + sum(tail(list))
+                    head(lst) + sum(tail(lst))
                 }
             }
 
