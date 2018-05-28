@@ -224,3 +224,16 @@ class TestInference(Base):
             """,
             ""
         )
+
+    def test_inference_228(self):
+        self.assertEval(
+            "24",
+            """
+            fn factorial {
+                (0) { 1 }
+                (n) { n * factorial(n - 1) }
+            }
+            factorial(4);
+            """,
+            ""
+        )
