@@ -18,7 +18,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from . import environment
-from .exceptions import NonBooleanExpressionError, PySchemeInternalError, MissingPrototypeError
+from .exceptions import NonBooleanExpressionError, PySchemeInternalError, MissingPrototypeError, PySchemeInferenceError
 from .singleton import Singleton, FlyWeight
 from . import types
 from . import inference
@@ -59,11 +59,20 @@ class Expr:
     def is_unknown(self) -> bool:
         raise NonBooleanExpressionError()
 
+    def is_constant(self) -> bool:
+        """
+        used by analyse_internal to avoid putting the expression in a type environment
+        """
+        return False
+
     def value(self):
         pass
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
         pass
+
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        raise PySchemeInferenceError(str(type(self)) + " cannot be used as a formal argument")
 
     def __eq__(self, other: 'Expr') -> bool:
         return id(self) == id(other)
@@ -131,6 +140,9 @@ class Nothing(Expr, metaclass=Singleton):
     def static_type(self) -> bool:
         return True
 
+    def is_constant(self):
+        return True
+
     def __str__(self):
         return "nothing"
 
@@ -143,6 +155,9 @@ class Constant(Expr):
         return self._value
 
     def static_type(self) -> bool:
+        return True
+
+    def is_constant(self):
         return True
 
     def __eq__(self, other: Expr) -> bool:
@@ -452,8 +467,8 @@ class Pair(List):
         return self._cdr
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        def car_continuation(evaluated_car: Expr, amb: 'types.Amb') -> 'types.Promise':
-            def cdr_continuation(evaluated_cdr: List, amb: 'types.Amb') -> 'types.Promise':
+        def car_continuation(evaluated_car: Expr, amb: types.Amb) -> types.Promise:
+            def cdr_continuation(evaluated_cdr: List, amb: types.Amb) -> types.Promise:
                 return lambda: ret(Pair(evaluated_car, evaluated_cdr), amb)
             return lambda: self._cdr.eval(env, cdr_continuation, amb)
         return self._car.eval(env, car_continuation, amb)
@@ -538,6 +553,9 @@ class Null(List, metaclass=Singleton):
     def map(self, fn: callable) -> List:
         return self
 
+    def is_constant(self):
+        return True
+
     def __len__(self) -> int:
         return 0
 
@@ -573,7 +591,7 @@ class Conditional(Expr):
         self._alternative = alternative
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        def test_continuation(result: Expr, amb: 'types.Amb') -> 'types.Promise':
+        def test_continuation(result: Expr, amb: types.Amb) -> types.Promise:
             if result.is_true():
                 return lambda: self._consequent.eval(env, ret, amb)
             else:
@@ -617,11 +635,20 @@ class Lambda(Expr):
                 return self._body.analyse_internal(new_env, new_non_generic)
             else:
                 arg = args.car()
+                # replace conditional with polymorphism later
                 if type(arg) is TypedSymbol:
                     symbol = arg.symbol()
                     arg_type = new_env[arg.type_symbol()]
                     new_env[symbol] = arg_type
                     debug("Lambda", symbol, ":", arg_type, "in", str(new_env))
+                elif arg.is_constant():
+                    arg_type = arg.type()
+                elif type(arg) is Application:
+                    arg_type = arg.analyse_farg(new_env, new_non_generic)
+                elif type(arg) is CompositeArgument:
+                    arg_type = arg.analyse_farg(new_env, new_non_generic)
+                elif env.noted_type_constructor(arg):
+                    arg_type = env[arg]
                 else:
                     arg_type = inference.TypeVariable()
                     new_env[arg] = arg_type
@@ -644,7 +671,7 @@ class Application(Expr):
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
 
-        def evaluated_op_continuation(evaluated_op: 'Op', amb: 'types.Amb') -> 'types.Promise':
+        def evaluated_op_continuation(evaluated_op: 'Op', amb: types.Amb) -> types.Promise:
             return lambda: evaluated_op.apply(self._operands, env, ret, amb)
 
         return self._operation.eval(env, evaluated_op_continuation, amb)
@@ -661,10 +688,44 @@ class Application(Expr):
                     analyse_recursive(operands.cdr())
                 )
 
-        analyse_recursive(self._operands).unify(
-            self._operation.analyse_internal(env, non_generic)
-        )
+        analyse_recursive(self._operands).unify(self._operation.analyse_internal(env, non_generic))
         return result_type
+
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        """
+        We have to return a result type
+        We have to populate the environment with variables
+        """
+
+        def analyse_recursive(args: List) -> inference.Type:
+            if type(args) is Null:
+                return inference.TypeVariable()
+            else:
+                arg = args.car()
+                if type(arg) is TypedSymbol:
+                    symbol = arg.symbol()
+                    arg_type = env[arg.type_symbol()]
+                    env[symbol] = arg_type
+                    debug("Lambda", symbol, ":", arg_type, "in", str(env))
+                else:
+                    if arg.is_constant():
+                        arg_type = arg.type()
+                    elif type(arg) is Application:
+                        arg_type = arg.analyse_farg(env, non_generic)
+                    elif env.noted_type_constructor(arg):
+                        arg_type = env[arg]
+                    else:
+                        arg_type = inference.TypeVariable()
+                        env[arg] = arg_type
+                    non_generic.add(arg_type)
+                result_type = analyse_recursive(args.cdr())
+                return inference.Function(arg_type, result_type)
+
+        operands_type = analyse_recursive(self._operands)
+        operation_type = self._operation.analyse_internal(env, non_generic)
+        operands_type.unify(operation_type)
+        return operands_type.final_result()
+
 
     def __str__(self) -> str:
         return str(self._operation) + str(self._operands)
@@ -675,7 +736,7 @@ class Sequence(Expr):
         self._exprs = exprs
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        def take_last_continuation(expr: List, amb: 'types.Amb') -> 'types.Promise':
+        def take_last_continuation(expr: List, amb: types.Amb) -> types.Promise:
             return lambda: ret(expr.last(), amb)
         return self._exprs.eval(env, take_last_continuation, amb)
 
@@ -733,7 +794,7 @@ class Env(Expr):
         """
         new_env = env.extend()
 
-        def eval_continuation(val: Expr, amb: 'types.Amb') -> 'types.Promise':
+        def eval_continuation(val: Expr, amb: types.Amb) -> types.Promise:
             return ret(EnvironmentWrapper(new_env), amb)
 
         return self._body.eval(new_env, eval_continuation, amb)
@@ -750,9 +811,9 @@ class Definition(Expr):
         self._value = value
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        def define_continuation(value: Expr, amb: 'types.Amb') -> 'types.Promise':
+        def define_continuation(value: Expr, amb: types.Amb) -> types.Promise:
 
-            def ret_nothing(_: Expr, amb: 'types.Amb') -> 'types.Promise':
+            def ret_nothing(_: Expr, amb: types.Amb) -> types.Promise:
                 return lambda: ret(Nothing(), amb)
 
             return lambda: env.define(self._symbol, value, ret_nothing, amb)
@@ -780,31 +841,31 @@ class EnvContext(Expr):
         self._expr = expr
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        def env_continuation(new_env: EnvironmentWrapper, amb: 'types.Amb') -> 'types.Promise':
+        def env_continuation(new_env: EnvironmentWrapper, amb: types.Amb) -> types.Promise:
             return lambda: self._expr.eval(new_env.env(), ret, amb)
 
         return self._env.eval(env, env_continuation, amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         lhs = self._env.analyse_internal(env, non_generic)
-        debug("EnvContext,", str(self._env), ":", str(lhs), "in", env)
+        # debug("EnvContext,", str(self._env), ":", str(lhs), "in", env)
         if type(lhs) is inference.TypeVariable:
             raise MissingPrototypeError(self._env)
         return self._expr.analyse_internal(lhs.prune().env(), non_generic)
 
 
 class Op(Expr):
-    def apply(self, args: List, env: 'environment.Environment', ret: 'types.Continuation', amb: 'types.Amb'):
+    def apply(self, args: List, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         pass
 
 
 class Primitive(Op):
     def apply(self, args: List, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        def deferred_apply(evaluated_args: List, amb: 'types.Amb') -> 'types.Promise':
+        def deferred_apply(evaluated_args: List, amb: types.Amb) -> types.Promise:
             return lambda: self.apply_evaluated_args(evaluated_args, ret, amb)
         return args.eval(env, deferred_apply, amb)
 
-    def apply_evaluated_args(self, args, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         pass
 
 
@@ -818,7 +879,7 @@ class Closure(Primitive):
         self._body = body
         self._env = env
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         formal_args = self._args
         actual_args = args
         dictionary = {}
@@ -833,7 +894,7 @@ class Closure(Primitive):
             return lambda: ret(Closure(formal_args, self._body, self._env.extend(dictionary)), amb)
         elif type(actual_args) is not Null:  # over-complete function application
 
-            def re_apply_continuation(closure: Closure, amb: 'types.Amb') -> 'types.Promise':
+            def re_apply_continuation(closure: Closure, amb: types.Amb) -> types.Promise:
                 return lambda: closure.apply_evaluated_args(actual_args, ret, amb)
 
             return lambda: self._body.eval(self._env.extend(dictionary), re_apply_continuation, amb)
@@ -857,32 +918,32 @@ class BinaryArithmetic(Primitive):
 
 
 class Addition(BinaryArithmetic, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb'):
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb):
         return lambda: ret(args[0] + args[1], amb)
 
 
 class Subtraction(BinaryArithmetic, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0] - args[1], amb)
 
 
 class Multiplication(BinaryArithmetic, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0] * args[1], amb)
 
 
 class Division(BinaryArithmetic, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0] // args[1], amb)
 
 
 class Modulus(BinaryArithmetic, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0] % args[1], amb)
 
 
 class Exponentiation(BinaryArithmetic, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0] ** args[1], amb)
 
 
@@ -901,32 +962,32 @@ class BinaryComparison(Primitive):
 
 
 class Equality(BinaryComparison, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].eq(args[1]), amb)
 
 
 class GT(BinaryComparison, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].gt(args[1]), amb)
 
 
 class LT(BinaryComparison, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].lt(args[1]), amb)
 
 
 class GE(BinaryComparison, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].ge(args[1]), amb)
 
 
 class LE(BinaryComparison, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].le(args[1]), amb)
 
 
 class NE(BinaryComparison, metaclass=Singleton):
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].ne(args[1]), amb)
 
 
@@ -946,16 +1007,16 @@ class And(BinaryLogic, metaclass=Singleton):
 
     def apply(self, args: List,
               env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
 
-        def cont(lhs: Expr, amb: 'types.Amb') -> 'types.Promise':
+        def cont(lhs: Expr, amb: types.Amb) -> types.Promise:
             if lhs.is_true():
                 return lambda: args[1].eval(env, ret, amb)
             elif lhs.is_false():
                 return lambda: ret(lhs, amb)
             else:
-                def cont2(rhs: Expr, amb: 'types.Continuation') -> 'types.Promise':
+                def cont2(rhs: Expr, amb: types.Continuation) -> types.Promise:
                     if rhs.is_false():
                         return lambda: ret(rhs, amb)
                     else:
@@ -970,16 +1031,16 @@ class Or(BinaryLogic, metaclass=Singleton):
 
     def apply(self, args: List,
               env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
 
-        def cont(lhs: Expr, amb: 'types.Amb') -> 'types.Promise':
+        def cont(lhs: Expr, amb: types.Amb) -> types.Promise:
             if lhs.is_true():
                 return lambda: ret(lhs, amb)
             elif lhs.is_false():
                 return lambda: args[1].eval(env, ret, amb)
             else:
-                def cont2(rhs: Expr, amb: 'types.Continuation') -> 'types.Promise':
+                def cont2(rhs: Expr, amb: types.Continuation) -> types.Promise:
                     if rhs.is_true():
                         return lambda: ret(rhs, amb)
                     else:
@@ -995,7 +1056,7 @@ class Xor(Primitive, metaclass=Singleton):
     def type(self):
         return BinaryLogic.type()
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0] ^ args[1], amb)
 
     def static_type(self):
@@ -1007,7 +1068,7 @@ class Not(Primitive, metaclass=Singleton):
     def type(self):
         return inference.Function(Boolean.type(), Boolean.type())
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(~(args[0]), amb)
 
     def static_type(self) -> bool:
@@ -1025,10 +1086,10 @@ class Then(SpecialForm, metaclass=Singleton):
 
     def apply(self, args: List,
               env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
 
-        def amb2() -> 'types.Promise':
+        def amb2() -> types.Promise:
             return lambda: args[1].eval(env, ret, amb)
 
         return lambda: args[0].eval(env, ret, amb2)
@@ -1042,10 +1103,11 @@ class Back(SpecialForm, metaclass=Singleton):
     def type(self):
         return inference.TypeVariable()
 
-    def apply(self, args: List,
+    def apply(self,
+              args: List,
               env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
         return lambda: amb()
 
     def static_type(self) -> bool:
@@ -1060,7 +1122,7 @@ class Cons(Primitive, metaclass=Singleton):
         list_t = inference.TypeOperator('list', t)
         return inference.Function(t, inference.Function(list_t, list_t))
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(Pair(args[0], args[1]), amb)
 
     def static_type(self) -> bool:
@@ -1074,7 +1136,7 @@ class Append(Primitive, metaclass=Singleton):
         list_t = Null.type()
         return inference.Function(list_t, inference.Function(list_t, list_t))
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].append(args[1]), amb)
 
     def static_type(self) -> bool:
@@ -1089,7 +1151,7 @@ class Head(Primitive, metaclass=Singleton):
         list_t = inference.TypeOperator('list', t)
         return inference.Function(list_t, t)
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].car(), amb)
 
     def static_type(self) -> bool:
@@ -1103,7 +1165,7 @@ class Tail(Primitive, metaclass=Singleton):
         list_t = Null.type()
         return inference.Function(list_t, list_t)
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(args[0].cdr(), amb)
 
     def static_type(self) -> bool:
@@ -1116,7 +1178,7 @@ class Length(Primitive, metaclass=Singleton):
         'list(#t) -> int'
         return inference.Function(Null.type(), Number.type())
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(Number(len(args[0])), amb)
 
     def static_type(self) -> bool:
@@ -1135,7 +1197,7 @@ class Print(Primitive):
     def __init__(self, output):
         self._output = output
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         for arg in args:
             self._output.write(str(arg))
         self._output.write("\n")
@@ -1154,7 +1216,7 @@ class Cont(Primitive):
     def __init__(self, ret: callable):
         self._ret = ret
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: self._ret(args[0], amb)
 
     def static_type(self) -> bool:
@@ -1175,10 +1237,10 @@ class CallCC(SpecialForm, metaclass=Singleton):
     def apply(self,
               args: List,
               env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
 
-        def do_apply(closure: Closure, amb: 'types.Amb') -> 'types.Promise':
+        def do_apply(closure: Closure, amb: types.Amb) -> types.Promise:
             return lambda: closure.apply(List.list([Cont(ret)]), env, ret, amb)
 
         return args[0].eval(env, do_apply, amb)
@@ -1193,7 +1255,7 @@ class Exit(Primitive):
         '#t'
         return inference.TypeVariable()
 
-    def apply_evaluated_args(self, args: List, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return None
 
     def static_type(self) -> bool:
@@ -1212,10 +1274,10 @@ class Error(SpecialForm):
     def apply(self,
               args: List,
               env: 'environment.Environment',
-              ret: 'types.Continuation',
-              amb: 'types.Amb') -> 'types.Promise':
+              ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
 
-        def print_continuation(printer: Print, amb: 'types.Amb') -> 'types.Promise':
+        def print_continuation(printer: Print, amb: types.Amb) -> types.Promise:
             return lambda: printer.apply(args, env, self.cont, amb)
 
         return env.lookup(Symbol("print"), print_continuation, amb)
@@ -1276,6 +1338,7 @@ class TypeDef(TypeSystem):
         return_type = self.flat_type.make_type(new_env, new_non_generic)
         for constructor in self.constructors:
             env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))
+            env.note_type_constructor(constructor.name)
         return Null.type()
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
@@ -1414,28 +1477,20 @@ class Composite(Expr):
             if last_type is not None:
                 this_type.unify(last_type)
             last_type = this_type
-
+        return last_type
 
 
 class CompositeComponent(Lambda):
     """
     represents a single sub-function in a composite function body
     """
-    def __str__(self):
-        return self.arguments.qualified_str('(', ', ', ')') + " " + str(self.body)
 
 
-class CompositeArgument(Expr):
+class CompositeArgument(Application):
     """
     represents a single, possibly parameterised and nested, symbolic argument
     to a CompositeComponent
     """
-    def __init__(self, symbol: Symbol, args: List):
-        self.symbol = symbol
-        self.args = args
-
-    def __str__(self):
-        return str(self.symbol) + self.args.qualified_str('(', ', ', ')')
 
 
 class NothingType(Type):

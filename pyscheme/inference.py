@@ -67,6 +67,8 @@ class Type:
     def freshrec(self, non_generics, mapping):
         return self.prune().make_fresh(non_generics, mapping)
 
+    def final_result(self):
+        return self
 
 class TypeVariable(Type):
     next_variable_id = 0
@@ -182,6 +184,9 @@ class Function(TypeOperator):
     def __init__(self, from_type, to_type):
         super(Function, self).__init__("->", from_type, to_type)
 
+    def final_result(self):
+        return self.types[1].final_result()
+
 
 class TypeEnvironment:
     counter = 0
@@ -208,6 +213,12 @@ class TypeEnvironment:
     def dump_dict(self):
         return ''
 
+    def note_type_constructor(self, name: 'expr.Symbol'):
+        pass
+
+    def noted_type_constructor(self, name: 'expr.Symbol'):
+        return False
+
     def __getitem__(self, symbol: 'expr.Symbol'):
         raise SymbolNotFoundError(symbol)
 
@@ -228,6 +239,7 @@ class TypeFrame(TypeEnvironment):
     def __init__(self, parent: TypeEnvironment, dictionary: Dict['expr.Symbol', Type]):
         self._parent = parent
         self._dictionary = dictionary
+        self.type_constructors = set()
         TypeEnvironment.counter += 1
         self._id = TypeEnvironment.counter
 
@@ -253,12 +265,14 @@ class TypeFrame(TypeEnvironment):
         self._parent.flatten(definitions)
         return definitions
 
+    def note_type_constructor(self, name: 'expr.Symbol'):
+        self.type_constructors.add(name)
+
+    def noted_type_constructor(self, name: 'expr.Symbol'):
+        return name in self.type_constructors or self._parent.noted_type_constructor(name)
+
     def dump_dict(self):
-        string = "{\n"
-        for k, v in self._dictionary.items():
-            string += ("    " + str(k) + ": " + str(v) + "\n")
-        string += "}\n"
-        return string
+        return ''
 
     def __getitem__(self, symbol: 'expr.Symbol') -> Type:
         if symbol in self._dictionary:

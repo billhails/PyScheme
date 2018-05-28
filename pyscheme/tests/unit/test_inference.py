@@ -177,14 +177,30 @@ class TestInference(TestCase):
             }
             '''
         )
+
     def test_composite_type(self):
         self.assertType(
-            'foo',
+            '((a -> b) -> (list(a) -> list(b)))',
             '''
             {
                 fn map {
                     (f, []) { [] }
                     (f, h @ t) { f(h) @ map(f, t) }
+                }
+                map;
+            }
+            '''
+        )
+
+    def test_composite_with_user_types(self):
+        self.assertType(
+            '((a -> b) -> (l(a) -> l(b)))',
+            '''
+            {
+                typedef l(t) { p(t, l(t)) | n }
+                fn map {
+                    (f, n)       { n }
+                    (f, p(h, t)) { p(f(h), map(f, t)) }
                 }
                 map;
             }

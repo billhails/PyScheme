@@ -140,7 +140,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_1(self):
         self.assertParse(
-            ['define map = fn {(f, null) { null } (f, pair(h, t)) { pair[f[h], map[f, t]] }}'],
+            ['define map = fn {Lambda [f, null]: { { null } } Lambda [f, pair[h, t]]: { { pair[f[h], map[f, t]] } }}'],
             """
             fn map {
                 (f, null) { null }
@@ -151,7 +151,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_2(self):
         self.assertParse(
-            ['define factorial = fn {(0) { 1 } (n) { *[n, factorial[-[n, 1]]] }}'],
+            ['define factorial = fn {Lambda [0]: { { 1 } } Lambda [n]: { { *[n, factorial[-[n, 1]]] } }}'],
             """
             fn factorial {
                 (0) { 1 }
@@ -162,7 +162,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_3(self):
         self.assertParse(
-            ['define len = fn {([]) { 0 } (@[_, t]) { +[1, len[t]] }}'],
+            ['define len = fn {Lambda [[]]: { { 0 } } Lambda [@[_, t]]: { { +[1, len[t]] } }}'],
             """
             fn len {
                 ([]) { 0 }
