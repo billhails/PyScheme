@@ -1407,15 +1407,20 @@ class Composite(Expr):
     def __str__(self):
         return "fn " + self.components.qualified_str('{', ' ', '}')
 
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
+        last_type = None
+        for component in self.components:
+            this_type = component.analyse_internal(env, non_generic)
+            if last_type is not None:
+                this_type.unify(last_type)
+            last_type = this_type
 
-class CompositeComponent(Expr):
+
+
+class CompositeComponent(Lambda):
     """
     represents a single sub-function in a composite function body
     """
-    def __init__(self, arguments: List, body: Sequence):
-        self.arguments = arguments
-        self.body = body
-
     def __str__(self):
         return self.arguments.qualified_str('(', ', ', ')') + " " + str(self.body)
 

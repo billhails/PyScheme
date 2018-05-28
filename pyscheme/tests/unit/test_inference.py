@@ -177,3 +177,16 @@ class TestInference(TestCase):
             }
             '''
         )
+    def test_composite_type(self):
+        self.assertType(
+            'foo',
+            '''
+            {
+                fn map {
+                    (f, []) { [] }
+                    (f, h @ t) { f(h) @ map(f, t) }
+                }
+                map;
+            }
+            '''
+        )
