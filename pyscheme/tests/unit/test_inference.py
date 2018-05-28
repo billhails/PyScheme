@@ -147,6 +147,32 @@ class TestInference(TestCase):
     def test_occurs_check(self):
         self.assertTypeFailure(PySchemeInferenceError, 'fn (f) { f(f) };')
 
+    def test_override_check(self):
+        self.assertTypeFailure(
+            PySchemeInferenceError,
+            '''
+            {
+                typedef colour { red | green }
+                {
+                    define red = 5;
+                }
+            }
+            '''
+        )
+
+    def test_override_check_2(self):
+        self.assertTypeFailure(
+            PySchemeInferenceError,
+            '''
+            {
+                typedef colour { red | green }
+                {
+                    typedef colours { red | blue }
+                }
+            }
+            '''
+        )
+
     def test_generic_non_generic(self):
         self.assertType(
             '(a -> list(a))',
@@ -235,7 +261,7 @@ class TestInference(TestCase):
             }
             '''
         )
-        
+
     def test_composite_with_call(self):
         self.assertType(
             'int',

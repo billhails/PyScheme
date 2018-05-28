@@ -821,6 +821,8 @@ class Definition(Expr):
         return lambda: self._value.eval(env, define_continuation, amb)
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
+        if env.noted_type_constructor(self._symbol):
+            raise PySchemeInferenceError("attempt to override type constructor " + str(self._symbol))
         env[self._symbol] = inference.TypeVariable()
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
@@ -1358,6 +1360,8 @@ class TypeConstructor(TypeSystem):
         self.arg_types = arg_types
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
+        if env.noted_type_constructor(self.name):
+            raise PySchemeInferenceError("attempt to override type constructor " + str(self.name))
         env[self.name] = inference.TypeVariable()
 
     def make_type(self, env: inference.TypeEnvironment, return_type: inference.Type, non_generic: set) -> inference.Type:
