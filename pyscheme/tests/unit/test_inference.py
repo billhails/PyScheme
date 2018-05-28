@@ -206,3 +206,47 @@ class TestInference(TestCase):
             }
             '''
         )
+
+    def test_composite_with_constants(self):
+        self.assertType(
+            '(int -> int)',
+            '''
+            {
+                fn factorial {
+                    (0) { 1 }
+                    (n) { n * factorial(n - 1) }
+                }
+                factorial;
+            }
+            '''
+        )
+
+    def test_composite_with_constants_2(self):
+        self.assertType(
+            '(l(a) -> int)',
+            '''
+            {
+                typedef l(t) { p(t, l(t)) | n }
+                fn len {
+                    (n) { 0 }
+                    (p(h, t)) { 1 + len(t) }
+                }
+                len;
+            }
+            '''
+        )
+        
+    def test_composite_with_call(self):
+        self.assertType(
+            'int',
+            '''
+            {
+                typedef l(t) { p(t, l(t)) | n }
+                fn len {
+                    (n) { 0 }
+                    (p(h, t)) { 1 + len(t) }
+                }
+                len(p(1, p(2, p(3, n))));
+            }
+            '''
+        )
