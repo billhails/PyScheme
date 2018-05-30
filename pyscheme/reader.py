@@ -195,12 +195,15 @@ class Reader:
         sub_function_arg : simple_subfunction_arg '@' sub_function_arg
                          | simple_subfunction_arg
 
-        sub_function_arg_2 : symbol [ '(' sub_function_arg_list ')' ]
-                                | number
-                                | string
-                                | char
-                                | boolean
-                                | '(' sub_function_arg ')'
+        sub_function_arg_2 : '[' [ sub_function_arg { ',' sub_function_arg } ] ']'
+                           | sub_function_arg_3
+
+        sub_function_arg_3 : symbol [ '(' sub_function_arg_list ')' ]
+                           | number
+                           | string
+                           | char
+                           | boolean
+                           | '(' sub_function_arg ')'
 
         statements : expression
                    | expression ';' statements
@@ -384,7 +387,7 @@ class Reader:
             return None
         return expr.Nest(body)
 
-    def body(self, fail=True):
+    def body(self, fail=True) -> Maybe[expr.Sequence]:
         """
             body : '{' statements '}'
         """
@@ -420,7 +423,7 @@ class Reader:
         else:
             return expr.Pair(sub_function, self.sub_functions())
 
-    def sub_function(self, fail=True) -> Maybe[expr.CompositeComponent]:
+    def sub_function(self, fail=True) -> Maybe[expr.CompositeLambda]:
         """
         sub_function : '(' sub_function_arguments ')' body
         """
@@ -430,7 +433,7 @@ class Reader:
             return None
         else:
             body = self.body()
-            return expr.CompositeComponent(sub_function_arguments, body)
+            return expr.CompositeLambda(sub_function_arguments, body)
 
     def sub_function_arguments(self, fail=True) -> Maybe[expr.List]:
         """
@@ -492,7 +495,7 @@ class Reader:
 
     def sub_function_arg_3(self, fail=True):
         """
-        sub_function_arg_2 : symbol [ '(' sub_function_arg_list ')' ]
+        sub_function_arg_3 : symbol [ '(' sub_function_arg_list ')' ]
                            | number
                            | string
                            | char
@@ -523,7 +526,7 @@ class Reader:
             if arg_list is None:
                 return symbol
             else:
-                return expr.CompositeArgument(symbol, arg_list)
+                return expr.Application(symbol, arg_list)
 
         if self.swallow('('):
             sub_function_arg = self.sub_function_arg()

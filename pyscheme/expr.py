@@ -45,7 +45,7 @@ class Expr:
         if len(args) == 0:
             return lambda: ret(self, amb)
         else:
-            raise PySchemeInternalError("non-op called with arguments")
+            raise PySchemeInternalError("non-op " + str(type(self)) + " called with arguments")
 
     def type(self):
         pass
@@ -1484,18 +1484,18 @@ class Composite(Expr):
         return last_type
 
 
-class CompositeComponent(Lambda):
+class CompositeLambda(Lambda):
     """
     represents a single sub-function in a composite function body
     """
+    pass
 
 
-class CompositeArgument(Application):
+class CompositeClosure(Closure):
     """
-    represents a single, possibly parameterised and nested, symbolic argument
-    to a CompositeComponent
+    type of closure resulting from evaluation of a Composite
     """
-
+    pass
 
 class NothingType(Type):
     def __init__(self):
