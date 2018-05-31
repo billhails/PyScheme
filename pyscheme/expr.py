@@ -157,8 +157,8 @@ class Constant(Expr):
     def static_type(self) -> bool:
         return True
 
-    def is_constant(self):
-        return True
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        return self.type()
 
     def __eq__(self, other: Expr) -> bool:
         return self._value == other.value()
@@ -372,11 +372,23 @@ class Symbol(Expr, metaclass=FlyWeight):
 
     __repr__ = __str__
 
+    def __len__(self):
+        return 1
+
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return self.get_type(env, non_generic)
 
     def get_type(self, env: inference.TypeEnvironment, non_generic: set):
         return env[self].fresh(non_generic)
+
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        if env.noted_type_constructor(self):
+            return_type = env[self]
+        else:
+            return_type = inference.TypeVariable()
+            env[self] = return_type
+            non_generic.add(return_type)
+        return return_type
 
     @classmethod
     def generate(cls):
@@ -403,6 +415,13 @@ class TypedSymbol(Expr):
 
     def __str__(self):
         return str(self._symbol) + ':' + str(self._type_symbol)
+
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        symbol = self.symbol()
+        arg_type = env[self.type_symbol()]
+        env[symbol] = arg_type
+        non_generic.add(arg_type)
+        return arg_type
 
     __repr__ = __str__
 
@@ -504,6 +523,41 @@ class Pair(List):
     def map(self, fn: callable) -> List:
         return Pair(fn(self._car), self._cdr.map(fn))
 
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        """
+        We have to return a result type
+        We have to populate the environment with variables
+        """
+
+        type_so_far = inference.TypeVariable()
+
+        def analyse_recursive(pair: Pair) -> inference.Type:
+            if type(pair) is Null:
+                result_type = Pair.type(type_so_far)
+                result_type.unify(Null.type())
+                return result_type # list of something
+            elif type(pair) is Symbol:
+                result_type = Pair.type(type_so_far)
+                env[pair] = result_type
+                return result_type
+            elif type(pair) is Pair:
+                arg_type = pair.car().analyse_farg(env, non_generic)
+
+                # elif type(item) is Pair:
+                #     arg_type = item.analyse_farg(env, non_generic)
+                # elif env.noted_type_constructor(item):
+                #     arg_type = env[item]
+                # else:
+                #     arg_type = inference.TypeVariable()
+                #     env[item] = arg_type
+                #     non_generic.add(arg_type)
+
+                type_so_far.unify(arg_type)
+                return analyse_recursive(pair.cdr())
+
+        return analyse_recursive(self)
+
+
     def __eq__(self, other: List) -> bool:
         if type(other) is Pair:
             return self._car == other.car() and self._cdr == other.cdr()
@@ -528,6 +582,9 @@ class Null(List, metaclass=Singleton):
     @classmethod
     def type(cls):
         return inference.TypeOperator('list', inference.TypeVariable())
+
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        return self.type()
 
     def is_null(self) -> bool:
         return True
@@ -634,25 +691,16 @@ class Lambda(Expr):
                 self._body.prepare_analysis(new_env)
                 return self._body.analyse_internal(new_env, new_non_generic)
             else:
-                arg = args.car()
+                arg_type = args.car().analyse_farg(new_env, new_non_generic)
                 # replace conditional with polymorphism later
-                if type(arg) is TypedSymbol:
-                    symbol = arg.symbol()
-                    arg_type = new_env[arg.type_symbol()]
-                    new_env[symbol] = arg_type
-                    debug("Lambda", symbol, ":", arg_type, "in", str(new_env))
-                elif arg.is_constant():
-                    arg_type = arg.type()
-                elif type(arg) is Application:
-                    arg_type = arg.analyse_farg(new_env, new_non_generic)
-                elif type(arg) is CompositeArgument:
-                    arg_type = arg.analyse_farg(new_env, new_non_generic)
-                elif env.noted_type_constructor(arg):
-                    arg_type = env[arg]
-                else:
-                    arg_type = inference.TypeVariable()
-                    new_env[arg] = arg_type
-                    new_non_generic.add(arg_type)
+                # if type(arg) is TypedSymbol:
+                #     symbol = arg.symbol()
+                #     arg_type = new_env[arg.type_symbol()]
+                #     new_env[symbol] = arg_type
+                # elif arg.is_constant():
+                #     arg_type = arg.type()
+                # elif type(arg) is Pair:
+                #     arg_type = arg.analyse_farg(new_env, new_non_generic)
                 result_type = analyse_recursive(args.cdr())
                 return inference.Function(arg_type, result_type)
 
@@ -690,42 +738,6 @@ class Application(Expr):
 
         analyse_recursive(self._operands).unify(self._operation.analyse_internal(env, non_generic))
         return result_type
-
-    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        """
-        We have to return a result type
-        We have to populate the environment with variables
-        """
-
-        def analyse_recursive(args: List) -> inference.Type:
-            if type(args) is Null:
-                return inference.TypeVariable()
-            else:
-                arg = args.car()
-                if type(arg) is TypedSymbol:
-                    symbol = arg.symbol()
-                    arg_type = env[arg.type_symbol()]
-                    env[symbol] = arg_type
-                    debug("Lambda", symbol, ":", arg_type, "in", str(env))
-                else:
-                    if arg.is_constant():
-                        arg_type = arg.type()
-                    elif type(arg) is Application:
-                        arg_type = arg.analyse_farg(env, non_generic)
-                    elif env.noted_type_constructor(arg):
-                        arg_type = env[arg]
-                    else:
-                        arg_type = inference.TypeVariable()
-                        env[arg] = arg_type
-                    non_generic.add(arg_type)
-                result_type = analyse_recursive(args.cdr())
-                return inference.Function(arg_type, result_type)
-
-        operands_type = analyse_recursive(self._operands)
-        operation_type = self._operation.analyse_internal(env, non_generic)
-        operands_type.unify(operation_type)
-        return operands_type.final_result()
-
 
     def __str__(self) -> str:
         return str(self._operation) + str(self._operands)
@@ -1454,6 +1466,19 @@ class NamedTuple(Expr):
         self.name = name
         self.values = values
 
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        final_type = inference.TypeVariable()
+        def analyse_values(values: List) -> inference.Type:
+            if type(values) is Null:
+                return final_type
+            else:
+                return inference.Function(
+                    values.car().analyse_farg(env, non_generic),
+                    analyse_values(values.cdr())
+                )
+        our_fn = analyse_values(self.values)
+        env[self.name].unify()
+
     def __str__(self):
         if type(self.values) is Null:
             return str(self.name)
@@ -1484,7 +1509,7 @@ class Composite(Expr):
         return last_type
 
 
-class CompositeLambda(Lambda):
+class ComponentLambda(Lambda):
     """
     represents a single sub-function in a composite function body
     """
@@ -1496,6 +1521,7 @@ class CompositeClosure(Closure):
     type of closure resulting from evaluation of a Composite
     """
     pass
+
 
 class NothingType(Type):
     def __init__(self):
