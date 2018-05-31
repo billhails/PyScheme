@@ -70,6 +70,7 @@ class Type:
     def final_result(self):
         return self
 
+
 class TypeVariable(Type):
     next_variable_id = 0
 

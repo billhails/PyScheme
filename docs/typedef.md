@@ -214,7 +214,7 @@ Composite(
     CompositeLambda(
         [   // arguments
             Symbol("fun"),
-            Application(
+            NamedTuple(
                 Symbol("pr"),
                 [
                     Symbol("h"),
@@ -251,7 +251,7 @@ This allows mutually recursive functions to type-check, but additionally it can 
 to override the definition of a type value, even in a nested scope,
 because they behave as constants.
 
-The type environment keeps an additional equivalently scoped set of symbols
+> The type environment keeps an additional equivalently scoped set of symbols
 that have been defined as type constructors. This allows the type checker to
 recognise symbols as type constructors / type values.
 
@@ -276,26 +276,24 @@ is held in the type environment. If it finds such a symbol, it registers its
 type in the argument list it is building, but does not add it to the type
 environment it is building for the function.
 
-To simplify the following, when I say "constant" I mean either a literal
+> To simplify the following, when I say "constant" I mean either a literal
 like `1` or `"hello"`, or a constant symbol registered with the type
 environment.
 
 The second `CompositeLambda` should be analysed to the following type:
 ```
 (type of fun)
-    -> (type of application of pr to (type of h, type of t))
+    -> (type of named tuple ("pr", type of h, type of t))
     -> (type of Sequence with fun, h and t in scope)
 ```
-So the analysis of `fun` is the same, but on encountering the application
-formal argument, the type checker knows that it can only legally be a
-type constructor. It knows the type of that constructor is:
+So the analysis of `fun` is the same, but on encountering the named tuple, it uses the type
+environment to look up the type of `pr`:
 ```text
 a -> lst(a) ->lst(a)
 ```
-However the type of the argument being analysed is the result of applying
-that type constructor, i.e. `lst(a)`.
+and from that it deduces the type of the tuple itself to be `lst(a)`
 
-Descending recursively into the parmeters of `pr`, the same strategy is followed:
+Descending recursively into the components of the named tuple, the same strategy is followed:
 constants and type constructors are used for their type, and symbols are given a
 type variable in the type environment.
 
@@ -335,32 +333,61 @@ We then unify with the type of the first composite.
 
 Type checking of the application of `map` uses the standard HM algorithm.
 
+#### Type checking lists as formal arguments
+
+The same process applies when parsing the following alternative to map, which
+uses built-in lists rather than declared types:
+```text
+fn map {
+    (f, []) { [] }
+    (f, h @ t) { f(h) @ map(f, t) }
+}
+```
+This should parse to:
+```
+Composite(
+    CompositeLambda(
+        [
+            Symbol("fun"),
+            Null()
+        ],
+        Sequence(...) // body
+    )
+    CompositeLambda(
+        [
+            Symbol("fun"),
+            Pair(
+                Symbol("h"),
+                Symbol("t")
+            )
+        ],
+        Sequence(...) // body
+    )
+)
+```
+We just treat lists as if they were named tuples, the process is the same.
+
 ### Evaluation
 Now that the type checker has validated the expressions, we can execute them with
 a certain confidence. In order to bind values to variables in the run-time,
-when some of those variables are embedded inside type constructors, we need to
-do a simplified (simpler than unification) pattern matching of the formal
-arguments with their actual arguments. But the actual arguments are
-constants and type structures, while the formal arguments are still just AST syntax.
+when some of those variables are embedded inside named tuples, we need to
+do a pattern matching of the formal arguments with their actual arguments.
 
-Furthermore, we no longer have access to the type environment.
+| actual argument | formal argument | action |
+| ----------------| --------------- | ------ |
+| constant        | constant        | fail if they are not equal |
+| constant        | symbol          | bind constant to symbol |
+| constant        | tuple           | fail |
+| constant        | list            | fail |
+| tuple           | constant        | fail |
+| tuple           | symbol          | bind tuple to symbol |
+| tuple           | tuple           | fail if the names are not equal, otherwise recurse on their components |
+| tuple           | list            | fail |
+| list            | constant        | fail |
+| list            | symbol          | bind list to symbol |
+| list            | tuple           | fail |
+| list            | list            | recurse on the components |
 
-The idea at the moment is to partially evaluate the formal arguments and then
-pattern match the result against the actual arguments. The difference between
-partial evaluation and full evaluation is that symbols that are not being applied
-to arguments are left as-is, and not looked up in the run-time environment.
-
-To continue with our example, in the second clause of the map fn:
-```text
-(fun, pr(h, t)) { ... }
-```
-When evaluating the formal arguments, only `pr` is evaluated (looked up) and
-applied to the symbols `h` and `t`, resulting in a `NamedTuple` with the name
-`pr` and values of the two unevaluated symbols.
-
-We can then pattern match the formal and actual arguments.
-
-* note to self, we need to disallow repetition of a single symbol in formal
-argument lists.
-* when a constant matches a constant they must be equal.
-* when a constant matches a symbol the symbol is bound to the constant in the env.
+I'm thinking of enlisting `amb` to run the type checking here, so "fail" means `back`, and the `apply` routine
+in the application of the composite function tries one function then the next by doing what `then` does. That means
+we get a prolog-like behaviour (if we allow the final function mismatch to fail back further.)

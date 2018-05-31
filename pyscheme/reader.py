@@ -203,7 +203,6 @@ class Reader:
                            | string
                            | char
                            | boolean
-                           | '(' sub_function_arg ')'
 
         statements : expression
                    | expression ';' statements
@@ -423,7 +422,7 @@ class Reader:
         else:
             return expr.Pair(sub_function, self.sub_functions())
 
-    def sub_function(self, fail=True) -> Maybe[expr.CompositeLambda]:
+    def sub_function(self, fail=True) -> Maybe[expr.ComponentLambda]:
         """
         sub_function : '(' sub_function_arguments ')' body
         """
@@ -433,7 +432,7 @@ class Reader:
             return None
         else:
             body = self.body()
-            return expr.CompositeLambda(sub_function_arguments, body)
+            return expr.ComponentLambda(sub_function_arguments, body)
 
     def sub_function_arguments(self, fail=True) -> Maybe[expr.List]:
         """
@@ -470,7 +469,13 @@ class Reader:
                          | subfunction_arg_2
         """
         self.debug("sub_function_arg", fail=fail)
-        return self.rassoc_binop(self.sub_function_arg_2, ['@'], self.sub_function_arg, fail)
+        subfunction_arg_2 = self.sub_function_arg_2(fail)
+        if subfunction_arg_2 is None:
+            return None
+        if self.swallow('@'):
+            return expr.Pair(subfunction_arg_2, self.sub_function_arg())
+        else:
+            return subfunction_arg_2
 
     def sub_function_arg_2(self, fail=True):
         """
@@ -500,7 +505,6 @@ class Reader:
                            | string
                            | char
                            | boolean
-                           | '(' sub_function_arg ')'
         """
         self.debug("sub_function_arg_3", fail=fail)
 
@@ -526,12 +530,7 @@ class Reader:
             if arg_list is None:
                 return symbol
             else:
-                return expr.Application(symbol, arg_list)
-
-        if self.swallow('('):
-            sub_function_arg = self.sub_function_arg()
-            self.consume(')')
-            return sub_function_arg
+                return expr.NamedTuple(symbol, arg_list)
 
         if fail:
             self.error("expecting symbol, constant or type constructor")
