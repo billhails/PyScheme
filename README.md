@@ -2,21 +2,7 @@
 
 A small lambda-language interpreter written in Python
 
-I have a few ideas I'd like to pull in from my abortive F-natural project,
-specifically:
-
-- [x] incorporate `amb` with keywords `then` and `back`, i.e. `define x = 5 then 6`
-and `if (x == 0) { back }`.
-- [x] strong implicit type checking.
-- [x] first-class environments.
-- [x] built-in linked lists with `@` (cons) and `@@` (append) operators.
-- [ ] strings are linked lists of char.
-- [x] Three-valued logic system.
-- [x] Partial and over-complete function application.
-- [x] `typedef`
-- [ ] composite (alternative) functions.
-
-Syntax is very much in the javascript style, and I'm currently parsing with a hand-written recursive descent parser,
+Syntax is very much in the javascript/C/Java style, and I'm currently parsing with a hand-written recursive descent parser,
 which isn't ideal.
 
 ## First Impressions
