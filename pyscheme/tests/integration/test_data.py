@@ -195,6 +195,21 @@ class TestConditional(Base):
             """
         )
 
+    def test_lt(self):
+        self.assertEval('true', '10 < 12;')
+
+    def test_gt(self):
+        self.assertEval('false', '10 > 12;')
+
+    def test_le(self):
+        self.assertEval('true', '10 <= 12;')
+
+    def test_ge(self):
+        self.assertEval('false', '10 >= 12;')
+
+    def test_ne(self):
+        self.assertEval('true', '10 != 12;')
+
     def test_nothing(self):
         self.assertEval(
             '',

@@ -163,6 +163,12 @@ class Constant(Expr):
     def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return self.type()
 
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        if self == other:
+            return lambda: ret(self, amb)
+        else:
+            return lambda: amb()
+
     def __eq__(self, other: Expr) -> bool:
         return self._value == other.value()
 
@@ -209,12 +215,6 @@ class Number(Constant):
     @classmethod
     def type(cls):
         return inference.TypeOperator("int")
-
-    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        if self == other:
-            return lambda: ret(self, amb)
-        else:
-            return lambda: amb()
 
     def __str__(self) -> str:
         return str(self._value)
@@ -1597,6 +1597,7 @@ class ComponentClosure(Closure):
     type of closure resulting from the evaluation of a ComponentLambda
     """
     def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        # TODO - allow curried application
         new_env = self._env.extend()
         def apply_evaluated_recursive(
                 fargs: List,
