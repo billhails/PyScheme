@@ -237,3 +237,43 @@ class TestInference(Base):
             """,
             ""
         )
+
+    def test_inference_241(self):
+        self.assertEval(
+            'pr[2, pr[4, pr[6, nll]]]',
+            '''
+            {
+                typedef lst(t) { pr(t, lst(t)) | nll }
+                
+                fn map {
+                    (f, nll) { nll }
+                    (f, pr(h, t)) { pr(f(h), map(f, t)) }
+                }
+                
+                fn mul(x, y) {
+                    x * y
+                }
+                
+                map(mul(2), pr(1, pr(2, pr(3, nll))));
+            }
+            '''
+        )
+
+    def test_inference_262(self):
+        self.assertEval(
+            '[2, 4, 6, 8, 10]',
+            '''
+            {
+                fn map {
+                    (f, []) { [] }
+                    (f, h @ t) { f(h) @ map(f, t) }
+                }
+                
+                fn mul(x, y) {
+                    x * y
+                }
+                
+                map(mul(2), [1, 2, 3, 4, 5]);
+            }
+            '''
+        )

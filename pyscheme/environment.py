@@ -35,8 +35,14 @@ class Environment:
     def define(self, symbol, value, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         pass
 
+    def contains(self, symbol: 'expr.Symbol'):
+        return False
+
     def __str__(self) -> str:
         return '[0]'
+
+    def __getitem__(self, symbol):
+        raise SymbolNotFoundError(symbol)
 
     def contents(self):
         return {}
@@ -70,6 +76,15 @@ class Frame(Environment):
                 del self._dictionary[symbol]
                 return lambda: amb()
             return lambda: ret(symbol, undo_amb)
+
+    def contains(self, symbol: 'expr.Symbol'):
+        return symbol in self._dictionary or self._parent.contains(symbol)
+
+    def __getitem__(self, symbol):
+        if symbol in self._dictionary:
+            return self._dictionary[symbol]
+        else:
+            return self._parent[symbol]
 
     def __str__(self) -> str:
         return '[' + str(self._number) + '] -> ' + str(self._parent)

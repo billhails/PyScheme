@@ -162,7 +162,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_3(self):
         self.assertParse(
-            ['define len = fn {Lambda [[]]: { { 0 } } Lambda [@[_, t]]: { { +[1, len[t]] } }}'],
+            ['define len = fn {Lambda [[]]: { { 0 } } Lambda [[_ . t]]: { { +[1, len[t]] } }}'],
             """
             fn len {
                 ([]) { 0 }

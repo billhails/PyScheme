@@ -281,7 +281,7 @@ class TypeFrame(TypeEnvironment):
         else:
             return self._parent[symbol]
 
-    def __contains__(self, symbol: 'expr.Symbol'):
+    def __contains__(self, symbol: 'expr.Symbol') -> bool:
         return symbol in self._dictionary or symbol in self._parent
 
     def __setitem__(self, symbol: 'expr.Symbol', typevar: Type):

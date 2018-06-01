@@ -48,7 +48,7 @@ class Expr:
             raise PySchemeInternalError("non-op " + str(type(self)) + " called with arguments")
 
     def type(self):
-        pass
+        raise PySchemeInferenceError("cannot determine type of " + str(type(self)) + ' ' + str(self))
 
     def is_true(self) -> bool:
         raise NonBooleanExpressionError()
@@ -67,6 +67,9 @@ class Expr:
 
     def value(self):
         pass
+
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        raise PySchemeInferenceError("cannot match " + str(type(self)))
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
         pass
@@ -206,6 +209,12 @@ class Number(Constant):
     @classmethod
     def type(cls):
         return inference.TypeOperator("int")
+
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        if self == other:
+            return lambda: ret(self, amb)
+        else:
+            return lambda: amb()
 
     def __str__(self) -> str:
         return str(self._value)
@@ -361,6 +370,12 @@ class Symbol(Expr, metaclass=FlyWeight):
     def value(self):
         return self._name
 
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        if env.contains(self) and type(env[self]) is NamedTuple:
+            return lambda: env[self].match(other, env, ret, amb)
+        else:
+            return lambda: env.define(self, other, ret, amb)
+
     def __hash__(self) -> int:
         return id(self)
 
@@ -374,6 +389,9 @@ class Symbol(Expr, metaclass=FlyWeight):
 
     def __len__(self):
         return 1
+
+    def trailing_str(self, sep: str, end: str) -> str:
+        return ' . ' + str(self) + end
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return self.get_type(env, non_generic)
@@ -479,6 +497,12 @@ class Pair(List):
         self._cdr = cdr
         self._len = 1 + len(cdr)
 
+    @classmethod
+    def type(cls, content=None):
+        if content is None:
+            content = inference.TypeVariable()
+        return inference.TypeOperator('list', content)
+
     def car(self) -> Expr:
         return self._car
 
@@ -509,6 +533,11 @@ class Pair(List):
 
     def append(self, other: List) -> List:
         return Pair(self._car, self._cdr.append(other))
+
+    def match(self, other: 'List', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        def car_continuation(val, amb) -> types.Promise:
+            return lambda: self.cdr().match(other.cdr(), env, ret, amb)
+        return lambda: self.car().match(other.car(), env, car_continuation, amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         self_type = inference.TypeOperator('list', self._car.analyse_internal(env, non_generic))
@@ -613,6 +642,12 @@ class Null(List, metaclass=Singleton):
     def is_constant(self):
         return True
 
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        if self == other:
+            return lambda: ret(self, amb)
+        else:
+            return lambda: amb()
+
     def __len__(self) -> int:
         return 0
 
@@ -680,7 +715,13 @@ class Lambda(Expr):
         if len(self._args) == 0:
             return lambda: self._body.eval(env, ret, amb)   # conform to type-checker's expectations
         else:
-            return lambda: ret(Closure(self._args, self._body, env), amb)
+            return lambda: ret(self.closure(self._args, self._body, env), amb)
+
+    def closure(self, args: List, body: Expr, env: 'environment.Environment') -> 'Closure':
+        """
+        intended to be overridden by i.e. ComponentLambda
+        """
+        return Closure(args, body, env)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         new_env = env.extend()
@@ -1477,7 +1518,14 @@ class NamedTuple(Expr):
                     analyse_values(values.cdr())
                 )
         our_fn = analyse_values(self.values)
-        env[self.name].unify()
+        env[self.name].fresh(non_generic).unify(our_fn)
+        return final_type
+
+    def match(self, other: 'NamedTuple', env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        if self.name == other.name:
+            return lambda: self.values.match(other.values, env, ret, amb)
+        else:
+            return lambda: amb()
 
     def __str__(self):
         if type(self.values) is Null:
@@ -1489,7 +1537,7 @@ class NamedTuple(Expr):
         return self.name == other.name and self.values == other.values
 
 
-class Composite(Expr):
+class Composite(Primitive):
     """
     represents the combined body of a composite function
     """
@@ -1508,19 +1556,61 @@ class Composite(Expr):
             last_type = this_type
         return last_type
 
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        def post_eval_continuation(evaluated_components, amb) -> types.Promise:
+            return lambda: ret(CompositeClosure(evaluated_components), amb)
+        return lambda: self.components.eval(env, post_eval_continuation, amb)
+
 
 class ComponentLambda(Lambda):
     """
     represents a single sub-function in a composite function body
     """
-    pass
+
+    def closure(self, args: List, body: Expr, env: 'environment.Environment') -> Closure:
+        """
+        overrides Lambda.closure
+        """
+        return ComponentClosure(args, body, env)
 
 
 class CompositeClosure(Closure):
     """
     type of closure resulting from evaluation of a Composite
     """
-    pass
+    def __init__(self, components):
+        self.components = components
+
+    def apply_evaluated_args(self, args, ret: types.Continuation, amb: types.Amb):
+        def try_recursive(components: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+            def amb2() -> types.Promise:
+                return lambda: try_recursive(components.cdr(), ret, amb)
+            if type(components) is Null:
+                return lambda: amb()
+            else:
+                return lambda: components.car().apply_evaluated_args(args, ret, amb2)
+        return try_recursive(self.components, ret, amb)
+
+
+class ComponentClosure(Closure):
+    """
+    type of closure resulting from the evaluation of a ComponentLambda
+    """
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        new_env = self._env.extend()
+        def apply_evaluated_recursive(
+                fargs: List,
+                aargs: List,
+                ret: types.Continuation,
+                amb: types.Amb
+        ) -> types.Promise:
+            def next_continuation(val, amb) -> types.Promise:
+                return lambda: apply_evaluated_recursive(fargs.cdr(), aargs.cdr(), ret, amb)
+            if type(aargs) is Null:
+                return lambda: self._body.eval(new_env, ret, amb)
+            else:
+                return lambda: fargs.car().match(aargs.car(), new_env, next_continuation, amb)
+        return apply_evaluated_recursive(self._args, args, ret, amb)
 
 
 class NothingType(Type):
