@@ -67,7 +67,7 @@ class TestInference(Base):
 
     def test_inference_5(self):
         self.assertError(
-            "PySchemeTypeError: string != int",
+            "PySchemeTypeError: list(char) != int",
             '''
             (0 @ []) @@ ("hello" @ []);
             '''
@@ -181,7 +181,7 @@ class TestInference(Base):
         self.assertEval(
             "true",
             """
-            typedef named_list(t) { named(string, list(t)) }
+            typedef named_list(t) { named(list(char), list(t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named("hello", [1, 2, 3]));
@@ -193,7 +193,7 @@ class TestInference(Base):
         self.assertEval(
             "false",
             """
-            typedef named_list(t) { named(string, list(t)) }
+            typedef named_list(t) { named(list(char), list(t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named("goodbye", [1, 2, 3]));
@@ -203,9 +203,9 @@ class TestInference(Base):
 
     def test_inference_204(self):
         self.assertError(
-            "PySchemeTypeError: bool != string",
+            "PySchemeTypeError: bool != list(char)",
             """
-            typedef named_list(t) { named(string, list(t)) }
+            typedef named_list(t) { named(list(char), list(t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named(false, [1, 2, 3]));
@@ -217,7 +217,7 @@ class TestInference(Base):
         self.assertError(
             "PySchemeTypeError: bool != int",
             """
-            typedef named_list(t) { named(string, list(t)) }
+            typedef named_list(t) { named(list(char), list(t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named("hello", [true, false]));

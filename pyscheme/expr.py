@@ -202,15 +202,6 @@ class Char(Constant):
         return str(self._value)
 
 
-class String(Constant):
-    @classmethod
-    def type(cls):
-        return inference.TypeOperator('string')
-
-    def __str__(self) -> str:
-        return str(self._value)
-
-
 class Number(Constant):
     @classmethod
     def type(cls):
@@ -393,6 +384,9 @@ class Symbol(Expr, metaclass=FlyWeight):
     def trailing_str(self, sep: str, end: str) -> str:
         return ' . ' + str(self) + end
 
+    def trailing_repr(self, sep: str, end: str) -> str:
+        return ' . ' + repr(self) + end
+
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return self.get_type(env, non_generic)
 
@@ -446,6 +440,10 @@ class TypedSymbol(Expr):
 
 class List(Expr):
     @classmethod
+    def type(cls, content):
+        return inference.TypeOperator('list', content)
+
+    @classmethod
     def list(cls, args, index=0) -> 'List':
         if index == len(args):
             return Null()
@@ -461,13 +459,23 @@ class List(Expr):
     def cdr(self) -> 'List':
         pass
 
+    def is_string(self):
+        return False
+
     def __len__(self) -> int:
         pass
 
     def __str__(self) -> str:
-        return self.qualified_str('[', ', ', ']')
+        if self.is_string():
+            return self.qualified_str('', '', '')
+        else:
+            return self.qualified_repr('[', ', ', ']')
 
-    __repr__ = __str__
+    def __repr__(self):
+        if self.is_string():
+            return self.qualified_repr('"', '', '"')
+        else:
+            return self.qualified_repr('[', ', ', ']')
 
     def __getitem__(self, item) -> Expr:
         pass
@@ -476,6 +484,9 @@ class List(Expr):
         pass
 
     def trailing_str(self, sep: str, end: str) -> str:
+        pass
+
+    def trailing_repr(self, sep: str, end: str) -> str:
         pass
 
     def append(self, other: 'List') -> 'List':
@@ -525,11 +536,20 @@ class Pair(List):
     def __len__(self) -> int:
         return self._len
 
+    def is_string(self):
+        return type(self._car) is Char
+
     def qualified_str(self, start: str, sep: str, end: str) -> str:
         return start + str(self._car) + self._cdr.trailing_str(sep, end)
 
+    def qualified_repr(self, start: str, sep: str, end: str) -> str:
+        return start + repr(self._car) + self._cdr.trailing_repr(sep, end)
+
     def trailing_str(self, sep: str, end: str) -> str:
         return sep + str(self._car) + self._cdr.trailing_str(sep, end)
+
+    def trailing_repr(self, sep: str, end: str) -> str:
+        return sep + repr(self._car) + self._cdr.trailing_repr(sep, end)
 
     def append(self, other: List) -> List:
         return Pair(self._car, self._cdr.append(other))
@@ -620,7 +640,13 @@ class Null(List, metaclass=Singleton):
     def qualified_str(self, start: str, sep: str, end: str) -> str:
         return start + end
 
+    def qualified_repr(self, start: str, sep: str, end: str) -> str:
+        return start + end
+
     def trailing_str(self, sep: str, end: str) -> str:
+        return end
+
+    def trailing_repr(self, sep: str, end: str) -> str:
         return end
 
     def append(self, other: List) -> List:
@@ -764,6 +790,7 @@ class Application(Expr):
     def __str__(self) -> str:
         return str(self._operation) + str(self._operands)
 
+    __repr__ = __str__
 
 class Sequence(Expr):
     def __init__(self, exprs: List):
@@ -1249,16 +1276,15 @@ class Print(Primitive):
     def type(self):
         'string -> string'
         return inference.Function(
-            String.type(),
-            String.type()
+            List.type(Char.type()),
+            List.type(Char.type())
         )
 
     def __init__(self, output):
         self._output = output
 
     def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        for arg in args:
-            self._output.write(str(arg))
+        self._output.write(str(args[0]))
         self._output.write("\n")
         return lambda: ret(args, amb)
 
@@ -1482,6 +1508,7 @@ class TypeConstructor(TypeSystem):
         else:
             return str(self.name) + str(self.arg_types)
 
+    __repr__ = __str__
 
 class Type(TypeSystem):
     """
@@ -1505,6 +1532,7 @@ class Type(TypeSystem):
     def __str__(self):
         return str(self.name) + ('' if type(self.components) is Null else str(self.components))
 
+    __repr__ = __str__
 
 class TupleConstructor(Primitive):
     """
@@ -1552,6 +1580,8 @@ class NamedTuple(Expr):
             return str(self.name)
         else:
             return str(self.name) + str(self.values)
+
+    __repr__ = __str__
 
     def __eq__(self, other: 'NamedTuple'):
         return self.name == other.name and self.values == other.values
@@ -1669,14 +1699,6 @@ class CharType(Type):
 
     def get_or_make_type(self, env):
         return Char.type()
-
-
-class StringType(Type):
-    def __init__(self):
-        Type.__init__(self, Symbol("string"), Null())
-
-    def get_or_make_type(self, env):
-        return String.type()
 
 
 class BoolType(Type):

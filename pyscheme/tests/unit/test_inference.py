@@ -69,7 +69,7 @@ class TestInference(TestCase):
         self.assertType('list(int)', '[1, 2];')
 
     def test_list_string(self):
-        self.assertType('list(string)', '["a", "b"];')
+        self.assertType('list(list(char))', '["a", "b"];')
 
     def test_nested_list(self):
         self.assertType('list(list(int))', '[[0, 1, 2], []];')
@@ -195,10 +195,10 @@ class TestInference(TestCase):
 
     def test_builtin_type(self):
         self.assertType(
-            '(string -> (list(a) -> named_list(a)))',
+            '(list(char) -> (list(a) -> named_list(a)))',
             '''
             {
-            typedef named_list(t) { named(string, list(t)) }
+            typedef named_list(t) { named(list(char), list(t)) }
             named;
             }
             '''

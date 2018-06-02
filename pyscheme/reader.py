@@ -65,7 +65,6 @@ class Tokeniser:
         'list': 'KW_LIST',
         'int': 'KW_INT',
         'char': 'KW_CHAR',
-        'string': 'KW_STRING',
         'bool': 'KW_BOOL',
     }
 
@@ -288,7 +287,6 @@ class Reader:
              | 'KW_LIST' '(' type ')'
              | 'KW_INT'
              | 'KW_CHAR'
-             | 'KW_STRING'
              | 'KW_BOOL'
              | symbol [ '(' type { ',' type } ')' ]
     """
@@ -809,14 +807,14 @@ class Reader:
         else:
             return None
 
-    def string(self, fail=True) -> Maybe[expr.Constant]:
+    def string(self, fail=True) -> Maybe[expr.List]:
         """
             string : STRING
         """
         self.debug("string", fail=fail)
         string = self.swallow('STRING')
         if string:
-            return expr.String(string.value)
+            return expr.List.list([expr.Char(c) for c in string.value])
         elif fail:
             self.error("expected string")
         else:
@@ -997,7 +995,6 @@ class Reader:
              | 'KW_LIST' '(' type ')'
              | 'KW_INT'
              | 'KW_CHAR'
-             | 'KW_STRING'
              | 'KW_BOOL'
              | symbol [ '(' type { ',' type } ')' ]
         """
@@ -1013,8 +1010,6 @@ class Reader:
             return expr.IntType()
         if self.swallow('KW_CHAR'):
             return expr.CharType()
-        if self.swallow('KW_STRING'):
-            return expr.StringType()
         if self.swallow('KW_BOOL'):
             return expr.BoolType()
         symbol = self.symbol()
