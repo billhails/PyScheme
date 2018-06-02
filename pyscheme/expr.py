@@ -571,16 +571,6 @@ class Pair(List):
                 return result_type
             elif type(pair) is Pair:
                 arg_type = pair.car().analyse_farg(env, non_generic)
-
-                # elif type(item) is Pair:
-                #     arg_type = item.analyse_farg(env, non_generic)
-                # elif env.noted_type_constructor(item):
-                #     arg_type = env[item]
-                # else:
-                #     arg_type = inference.TypeVariable()
-                #     env[item] = arg_type
-                #     non_generic.add(arg_type)
-
                 type_so_far.unify(arg_type)
                 return analyse_recursive(pair.cdr())
 
@@ -733,22 +723,13 @@ class Lambda(Expr):
                 return self._body.analyse_internal(new_env, new_non_generic)
             else:
                 arg_type = args.car().analyse_farg(new_env, new_non_generic)
-                # replace conditional with polymorphism later
-                # if type(arg) is TypedSymbol:
-                #     symbol = arg.symbol()
-                #     arg_type = new_env[arg.type_symbol()]
-                #     new_env[symbol] = arg_type
-                # elif arg.is_constant():
-                #     arg_type = arg.type()
-                # elif type(arg) is Pair:
-                #     arg_type = arg.analyse_farg(new_env, new_non_generic)
                 result_type = analyse_recursive(args.cdr())
                 return inference.Function(arg_type, result_type)
 
         return analyse_recursive(self._args)
 
     def __str__(self) -> str:
-        return "Lambda " + str(self._args) + ": { " + str(self._body) + " }"
+        return self.__class__.__name__  + " " + str(self._args) + ": { " + str(self._body) + " }"
 
     __repr__ = __str__
 
@@ -859,6 +840,9 @@ class Env(Expr):
 
 
 class Definition(Expr):
+    """
+    The `define` statement
+    """
     def __init__(self, symbol: Symbol, value: Expr):
         self._symbol = symbol
         self._value = value
@@ -903,18 +887,21 @@ class EnvContext(Expr):
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         lhs = self._env.analyse_internal(env, non_generic)
-        # debug("EnvContext,", str(self._env), ":", str(lhs), "in", env)
         if type(lhs) is inference.TypeVariable:
             raise MissingPrototypeError(self._env)
         return self._expr.analyse_internal(lhs.prune().env(), non_generic)
 
 
 class Op(Expr):
+    """base class for operators
+    """
     def apply(self, args: List, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         pass
 
 
 class Primitive(Op):
+    """primitive operators can have their arguments evaluated for them
+    """
     def apply(self, args: List, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def deferred_apply(evaluated_args: List, amb: types.Amb) -> types.Promise:
             return lambda: self.apply_evaluated_args(evaluated_args, ret, amb)
@@ -925,10 +912,14 @@ class Primitive(Op):
 
 
 class SpecialForm(Op):
+    """special forms evaluate their own arguments
+    """
     pass
 
 
 class Closure(Primitive):
+    """closures are created by evaluating a lambda (fn)
+    """
     def __init__(self, args: List, body: Expr, env: 'environment.Environment'):
         self._args = args
         self._body = body
@@ -957,10 +948,13 @@ class Closure(Primitive):
             return lambda: self._body.eval(self._env.extend(dictionary), ret, amb)
 
     def __str__(self) -> str:
-        return "Closure(" + str(self._args) + ": " + str(self._body) + ")"
+        return self.__class__.__name__ + "(" + str(self._args) + ": " + str(self._body) + ")"
 
 
 class BinaryArithmetic(Primitive):
+    """common base class for binary arithmetic operators.
+    type is always `int -> int -> int`
+    """
     @classmethod
     def type(self):
         return inference.Function(
@@ -1004,6 +998,9 @@ class Exponentiation(BinaryArithmetic, metaclass=Singleton):
 
 
 class BinaryComparison(Primitive):
+    """base class for binary comparison operators.
+    type is always `t -> t -> bool`
+    """
     @classmethod
     def type(self):
         typeVar = inference.TypeVariable()
@@ -1047,6 +1044,9 @@ class NE(BinaryComparison, metaclass=Singleton):
 
 
 class BinaryLogic(SpecialForm):
+    """base class for binary boolean operators.
+    type is always `bool -> bool -> bool`
+    """
     @classmethod
     def type(self):
         return inference.Function(
@@ -1131,6 +1131,8 @@ class Not(Primitive, metaclass=Singleton):
 
 
 class Then(SpecialForm, metaclass=Singleton):
+    """the `then` operator
+    """
     @classmethod
     def type(self):
         typevar = inference.TypeVariable()
@@ -1154,6 +1156,8 @@ class Then(SpecialForm, metaclass=Singleton):
 
 
 class Back(SpecialForm, metaclass=Singleton):
+    """the `back` statement
+    """
     @classmethod
     def type(self):
         return inference.TypeVariable()
@@ -1263,6 +1267,8 @@ class Print(Primitive):
 
 
 class Cont(Primitive):
+    """wrapper for the continuation passed by `here` (CallCC)
+    """
     @classmethod
     def type(self):
         '#t'
@@ -1279,6 +1285,8 @@ class Cont(Primitive):
 
 
 class CallCC(SpecialForm, metaclass=Singleton):
+    """The `here` function
+    """
     @classmethod
     def type(self):
         '(#t -> #u) -> #u'
@@ -1583,11 +1591,12 @@ class CompositeClosure(Closure):
 
     def apply_evaluated_args(self, args, ret: types.Continuation, amb: types.Amb):
         def try_recursive(components: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
-            def amb2() -> types.Promise:
-                return lambda: try_recursive(components.cdr(), ret, amb)
             if type(components) is Null:
                 return lambda: amb()
             else:
+                def amb2() -> types.Promise:
+                    return lambda: try_recursive(components.cdr(), ret, amb)
+
                 return lambda: components.car().apply_evaluated_args(args, ret, amb2)
         return try_recursive(self.components, ret, amb)
 
@@ -1597,7 +1606,6 @@ class ComponentClosure(Closure):
     type of closure resulting from the evaluation of a ComponentLambda
     """
     def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        # TODO - allow curried application
         new_env = self._env.extend()
         def apply_evaluated_recursive(
                 fargs: List,
@@ -1605,11 +1613,19 @@ class ComponentClosure(Closure):
                 ret: types.Continuation,
                 amb: types.Amb
         ) -> types.Promise:
-            def next_continuation(val, amb) -> types.Promise:
-                return lambda: apply_evaluated_recursive(fargs.cdr(), aargs.cdr(), ret, amb)
-            if type(aargs) is Null:
+            if type(fargs) is Null and type(aargs) is Null:
                 return lambda: self._body.eval(new_env, ret, amb)
+            elif type(fargs) is Null:  # over-application
+                def re_apply_continuation(closure: Closure, amb: types.Amb) -> types.Promise:
+                    return lambda: closure.apply_evaluated_args(aargs, ret, amb)
+
+                return lambda: self._body.eval(new_env, re_apply_continuation, amb)
+            elif type(aargs) is Null:  # currying
+                return lambda: ret(ComponentClosure(fargs, self._body, new_env), amb)
             else:
+                def next_continuation(val, amb) -> types.Promise:
+                    return lambda: apply_evaluated_recursive(fargs.cdr(), aargs.cdr(), ret, amb)
+
                 return lambda: fargs.car().match(aargs.car(), new_env, next_continuation, amb)
         return apply_evaluated_recursive(self._args, args, ret, amb)
 

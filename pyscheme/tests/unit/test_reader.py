@@ -115,9 +115,9 @@ class TestReader(TestCase):
         self.assertParse(
             ['typedef(lst[t] : [pair[t, lst[t]], null])'],
             "typedef lst(t) { pair(t, lst(t)) | null }"
-            #                  ----               ----    : type constructors
-            #        -------        -  -------            : types
-            #             -         -       -             : typevars
+            #                 ----              ----    : type constructors
+            #        ------        -  ------            : types
+            #             -        -      -             : typevars
         )
 
     def test_parse_typedef_2(self):
@@ -140,7 +140,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_1(self):
         self.assertParse(
-            ['define map = fn {Lambda [f, null]: { { null } } Lambda [f, pair[h, t]]: { { pair[f[h], map[f, t]] } }}'],
+            ['define map = fn {ComponentLambda [f, null]: { { null } } ComponentLambda [f, pair[h, t]]: { { pair[f[h], map[f, t]] } }}'],
             """
             fn map {
                 (f, null) { null }
@@ -151,7 +151,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_2(self):
         self.assertParse(
-            ['define factorial = fn {Lambda [0]: { { 1 } } Lambda [n]: { { *[n, factorial[-[n, 1]]] } }}'],
+            ['define factorial = fn {ComponentLambda [0]: { { 1 } } ComponentLambda [n]: { { *[n, factorial[-[n, 1]]] } }}'],
             """
             fn factorial {
                 (0) { 1 }
@@ -162,7 +162,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_3(self):
         self.assertParse(
-            ['define len = fn {Lambda [[]]: { { 0 } } Lambda [[_ . t]]: { { +[1, len[t]] } }}'],
+            ['define len = fn {ComponentLambda [[]]: { { 0 } } ComponentLambda [[_ . t]]: { { +[1, len[t]] } }}'],
             """
             fn len {
                 ([]) { 0 }
