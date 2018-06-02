@@ -1314,12 +1314,24 @@ class CallCC(SpecialForm, metaclass=Singleton):
 
 class Exit(Primitive):
     @classmethod
-    def type(self):
+    def type(cls):
         '#t'
         return inference.TypeVariable()
 
     def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return None
+
+    def static_type(self) -> bool:
+        return True
+
+
+class Spawn(Primitive):
+    @classmethod
+    def type(cls):
+        return Boolean.type()
+
+    def apply_evaluated_args(self, args: List, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        return [lambda: ret(T(), amb), lambda: ret(F(), amb)]
 
     def static_type(self) -> bool:
         return True

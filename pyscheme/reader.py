@@ -57,6 +57,7 @@ class Tokeniser:
         'xor': 'XOR',
         'then': 'THEN',
         'back': 'BACK',
+        'spawn': 'SPAWN',
         'define': 'DEFINE',
         'env': 'ENV',
         'typedef': 'TYPEDEF',
@@ -262,6 +263,7 @@ class Reader:
              | FN composite_body
              | ENV body
              | BACK
+             | SPAWN
              | '(' expression ')'
 
         formals : '(' fargs ')'
@@ -710,6 +712,7 @@ class Reader:
                    | FN composite_body
                    | ENV body
                    | BACK
+                   | SPAWN
                    | '(' expression ')'
         """
         self.debug("atom", fail=fail)
@@ -753,6 +756,10 @@ class Reader:
             return expr.Env(body)
 
         token = self.swallow('BACK')
+        if token:
+            return self.apply_token(token)
+
+        token = self.swallow('SPAWN')
         if token:
             return self.apply_token(token)
 

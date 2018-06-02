@@ -60,6 +60,7 @@ class Repl:
                     "print": expr.Print(self.output), # t -> t
                     "here": expr.CallCC(),            # ((t -> _) -> t) -> a ?
                     "exit": expr.Exit(),              # _
+                    "spawn": expr.Spawn(),            # bool
                     "error": expr.Error(
                         lambda val, amb:
                         lambda: self.repl(lambda:
@@ -80,7 +81,10 @@ class Repl:
             thunk = threads.pop(0)
             next = thunk()
             if next is not None:
-                threads += [next]
+                if type(next) is list:  # spawn returns a list of two threads
+                    threads += next
+                else:
+                    threads += [next]
 
     def read(self, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         result = self.reader.read()
