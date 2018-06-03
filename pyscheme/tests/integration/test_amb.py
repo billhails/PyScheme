@@ -158,37 +158,29 @@ class TestAmb(Base):
                     condition or back
                 }
                 
-                fn one_of(lst) {
-                    require(length(lst) > 0);
-                    head(lst) then one_of(tail(lst))
+                fn one_of {
+                    ([]) { back }
+                    (h @ t) { h then one_of(t) }
                 }
                 
-                fn member(x, l) {
-                    if (l == []) {
-                        false
-                    } else {
-                        x == head(l) or member(x, tail(l))
-                    }
+                fn member {
+                    (x, []) { false }
+                    (x, h @ t) { x == h or member(x, t) }
                 }
 
-                fn exclude (l, m) {
-                    if (m == []) {
-                        []
-                    } else {
-                        if (member(head(m), l)) {
-                            exclude(l, tail(m))
+                fn exclude {
+                    (l, []) { [] }
+                    (l, h @ t) {
+                        if (member(h, l)) {
+                            exclude(l, t)
                         } else {
-                            head(m) @ exclude(l, tail(m))
+                            h @ exclude(l, t)
                         }
                     }
                 }
                 
                 fn abs(n) {
-                    if (n < 0) {
-                        0 - n
-                    } else {
-                        n
-                    }
+                    if (n < 0) { 0 - n } else { n }
                 }
                 
                 define floors = [1, 2, 3, 4, 5];

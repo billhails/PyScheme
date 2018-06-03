@@ -1702,7 +1702,7 @@ class CompositeClosure(Closure):
 
                 return lambda: components.car().apply_evaluated_args(args, ret, ambivalence.Amb(amb2, amb.cut()))
 
-        return try_recursive(self.components, ret, amb)
+        return try_recursive(self.components, ret, amb.cut_point())
 
 
 class ComponentClosure(Closure):
@@ -1717,15 +1717,15 @@ class ComponentClosure(Closure):
                 fargs: LinkedList,
                 aargs: LinkedList,
                 ret: types.Continuation,
-                amb: types.Amb
+                amb: ambivalence.Amb
         ) -> types.Promise:
             if type(fargs) is Null and type(aargs) is Null:
-                return lambda: self._body.eval(new_env, ret, amb)
+                return lambda: self._body.eval(new_env, ret, amb.cut())
             elif type(fargs) is Null:  # over-application
                 def re_apply_continuation(closure: Closure, amb: types.Amb) -> types.Promise:
                     return lambda: closure.apply_evaluated_args(aargs, ret, amb)
 
-                return lambda: self._body.eval(new_env, re_apply_continuation, amb)
+                return lambda: self._body.eval(new_env, re_apply_continuation, amb.cut())
             elif type(aargs) is Null:  # currying
                 return lambda: ret(ComponentClosure(fargs, self._body, new_env), amb)
             else:

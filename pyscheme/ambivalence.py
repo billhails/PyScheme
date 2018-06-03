@@ -35,3 +35,6 @@ class Amb:
 
     def cut(self):
         return self._cut
+
+    def cut_point(self):
+        return Amb(self._amb, Amb(self._amb))
