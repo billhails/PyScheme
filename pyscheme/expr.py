@@ -22,7 +22,7 @@ from .exceptions import NonBooleanExpressionError, PySchemeInternalError, Missin
 from .singleton import Singleton, FlyWeight
 from . import types
 from . import inference
-
+from . import ambivalence
 
 def debug(*args, **kwargs):
     if Config.debug:
@@ -196,7 +196,7 @@ class Constant(Expr):
         if self == other:
             return lambda: ret(self, amb)
         else:
-            return lambda: amb()
+            return amb
 
     def __cmp__(self, other: 'Constant'):
         if self._value < other.value():
@@ -1216,11 +1216,11 @@ class Then(SpecialForm, metaclass=Singleton):
     def apply(self, args: LinkedList,
               env: 'environment.Environment',
               ret: types.Continuation,
-              amb: types.Amb) -> types.Promise:
+              amb: ambivalence.Amb) -> types.Promise:
         def amb2() -> types.Promise:
             return lambda: args[1].eval(env, ret, amb)
 
-        return lambda: args[0].eval(env, ret, amb2)
+        return lambda: args[0].eval(env, ret, ambivalence.Amb(amb2, amb.cut()))
 
     def static_type(self) -> bool:
         return True
@@ -1238,8 +1238,9 @@ class Back(SpecialForm, metaclass=Singleton):
               args: LinkedList,
               env: 'environment.Environment',
               ret: types.Continuation,
-              amb: types.Amb) -> types.Promise:
-        return lambda: amb()
+              amb: types.Amb
+    ) -> types.Promise:
+        return amb
 
     def static_type(self) -> bool:
         return True
@@ -1691,15 +1692,15 @@ class CompositeClosure(Closure):
     def __init__(self, components):
         self.components = components
 
-    def apply_evaluated_args(self, args, ret: types.Continuation, amb: types.Amb):
-        def try_recursive(components: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+    def apply_evaluated_args(self, args, ret: types.Continuation, amb: ambivalence.Amb):
+        def try_recursive(components: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
             if type(components) is Null:
-                return lambda: amb()
+                return amb
             else:
                 def amb2() -> types.Promise:
                     return lambda: try_recursive(components.cdr(), ret, amb)
 
-                return lambda: components.car().apply_evaluated_args(args, ret, amb2)
+                return lambda: components.car().apply_evaluated_args(args, ret, ambivalence.Amb(amb2, amb.cut()))
 
         return try_recursive(self.components, ret, amb)
 

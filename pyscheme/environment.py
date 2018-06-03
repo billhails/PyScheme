@@ -21,6 +21,7 @@ from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError
 from . import expr
 from . import types
 from typing import Dict
+from . import ambivalence
 
 
 class Environment:
@@ -66,7 +67,7 @@ class Frame(Environment):
     def define(self, symbol: 'expr.Symbol',
                value: 'expr.Expr',
                ret: 'types.Continuation',
-               amb: 'types.Amb') -> 'types.Promise':
+               amb: ambivalence.Amb) -> 'types.Promise':
         if symbol in self._dictionary:
             raise SymbolAlreadyDefinedError
         else:
@@ -75,7 +76,7 @@ class Frame(Environment):
             def undo_amb() -> 'types.Promise':
                 del self._dictionary[symbol]
                 return lambda: amb()
-            return lambda: ret(symbol, undo_amb)
+            return lambda: ret(symbol, ambivalence.Amb(undo_amb, amb.cut()))
 
     def contains(self, symbol: 'expr.Symbol'):
         return symbol in self._dictionary or self._parent.contains(symbol)

@@ -25,6 +25,8 @@ from io import StringIO
 import pyscheme.reader as reader
 from .inference import TypeEnvironment
 from .exceptions import PySchemeError
+from . import ambivalence
+
 
 class Repl:
     def __init__(self, input: StringIO, output: StringIO, error: StringIO):
@@ -107,7 +109,7 @@ class Repl:
 
     def repl(self, amb: 'types.Amb') -> 'types.Promise':
         def print_continuation(expr, amb: 'types.Amb') -> 'types.Promise':
-            return lambda: self.repl(lambda: None)
+            return lambda: self.repl(ambivalence.Amb(lambda: None))
 
         def eval_continuation(evaluated_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
             return lambda: self.print(evaluated_expr, print_continuation, amb)
@@ -118,5 +120,5 @@ class Repl:
         return lambda: self.read(read_continuation, amb)
 
     def run(self):
-        self.trampoline([lambda: self.repl(lambda: None)])
+        self.trampoline([lambda: self.repl(ambivalence.Amb(lambda: None))])
 
