@@ -130,7 +130,12 @@ class Expr:
         return False
 
     def __cmp__(self, other):
-        raise PySchemeInternalError(self.__class__.__name__ + " objects are not comparable")
+        if id(self) == id(other):
+            return 0
+        elif id(self) < id(other):
+            return -1
+        else:
+            return 1
 
     def __lt__(self, other):
         return self.__cmp__(other) < 0

@@ -26,13 +26,8 @@ class TestSort(Base):
             '["everywhere", "goodbye", "hello", "here", "there"]',
             '''
             {
-                define unsorted = [
-                    "hello",
-                    "goodbye",
-                    "here",
-                    "there",
-                    "everywhere"
-                ];
+                define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
+
                 // https://www.objc.io/blog/2014/10/20/functional-snippet-3-functional-quicksort/
                 fn qsort {
                     ([]) { [] }
@@ -42,11 +37,11 @@ class TestSort(Base):
                         qsort(lesser) @@ [pivot] @@ qsort(greater)
                     }
                 }
-                
+
                 fn lt(a, b) { a < b }
-                
+
                 fn ge(a, b) { a >= b }
-                
+
                 fn filter {
                     (f, []) { [] }
                     (f, h @ t) {
@@ -57,9 +52,8 @@ class TestSort(Base):
                         }
                     }
                 }
-                
+
                 qsort(unsorted);
             }
             '''
         )
-

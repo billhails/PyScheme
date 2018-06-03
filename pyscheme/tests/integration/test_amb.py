@@ -137,3 +137,82 @@ class TestAmb(Base):
             barrels_of_fun();
             """
         )
+
+    def test_multiple_dwellings(self):
+        """
+        Baker, Cooper, Fletcher, Miller, and Smith live on different floors of an
+        apartment house that contains only five floors. Baker does not live on the
+        top floor. Cooper does not live on the bottom floor. Fletcher does not
+        live on either the top or the bottom floor. Miller lives on a higher floor
+        than does Cooper. Smith does not live on a floor adjacent to Fletcher's.
+        Fletcher does not live on a floor adjacent to Cooper's.
+        Where does everyone live?
+        """
+        self.assertEval(
+            '[result["baker", 3], result["cooper", 2], result["fletcher", 4], result["miller", 5], result["smith", 1]]',
+            '''
+            {
+                typedef named_result { result(list(char), int) }
+                
+                fn require(condition) {
+                    condition or back
+                }
+                
+                fn one_of(lst) {
+                    require(length(lst) > 0);
+                    head(lst) then one_of(tail(lst))
+                }
+                
+                fn member(x, l) {
+                    if (l == []) {
+                        false
+                    } else {
+                        x == head(l) or member(x, tail(l))
+                    }
+                }
+
+                fn exclude (l, m) {
+                    if (m == []) {
+                        []
+                    } else {
+                        if (member(head(m), l)) {
+                            exclude(l, tail(m))
+                        } else {
+                            head(m) @ exclude(l, tail(m))
+                        }
+                    }
+                }
+                
+                fn abs(n) {
+                    if (n < 0) {
+                        0 - n
+                    } else {
+                        n
+                    }
+                }
+                
+                define floors = [1, 2, 3, 4, 5];
+                define baker = one_of(floors);
+                define cooper = one_of(exclude([baker], floors));
+                define fletcher = one_of(exclude([baker, cooper], floors));
+                define miller = one_of(exclude([baker, cooper, fletcher], floors));
+                define smith = head(exclude([baker, cooper, fletcher, miller], floors));
+                require(baker != 5);
+                require(cooper != 1);
+                require(fletcher != 5);
+                require(fletcher != 1);
+                require(miller > cooper);
+                require(abs(smith - fletcher) != 1);
+                require(abs(fletcher - cooper) != 1);
+                
+                [
+                    result("baker", baker),
+                    result("cooper", cooper),
+                    result("fletcher", fletcher),
+                    result("miller", miller),
+                    result("smith", smith)
+                ];
+            }
+            ''',
+            'multiple dwellings'
+        )
