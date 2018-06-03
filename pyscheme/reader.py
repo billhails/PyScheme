@@ -411,7 +411,7 @@ class Reader:
         self.consume('}')
         return expr.Composite(sub_functions)
 
-    def sub_functions(self) -> expr.List:
+    def sub_functions(self) -> expr.LinkedList:
         """
         sub_functions : sub_function { sub_function }
         """
@@ -434,7 +434,7 @@ class Reader:
             body = self.body()
             return expr.ComponentLambda(sub_function_arguments, body)
 
-    def sub_function_arguments(self, fail=True) -> Maybe[expr.List]:
+    def sub_function_arguments(self, fail=True) -> Maybe[expr.LinkedList]:
         """
         sub_function_arguments : '(' sub_function_arg_list ')'
 
@@ -450,7 +450,7 @@ class Reader:
             else:
                 return None
 
-    def sub_function_arg_list(self, fail=True) -> expr.List:
+    def sub_function_arg_list(self, fail=True) -> expr.LinkedList:
         """
         sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
         """
@@ -537,7 +537,7 @@ class Reader:
         else:
             return None
 
-    def statements(self) -> expr.List:
+    def statements(self) -> expr.LinkedList:
         """
             statements : expression
                        | expression ';' statements
@@ -770,7 +770,7 @@ class Reader:
         else:
             return None
 
-    def formals(self, fail=True) -> Maybe[expr.List]:
+    def formals(self, fail=True) -> Maybe[expr.LinkedList]:
         self.debug("formals")
         if self.swallow('('):
             symbols = self.fargs()
@@ -807,14 +807,14 @@ class Reader:
         else:
             return None
 
-    def string(self, fail=True) -> Maybe[expr.List]:
+    def string(self, fail=True) -> Maybe[expr.LinkedList]:
         """
             string : STRING
         """
         self.debug("string", fail=fail)
         string = self.swallow('STRING')
         if string:
-            return expr.List.list([expr.Char(c) for c in string.value])
+            return expr.LinkedList.list([expr.Char(c) for c in string.value])
         elif fail:
             self.error("expected string")
         else:
@@ -857,7 +857,7 @@ class Reader:
         else:
             return None
 
-    def lst(self, fail=True) -> Maybe[expr.List]:
+    def lst(self, fail=True) -> Maybe[expr.LinkedList]:
         """
             list : '[' exprs ']'
         """
@@ -871,7 +871,7 @@ class Reader:
         else:
             return None
 
-    def fargs(self) -> expr.List:
+    def fargs(self) -> expr.LinkedList:
         """
             fargs : empty
             fargs : farg [ ',' nfargs ]
@@ -884,7 +884,7 @@ class Reader:
             fargs = self.fargs()
             return expr.Pair(farg, fargs)
         else:
-            return expr.List.list([farg])
+            return expr.LinkedList.list([farg])
 
     def farg(self, fail=True):
         """
@@ -900,7 +900,7 @@ class Reader:
         else:
             return symbol
 
-    def exprs(self) -> expr.List:
+    def exprs(self) -> expr.LinkedList:
         """
             exprs : empty
                   | expression { ',' exprs }
@@ -954,7 +954,7 @@ class Reader:
             formals = expr.Null()
         return expr.FlatType(type_name, formals)
 
-    def type_body(self) -> expr.List:
+    def type_body(self) -> expr.LinkedList:
         """
         type_body : type_constructor { '|' type_constructor }
         """
@@ -1050,7 +1050,7 @@ class Reader:
 
     @classmethod
     def apply_string(cls, name: str, *args):
-        return expr.Application(expr.Symbol(name), expr.List.list(args))
+        return expr.Application(expr.Symbol(name), expr.LinkedList.list(args))
 
     def swallow(self, *args) -> Maybe[Token]:
         """

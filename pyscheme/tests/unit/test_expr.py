@@ -204,7 +204,7 @@ class TestList(TestCase):
         self.a = expr.Symbol("a")
         self.b = expr.Symbol("b")
         self.c = expr.Symbol("c")
-        self.list = expr.List.list([self.a, self.b, self.c])
+        self.list = expr.LinkedList.list([self.a, self.b, self.c])
         self.null = expr.Null()
 
     def tearDown(self):

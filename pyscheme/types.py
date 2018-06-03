@@ -17,15 +17,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from typing import Callable, Union, TypeVar
+from typing import Callable, Union, TypeVar, List
 
 S = TypeVar('S')
 Maybe = Union[S, None]
 
 # Promises are used by the trampoline in the repl.
-# A promise is either None or a callable of no arguments that returns a Promise.
-# If the trampoline sees None it will terminate the thread.
-Promise = Maybe[Callable[[], 'Promise']]
+# A promise is either None or a callable of no arguments that returns a Promise, or a list of those callables.
+# If the trampoline sees None it will terminate the current thread (used by `exit).
+# If the trampoline sees a list, it will install each element as a separate thread (used by `spawn`).
+CallablePromise = Callable[[], 'Promise']
+Promise = Union[None, CallablePromise, List[CallablePromise]]
 
 # A Continuation is a callable that takes an Expr and an Amb (backtracking continuation)
 # and returns a promise.

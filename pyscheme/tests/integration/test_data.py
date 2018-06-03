@@ -210,6 +210,36 @@ class TestConditional(Base):
     def test_ne(self):
         self.assertEval('true', '10 != 12;')
 
+    def test_list_comparison_1(self):
+        self.assertEval('true', '[1, 2, 3] < [1, 2, 4];')
+
+    def test_list_comparison_2(self):
+        self.assertEval('true', '[1, 2, 3] < [1, 2, 3, 4];')
+
+    def test_list_comparison_3(self):
+        self.assertEval('true', '[1, 2, 3, 4] > [1, 2, 3];')
+
+    def test_boolean_comparison(self):
+        self.assertEval('true', 'false < unknown;')
+
+    def test_boolean_comparison_2(self):
+        self.assertEval('true', 'unknown < true;')
+
+    def test_boolean_comparison_3(self):
+        self.assertEval('true', 'false < true;')
+
+    def test_string_comparison_1(self):
+        self.assertEval('true', '"hello" > "goodbye";')
+
+    def test_string_comparison_2(self):
+        self.assertEval('false', '"hello" < "goodbye";')
+
+    def test_string_comparison_3(self):
+        self.assertEval('false', '"hello" <= "goodbye";')
+
+    def test_string_comparison_4(self):
+        self.assertEval('true', '"hello" == "hello";')
+
     def test_nothing(self):
         self.assertEval(
             '',
