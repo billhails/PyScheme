@@ -1491,7 +1491,7 @@ class TypeDef(TypeSystem):
             debug("unifying", constructor.name, "in", env)
             env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))
             env.note_type_constructor(constructor.name)
-        return Null.type()
+        return return_type
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return self.constructors.eval(env, lambda _, amb: ret(Nothing(), amb), amb)

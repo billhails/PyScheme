@@ -28,19 +28,12 @@ class TestSort(Base):
             {
                 define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
 
-                // https://www.objc.io/blog/2014/10/20/functional-snippet-3-functional-quicksort/
                 fn qsort {
                     ([]) { [] }
                     (pivot @ rest) {
-                        define lesser = filter(ge(pivot), rest);
-                        define greater = filter(lt(pivot), rest);
-                        qsort(lesser) @@ [pivot] @@ qsort(greater)
+                        qsort(filter(pivot >=, rest)) @@ [pivot] @@ qsort(filter(pivot <, rest))
                     }
                 }
-
-                fn lt(a, b) { a < b }
-
-                fn ge(a, b) { a >= b }
 
                 fn filter {
                     (f, []) { [] }

@@ -56,12 +56,64 @@ class TestCurrying(Base):
                         fun(head(lst)) @ map(fun, tail(lst))
                     }
                 }
-                
+
                 fn add(x, y) {
                     x + y
                 }
-                
+
                 map(add(1), [1, 2, 3, 4]);
+            '''
+        )
+
+    def test_map_curried_binop_1(self):
+        self.assertEval(
+            '[3, 4, 5, 6]',
+            '''
+                fn map {
+                    (f, []) { [] }
+                    (f, h @ t) { f(h) @ map(f, t) }
+                }
+
+                map(1 + 1 +, [1, 2, 3, 4]);
+            '''
+        )
+
+    def test_map_curried_binop_2(self):
+        self.assertEval(
+            '[6, 7, 8, 9]',
+            '''
+                fn map {
+                    (f, []) { [] }
+                    (f, h @ t) { f(h) @ map(f, t) }
+                }
+
+                map(2 * 2 + 1 +, [1, 2, 3, 4]);
+            '''
+        )
+
+    def test_map_curried_binop_3(self):
+        self.assertEval(
+            '[[2, 1], [2, 2], [2, 3], [2, 4]]',
+            '''
+                fn map {
+                    (f, []) { [] }
+                    (f, h @ t) { f(h) @ map(f, t) }
+                }
+
+                map(2 @, [[1], [2], [3], [4]]);
+            '''
+        )
+
+    def test_map_curried_binop_4(self):
+        self.assertError(
+            'PySchemeTypeError: (list(int) -> list(int)) != list(int)',
+            '''
+                fn map {
+                    (f, []) { [] }
+                    (f, h @ t) { f(h) @ map(f, t) }
+                }
+
+                map(1 @ 2 @, [[1], [2], [3], [4]]);
             '''
         )
 

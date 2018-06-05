@@ -291,15 +291,14 @@ class TestInference(TestCase):
 
     def test_composite_with_call_type(self):
         self.assertTypes(
-            ['lst(a)', '(lst(b) -> int)', '(lst(c) -> int)'],
+            ['lst(a)', '(lst(a) -> int)'],
             '''
-            
                 typedef lst(t) { pair(t, lst(t)) | null }
+
                 fn len {
                     (null) { 0 }
                     (pair(h, t)) { 1 + len(t) }
                 }
-                len;
             
             '''
         )
