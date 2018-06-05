@@ -922,10 +922,12 @@ class Definition(Expr):
     def prepare_analysis(self, env: inference.TypeEnvironment):
         if env.noted_type_constructor(self._symbol):
             raise PySchemeInferenceError("attempt to override type constructor " + str(self._symbol))
+        debug("pre-installing", self._symbol, "in", env)
         env[self._symbol] = inference.TypeVariable()
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         defn_type = self._value.analyse_internal(env, non_generic)
+        debug("unifying", self._symbol, "in", env)
         env[self._symbol].unify(defn_type)
         return env[self._symbol]
 
@@ -1486,6 +1488,7 @@ class TypeDef(TypeSystem):
         new_non_generic = non_generic.copy()
         return_type = self.flat_type.make_type(new_env, new_non_generic)
         for constructor in self.constructors:
+            debug("unifying", constructor.name, "in", env)
             env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))
             env.note_type_constructor(constructor.name)
         return Null.type()
@@ -1510,6 +1513,7 @@ class TypeConstructor(TypeSystem):
     def prepare_analysis(self, env: inference.TypeEnvironment):
         if env.noted_type_constructor(self.name):
             raise PySchemeInferenceError("attempt to override type constructor " + str(self.name))
+        debug("pre-installing", self.name, "in", env)
         env[self.name] = inference.TypeVariable()
 
     def make_type(self, env: inference.TypeEnvironment, return_type: inference.Type,

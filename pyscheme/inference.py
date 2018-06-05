@@ -220,6 +220,9 @@ class TypeEnvironment:
     def noted_type_constructor(self, name: 'expr.Symbol'):
         return False
 
+    def in_current_frame(self, name: 'expr.Symbol'):
+        return False
+
     def __getitem__(self, symbol: 'expr.Symbol'):
         raise SymbolNotFoundError(symbol)
 
@@ -274,6 +277,10 @@ class TypeFrame(TypeEnvironment):
 
     def dump_dict(self):
         return ''
+
+    def in_current_frame(self, name: 'expr.Symbol'):
+        return name in self._dictionary
+
 
     def __getitem__(self, symbol: 'expr.Symbol') -> Type:
         if symbol in self._dictionary:

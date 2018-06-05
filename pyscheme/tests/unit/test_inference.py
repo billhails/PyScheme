@@ -47,6 +47,17 @@ class TestInference(TestCase):
         analysis = result.analyse(self.repl.type_env)
         self.assertEqual(expected_type, str(analysis))
 
+    def assertTypes(self, expected_types: list, expression: str):
+        self.input.write(expression)
+        self.input.seek(0)
+        analysis = []
+        while True:
+            result = self.repl.reader.read()
+            if result is None:
+                break
+            analysis += [str(result.analyse(self.repl.type_env))]
+        self.assertEqual(expected_types, analysis)
+
     def assertTypeFailure(self, expected_exception, expression: str):
         self.input.write(expression)
         self.input.seek(0)
@@ -267,12 +278,113 @@ class TestInference(TestCase):
             'int',
             '''
             {
-                typedef l(t) { p(t, l(t)) | n }
+                typedef lst(t) { pair(t, lst(t)) | null }
                 fn len {
-                    (n) { 0 }
-                    (p(h, t)) { 1 + len(t) }
+                    (null) { 0 }
+                    (pair(h, t)) { 1 + len(t) }
                 }
-                len(p(1, p(2, p(3, n))));
+                len(pair(1, pair(2, pair(3, null))));
+            }
+            '''
+        )
+
+
+    def test_composite_with_call_type(self):
+        self.assertTypes(
+            ['lst(a)', '(lst(b) -> int)', '(lst(c) -> int)'],
+            '''
+            
+                typedef lst(t) { pair(t, lst(t)) | null }
+                fn len {
+                    (null) { 0 }
+                    (pair(h, t)) { 1 + len(t) }
+                }
+                len;
+            
+            '''
+        )
+
+    def test_filter(self):
+        self.assertType(
+            '((a -> bool) -> (list(a) -> list(a)))',
+            '''
+            {
+                fn filter {
+                        (f, []) { [] }
+                        (f, h @ t) {
+                            if (f(h)) {
+                                h @ filter(f, t)
+                            } else {
+                                filter(f, t)
+                            }
+                        }
+                    }
+                filter
+            }
+            '''
+        )
+
+    def test_qsort(self):
+        self.assertType(
+            '(list(a) -> list(a))',
+            '''
+            {
+                fn qsort {
+                    ([]) { [] }
+                    (pivot @ rest) {
+                        define lesser = filter(ge(pivot), rest);
+                        define greater = filter(lt(pivot), rest);
+                        qsort(lesser) @@ [pivot] @@ qsort(greater)
+                    }
+                }
+
+                fn lt(a, b) { a < b }
+
+                fn ge(a, b) { a >= b }
+
+                fn filter {
+                    (f, []) { [] }
+                    (f, h @ t) {
+                        if (f(h)) {
+                            h @ filter(f, t)
+                        } else {
+                            filter(f, t)
+                        }
+                    }
+                }
+
+                qsort
+            }
+            '''
+        )
+
+    def test_filter_type(self):
+        self.assertType(
+            '((a -> bool) -> (list(a) -> list(a)))',
+            '''
+                fn filter {
+                    (f, []) { [] }
+                    (f, h @ t) {
+                        if (f(h)) {
+                            h @ filter(f, t)
+                        } else {
+                            filter(f, t)
+                        }
+                    }
+                }
+
+                filter
+            
+            '''
+        )
+
+    def test_ge(self):
+        self.assertType(
+            '(a -> (a -> bool))',
+            '''
+            {
+                fn ge(a, b) { a >= b }
+                ge
             }
             '''
         )
