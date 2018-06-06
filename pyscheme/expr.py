@@ -368,7 +368,7 @@ class U(Boolean, metaclass=Singleton):
 
 
 class Symbol(Constant, metaclass=FlyWeight):
-    counter = 1
+    counter = 0
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: env.lookup(self, ret, amb)
@@ -413,13 +413,24 @@ class Symbol(Constant, metaclass=FlyWeight):
     @classmethod
     def generate(cls):
         name = ''
-        counter = cls.counter
-        while counter > 0:
-            remainder = counter % 26
-            name += chr(ord('a') + remainder)
-            counter = counter // 26
+        if cls.counter == 0:
+            name = 'a'
+        else:
+            counter = cls.counter
+            while counter > 0:
+                remainder = counter % 26
+                name += chr(ord('a') + remainder)
+                counter = counter // 26
+
         cls.counter += 1
-        return cls('#' + name)
+        return Symbol('#' + name)
+
+    @classmethod
+    def reset(cls):
+        """
+        for testing
+        """
+        cls.counter = 0
 
 
 class TypedSymbol(Expr):

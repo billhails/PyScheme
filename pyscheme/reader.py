@@ -47,7 +47,6 @@ class Tokeniser:
     reserved = {
         'if': 'IF',
         'else': 'ELSE',
-        'elseif': 'ELSEIF',
         'fn': 'FN',
         'true': 'TRUE',
         'false': 'FALSE',
@@ -172,7 +171,7 @@ class Reader:
             | construct
             | EOF
 
-        construct : IF '(' expression ')' nest { ELSEIF '(' expression ')' nest } ELSE nest
+        construct : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
                   | FN symbol formals body
                   | FN symbol composite_body
                   | typedef
@@ -332,7 +331,7 @@ class Reader:
 
     def construct(self, fail=True):
         """
-            construct : IF '(' expression ')' nest { ELSEIF '(' expression ')' nest } ELSE nest
+            construct : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
                       | FN symbol '(' formals ')' body
                       | FN symbol composite_body
                       | typedef
@@ -377,12 +376,12 @@ class Reader:
         return self.nest(fail)
 
     def alternative(self):
-        if self.swallow('ELSEIF'):
+        self.consume('ELSE')
+        if self.swallow('IF'):
             test = self.test()
             consequent = self.nest()
             return expr.Conditional(test, consequent, self.alternative())
         else:
-            self.consume('ELSE')
             return self.nest()
 
     def test(self):

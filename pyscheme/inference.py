@@ -80,18 +80,15 @@ class TypeVariable(Type):
         self.instance = None
         self.__name = None
 
-    next_variable_name = 'a'
-
     @classmethod
     def reset_names(cls):
         """used for consistency during testing"""
-        cls.next_variable_name = 'a'
+        expr.Symbol.reset()
 
     @property
     def name(self):
         if self.__name is None:
-            self.__name = TypeVariable.next_variable_name
-            TypeVariable.next_variable_name = chr(ord(TypeVariable.next_variable_name) + 1)
+            self.__name = expr.Symbol.generate().value()
         return self.__name
 
     def make_fresh(self, non_generics, mapping):

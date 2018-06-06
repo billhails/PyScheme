@@ -32,7 +32,7 @@ class TestComposite(Base):
                 (t, branch(left, u, right)) {
                     if (t < u) {
                         branch(insert(t, left), u, right)
-                    } elseif (t == u) {
+                    } else if (t == u) {
                         branch(left, u, right)
                     } else {
                         branch(left, u, insert(t, right))
@@ -56,7 +56,7 @@ class TestComposite(Base):
                 (t, branch(left, u, right)) {
                     if (t < u) {
                         branch(insert(t, left), u, right)
-                    } elseif (t == u) {
+                    } else if (t == u) {
                         branch(left, u, right)
                     } else {
                         branch(left, u, insert(t, right))
@@ -86,7 +86,7 @@ class TestComposite(Base):
                     (index, val, branch(left, j, w, right)) {
                         if (index < j) {
                             branch(insert(index, val, left), j, w, right)
-                        } elseif (index == j) {
+                        } else if (index == j) {
                             branch(left, j, val, right)
                         } else {
                             branch(left, j, w, insert(index, val, right))
@@ -101,7 +101,7 @@ class TestComposite(Base):
                     (index, branch(left, j, val, right)) {
                         if (index < j) {
                             retrieve(index, left)
-                        } elseif (index > j) {
+                        } else if (index > j) {
                             retrieve(index, right)
                         } else {
                             some(val)
@@ -118,6 +118,23 @@ class TestComposite(Base):
             }
             ''',
             'btrees'
+        )
+
+    def test_composite_3(self):
+        self.assertEval(
+            'branch[branch[leaf, true, leaf], true, branch[leaf, true, leaf]]',
+            '''
+            {
+                typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+                
+                fn complete {
+                    (v, 0) { leaf }
+                    (v, n) { branch(complete(v, n-1), v, complete(v, n-1)) }
+                }
+                
+                complete(true, 2);
+            }
+            '''
         )
 
     def test_composite_44(self):
