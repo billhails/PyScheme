@@ -242,6 +242,21 @@ class Number(Constant):
         return Number(self._value ** power.value())
 
 
+class Wildcard(Constant):
+    def __init__(self):
+        super(Wildcard, self).__init__('_')
+
+    @classmethod
+    def type(cls):
+        return inference.TypeVariable()
+
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
+        """
+        always match
+        """
+        return lambda: ret(self, amb)
+
 class Boolean(Constant):
     @classmethod
     def type(cls):
@@ -1013,9 +1028,10 @@ class Closure(Primitive):
         dictionary = {}
         while type(formal_args) is not Null and type(actual_args) is not Null:
             farg = formal_args.car()
-            if type(farg) is TypedSymbol:
+            if isinstance(farg, TypedSymbol):
                 farg = farg.symbol()
-            dictionary[farg] = actual_args.car()
+            if not isinstance(farg, Wildcard):
+                dictionary[farg] = actual_args.car()
             formal_args = formal_args.cdr()
             actual_args = actual_args.cdr()
         if type(formal_args) is not Null:  # currying

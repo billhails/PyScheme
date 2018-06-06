@@ -66,6 +66,7 @@ class Tokeniser:
         'int': 'KW_INT',
         'char': 'KW_CHAR',
         'bool': 'KW_BOOL',
+        '_': 'WILDCARD',
     }
 
     regexes = {
@@ -264,6 +265,9 @@ class Reader:
              | BACK
              | SPAWN
              | '(' expression ')'
+
+        symbol : ID
+               | WILDCARD
 
         formals : '(' fargs ')'
 
@@ -795,11 +799,14 @@ class Reader:
     def symbol(self, fail=True) -> Maybe[expr.Symbol]:
         """
             symbol : ID
+                   | WILDCARD
         """
         self.debug("symbol", fail=fail)
         identifier = self.swallow('ID')
         if identifier:
             return expr.Symbol(identifier.value)
+        elif self.swallow('WILDCARD'):
+            return expr.Wildcard()
         elif fail:
             self.error("expected id")
         else:
