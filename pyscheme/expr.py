@@ -1621,7 +1621,7 @@ class Type(TypeSystem):
 
 class TupleConstructor(Primitive):
     """
-    TypeConstructor is to TypeDef what Closure is to Lambda,
+    TupleConstructor is to TypeDef what Closure is to Lambda,
     it's a function of n arguments that returns a Compound Data Structure
     """
 
@@ -1671,6 +1671,10 @@ class NamedTuple(Expr):
             return str(self.name) + str(self.values)
 
     __repr__ = __str__
+
+    def __cmp__(self, other: 'NamedTuple'):
+        return self.name.__cmp__(other.name) or self.values.__cmp__(other.values)
+
 
     def __eq__(self, other: 'NamedTuple'):
         return self.name == other.name and self.values == other.values
