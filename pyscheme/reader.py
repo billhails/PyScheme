@@ -278,6 +278,7 @@ class Reader:
               | farg { ',' fargs }
 
         farg : symbol [ ':' symbol ]
+             | WIDCARD
 
         symbols : empty
                 | symbol { ',' symbols }
@@ -922,8 +923,13 @@ class Reader:
     def farg(self, fail=True):
         """
         farg : symbol [ ':' symbol ]
+             | WILDCARD
         """
         self.debug("farg")
+        wildcard = self.wildcard(False)
+        if wildcard is not None:
+            return wildcard
+
         symbol = self.symbol(fail)
         if symbol is None:
             return None
