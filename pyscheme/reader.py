@@ -59,6 +59,7 @@ class Tokeniser:
         'back': 'BACK',
         'spawn': 'SPAWN',
         'define': 'DEFINE',
+        'prototype': 'PROTOTYPE',
         'env': 'ENV',
         'typedef': 'TYPEDEF',
         'nothing': 'NOTHING',
@@ -66,6 +67,7 @@ class Tokeniser:
         'int': 'KW_INT',
         'char': 'KW_CHAR',
         'bool': 'KW_BOOL',
+        'string': 'KW_STRING',
         '_': 'WILDCARD',
     }
 
@@ -78,6 +80,7 @@ class Tokeniser:
 
     literals = (
         '@@', '@',
+        '->',
         '==', '>=', '<=', '>', '<', '!=',
         '**', '+', '-', '*', '/', '%',
         '{', '}',
@@ -292,6 +295,7 @@ class Reader:
              | 'KW_INT'
              | 'KW_CHAR'
              | 'KW_BOOL'
+             | 'KW_STRING'
              | symbol [ '(' type { ',' type } ')' ]
     """
 
@@ -1014,6 +1018,7 @@ class Reader:
              | 'KW_INT'
              | 'KW_CHAR'
              | 'KW_BOOL'
+             | 'KW_STRING'
              | symbol [ '(' type { ',' type } ')' ]
         """
         self.debug("type")
@@ -1030,6 +1035,8 @@ class Reader:
             return expr.CharType()
         if self.swallow('KW_BOOL'):
             return expr.BoolType()
+        if self.swallow('KW_STRING'):  # convenient shorthand
+            return expr.ListType(expr.Pair(expr.CharType(), expr.Null()))
         symbol = self.symbol()
         if self.swallow('('):
             types = self.types()

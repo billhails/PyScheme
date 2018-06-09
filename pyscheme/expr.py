@@ -955,7 +955,7 @@ class Definition(Expr):
         defn_type = self._value.analyse_internal(env, non_generic)
         debug("unifying", self._symbol, "in", env)
         env[self._symbol].unify(defn_type)
-        return env[self._symbol]
+        return Nothing.type()
 
     def __str__(self):
         return "define " + str(self._symbol) + " = " + str(self._value)
@@ -981,6 +981,11 @@ class EnvContext(Expr):
         if type(lhs) is inference.TypeVariable:
             raise MissingPrototypeError(self._env)
         return self._expr.analyse_internal(lhs.prune().env(), non_generic)
+
+    def __str__(self):
+        return str(self._env) + '.' + str(self._expr)
+
+    __repr__ = __str__
 
 
 class Op(Expr):
@@ -1514,6 +1519,8 @@ class TypeDef(TypeSystem):
         new_env = env.extend()
         new_non_generic = non_generic.copy()
         return_type = self.flat_type.make_type(new_env, new_non_generic)
+        # we may be looked up as a type variable if there are no argument types
+        env[self.flat_type.symbol] = return_type
         for constructor in self.constructors:
             debug("unifying", constructor.name, "in", env)
             env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))
@@ -1604,10 +1611,18 @@ class Type(TypeSystem):
         self.components = components
 
     def make_type(self, env: inference.TypeEnvironment, non_generic: set):
+        # self is either a type variable or a concrete type, predefined or typedef'd
+        # possibly even the type currently being defined.
         components = self.components.map(lambda component: component.make_type(env, non_generic))
         if type(components) is Null:
+            # default just looks up in env, either a type var or a typedef
             return self.get_or_make_type(env)
         else:
+            # necessary because this may be a recursive use of the type
+            # being defined, and the types of the components in the usage
+            # may be more restrictive than the types of our components
+            # in the type being defined, so we can't just do a lookup
+            # on self.name, we have to unify with that.
             return inference.TypeOperator(self.name.value(), *components)
 
     def get_or_make_type(self, env):

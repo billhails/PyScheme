@@ -143,7 +143,7 @@ class EnvironmentType(Type):
             raise PySchemeTypeError(self, other)
 
     def __str__(self):
-        return "EnvironmentType " + str(self._env) + self._env.dump_dict()
+        return "env " + str(self._env) + self._env.dump_dict()
 
 
 class TypeOperator(Type):
