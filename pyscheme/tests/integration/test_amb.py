@@ -158,7 +158,7 @@ class TestAmb(Base):
                     condition or back
                 }
                 
-                fn one_of {
+                fn one_of { // demonstrate implicit green cut in composite functions
                     ([]) { back }
                     (h @ t) { h then one_of(t) }
                 }
