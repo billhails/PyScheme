@@ -66,6 +66,7 @@ class Tokeniser:
         'int': 'KW_INT',
         'char': 'KW_CHAR',
         'bool': 'KW_BOOL',
+        '_': 'WILDCARD',
     }
 
     regexes = {
@@ -171,7 +172,7 @@ class Reader:
             | construct
             | EOF
 
-        construct : IF '(' expression ')' nest ELSE nest
+        construct : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
                   | FN symbol formals body
                   | FN symbol composite_body
                   | typedef
@@ -265,6 +266,9 @@ class Reader:
              | SPAWN
              | '(' expression ')'
 
+        symbol : ID
+               | WILDCARD
+
         formals : '(' fargs ')'
 
         fargs : empty
@@ -331,7 +335,7 @@ class Reader:
 
     def construct(self, fail=True):
         """
-            construct : IF '(' expression ')' nest ELSE nest
+            construct : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
                       | FN symbol '(' formals ')' body
                       | FN symbol composite_body
                       | typedef
@@ -340,13 +344,9 @@ class Reader:
         """
         self.debug("construct", fail=fail)
         if self.swallow('IF'):
-            self.consume('(')
-            test = self.expression()
-            self.consume(')')
+            test = self.test()
             consequent = self.nest()
-            self.consume('ELSE')
-            alternative = self.nest()
-            return expr.Conditional(test, consequent, alternative)
+            return expr.Conditional(test, consequent, self.alternative())
 
         fn = self.swallow('FN')
         if fn is not None:
@@ -378,6 +378,21 @@ class Reader:
                 return expr.Definition(symbol, expr.Env(body))
 
         return self.nest(fail)
+
+    def alternative(self):
+        self.consume('ELSE')
+        if self.swallow('IF'):
+            test = self.test()
+            consequent = self.nest()
+            return expr.Conditional(test, consequent, self.alternative())
+        else:
+            return self.nest()
+
+    def test(self):
+        self.consume('(')
+        test = self.expression()
+        self.consume(')')
+        return test
 
     def nest(self, fail=True):
         self.debug("nest", fail=fail)
@@ -784,11 +799,14 @@ class Reader:
     def symbol(self, fail=True) -> Maybe[expr.Symbol]:
         """
             symbol : ID
+                   | WILDCARD
         """
         self.debug("symbol", fail=fail)
         identifier = self.swallow('ID')
         if identifier:
             return expr.Symbol(identifier.value)
+        elif self.swallow('WILDCARD'):
+            return expr.Wildcard()
         elif fail:
             self.error("expected id")
         else:
@@ -1028,8 +1046,11 @@ class Reader:
             return None
         op = self.swallow(*ops)
         if op:
-            rhs = m_rhs()
-            return self.apply_token(op, lhs, rhs)
+            rhs = m_rhs(False)
+            if rhs is None:
+                return self.curry_token(op, lhs)
+            else:
+                return self.apply_token(op, lhs, rhs)
         else:
             return lhs
 
@@ -1040,13 +1061,26 @@ class Reader:
         while True:
             op = self.swallow(*ops)
             if op:
-                rhs = method()
-                lhs = self.apply_token(op, lhs, rhs)
+                rhs = method(False)
+                if rhs is None:
+                    return self.curry_token(op, lhs)
+                else:
+                    lhs = self.apply_token(op, lhs, rhs)
             else:
                 return lhs
 
     def apply_token(self, token: Token, *args):
         return self.apply_string(token.value, *args)
+
+    def curry_token(self, token: Token, lhs):
+        rhs = expr.Symbol.generate()
+        return self.make_closure(
+            rhs,
+            expr.Application(expr.Symbol(token.value), expr.LinkedList.list([lhs, rhs]))
+        )
+
+    def make_closure(self, argument: expr.Symbol, body: expr.Application):
+        return expr.Lambda(expr.LinkedList.list([argument]), expr.Sequence(expr.LinkedList.list([body])))
 
     @classmethod
     def apply_string(cls, name: str, *args):

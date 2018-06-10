@@ -83,3 +83,37 @@ class TestEnv(Base):
             ''',
             "code can see definitions in enclosing environments"
         )
+
+    def test_not_found(self):
+        self.assertError(
+            'SymbolNotFoundError: no_such_symbol',
+            '''
+            {
+                no_such_symbol
+            }
+            '''
+        )
+
+    def test_redefine_error(self):
+        self.assertError(
+            'SymbolAlreadyDefinedError: x',
+            '''
+            define x = 10;
+            define x = 10;
+            '''
+        )
+
+    def test_redefine_scope_ok(self):
+        self.assertEval(
+            '10',
+            '''
+            {
+                define x = 10;
+                {
+                    define x = 12;
+                }
+                x;
+            }
+            '''
+        )
+

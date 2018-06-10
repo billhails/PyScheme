@@ -80,18 +80,15 @@ class TypeVariable(Type):
         self.instance = None
         self.__name = None
 
-    next_variable_name = 'a'
-
     @classmethod
     def reset_names(cls):
         """used for consistency during testing"""
-        cls.next_variable_name = 'a'
+        expr.Symbol.reset()
 
     @property
     def name(self):
         if self.__name is None:
-            self.__name = TypeVariable.next_variable_name
-            TypeVariable.next_variable_name = chr(ord(TypeVariable.next_variable_name) + 1)
+            self.__name = expr.Symbol.generate().value()
         return self.__name
 
     def make_fresh(self, non_generics, mapping):
@@ -220,6 +217,9 @@ class TypeEnvironment:
     def noted_type_constructor(self, name: 'expr.Symbol'):
         return False
 
+    def in_current_frame(self, name: 'expr.Symbol'):
+        return False
+
     def __getitem__(self, symbol: 'expr.Symbol'):
         raise SymbolNotFoundError(symbol)
 
@@ -274,6 +274,10 @@ class TypeFrame(TypeEnvironment):
 
     def dump_dict(self):
         return ''
+
+    def in_current_frame(self, name: 'expr.Symbol'):
+        return name in self._dictionary
+
 
     def __getitem__(self, symbol: 'expr.Symbol') -> Type:
         if symbol in self._dictionary:

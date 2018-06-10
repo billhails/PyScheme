@@ -174,3 +174,23 @@ class TestTypedef(Base):
             ''',
             'type constructors can be curried'
         )
+
+    def test_lst_append(self):
+        self.assertEval(
+            'pair[1, pair[2, pair[3, pair[4, pair[5, pair[6, null]]]]]]',
+            '''
+            {
+                typedef lst(t) { pair(t, lst(t)) | null }
+                
+                fn append {
+                    (null, ys) { ys }
+                    (pair(h, t), ys) { pair(h, append(t, ys)) }
+                }
+                
+                define xs = pair(1, pair(2, pair(3, null)));
+                define ys = pair(4, pair(5, pair(6, null)));
+                
+                append(xs, ys);
+            }
+            '''
+        )

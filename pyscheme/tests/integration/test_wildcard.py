@@ -19,34 +19,48 @@
 from pyscheme.tests.integration.base import Base
 
 
-class TestSort(Base):
+class TestWildcard(Base):
+    """
+    wildcard '_' in formal arguments behaves like a constant that
+    matches (equals) anything
+    """
 
-    def test_sort(self):
+    def test_wildcard_1(self):
         self.assertEval(
-            '["everywhere", "goodbye", "hello", "here", "there"]',
+            'hello',
+            '''
+            fn ignore(_, _, foo) { foo }
+            
+            ignore(true, 10, "hello");
+            '''
+        )
+
+    def test_wildcard_2(self):
+        self.assertEval(
+            '3',
             '''
             {
-                define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
-
-                fn qsort {
-                    ([]) { [] }
-                    (pivot @ rest) {
-                        qsort(filter(pivot >=, rest)) @@ [pivot] @@ qsort(filter(pivot <, rest))
-                    }
+                fn len {
+                    ([]) { 0 }
+                    (_ @ t) { 1 + len(t) }
                 }
-
-                fn filter {
-                    (f, []) { [] }
-                    (f, h @ t) {
-                        if (f(h)) {
-                            h @ filter(f, t)
-                        } else {
-                            filter(f, t)
-                        }
-                    }
-                }
-
-                qsort(unsorted);
+                
+                len([1, 2, 3]);
             }
+            '''
+        )
+
+    def test_wildcard_3(self):
+        self.assertEval(
+            '2',
+            '''
+            typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+
+            fn ignore {
+                (leaf) { 0 }
+                (branch(_, t, _)) { t }
+            }
+
+            ignore(branch(leaf, 2, leaf));
             '''
         )

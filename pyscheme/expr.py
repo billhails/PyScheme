@@ -242,6 +242,21 @@ class Number(Constant):
         return Number(self._value ** power.value())
 
 
+class Wildcard(Constant):
+    def __init__(self):
+        super(Wildcard, self).__init__('_')
+
+    @classmethod
+    def type(cls):
+        return inference.TypeVariable()
+
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
+        """
+        always match
+        """
+        return lambda: ret(self, amb)
+
 class Boolean(Constant):
     @classmethod
     def type(cls):
@@ -368,7 +383,7 @@ class U(Boolean, metaclass=Singleton):
 
 
 class Symbol(Constant, metaclass=FlyWeight):
-    counter = 1
+    counter = 0
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: env.lookup(self, ret, amb)
@@ -413,13 +428,24 @@ class Symbol(Constant, metaclass=FlyWeight):
     @classmethod
     def generate(cls):
         name = ''
-        counter = cls.counter
-        while counter > 0:
-            remainder = counter % 26
-            name += chr(ord('a') + remainder)
-            counter = counter // 26
+        if cls.counter == 0:
+            name = 'a'
+        else:
+            counter = cls.counter
+            while counter > 0:
+                remainder = counter % 26
+                name += chr(ord('a') + remainder)
+                counter = counter // 26
+
         cls.counter += 1
-        return cls('#' + name)
+        return Symbol('#' + name)
+
+    @classmethod
+    def reset(cls):
+        """
+        for testing
+        """
+        cls.counter = 0
 
 
 class TypedSymbol(Expr):
@@ -922,10 +948,12 @@ class Definition(Expr):
     def prepare_analysis(self, env: inference.TypeEnvironment):
         if env.noted_type_constructor(self._symbol):
             raise PySchemeInferenceError("attempt to override type constructor " + str(self._symbol))
+        debug("pre-installing", self._symbol, "in", env)
         env[self._symbol] = inference.TypeVariable()
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         defn_type = self._value.analyse_internal(env, non_generic)
+        debug("unifying", self._symbol, "in", env)
         env[self._symbol].unify(defn_type)
         return env[self._symbol]
 
@@ -1000,9 +1028,10 @@ class Closure(Primitive):
         dictionary = {}
         while type(formal_args) is not Null and type(actual_args) is not Null:
             farg = formal_args.car()
-            if type(farg) is TypedSymbol:
+            if isinstance(farg, TypedSymbol):
                 farg = farg.symbol()
-            dictionary[farg] = actual_args.car()
+            if not isinstance(farg, Wildcard):
+                dictionary[farg] = actual_args.car()
             formal_args = formal_args.cdr()
             actual_args = actual_args.cdr()
         if type(formal_args) is not Null:  # currying
@@ -1486,9 +1515,10 @@ class TypeDef(TypeSystem):
         new_non_generic = non_generic.copy()
         return_type = self.flat_type.make_type(new_env, new_non_generic)
         for constructor in self.constructors:
+            debug("unifying", constructor.name, "in", env)
             env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))
             env.note_type_constructor(constructor.name)
-        return Null.type()
+        return return_type
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return self.constructors.eval(env, lambda _, amb: ret(Nothing(), amb), amb)
@@ -1510,6 +1540,7 @@ class TypeConstructor(TypeSystem):
     def prepare_analysis(self, env: inference.TypeEnvironment):
         if env.noted_type_constructor(self.name):
             raise PySchemeInferenceError("attempt to override type constructor " + str(self.name))
+        debug("pre-installing", self.name, "in", env)
         env[self.name] = inference.TypeVariable()
 
     def make_type(self, env: inference.TypeEnvironment, return_type: inference.Type,
