@@ -117,3 +117,58 @@ class TestEnv(Base):
             '''
         )
 
+    def test_typedef_in_env(self):
+        self.assertEval(
+            'pair[2, pair[3, null]]',
+            '''
+            env e {
+                typedef lst(t) {pair(t, lst(t)) | null }
+
+                fn map {
+                    (f, null) { null }
+                    (f, pair(h, t)) { pair(f(h), map(f, t)) }
+                }
+            }
+
+            fn test(e:e) {
+                define l = e.pair(1, e.pair(2, e.null));
+                e.map(1 +, l)
+            }
+
+            test(e);
+            '''
+        )
+
+    def test_typedef_in_env_2(self):
+        self.assertEval(
+            'Closure([e:e]: { define l = e.pair[1, e.pair[2, e.null]] ; e.map[Lambda [#c]: { { +[1, #c] } }, l] })',
+            '''
+            env e {
+                typedef lst(t) {pair(t, lst(t)) | null }
+
+                fn map {
+                    (f, null) { null }
+                    (f, pair(h, t)) { pair(f(h), map(f, t)) }
+                }
+            }
+
+            fn test(e:e) {
+                define l = e.pair(1, e.pair(2, e.null));
+                e.map(1 +, l)
+            }
+
+            test;
+            '''
+        )
+
+    def test_typedef_in_env_3(self):
+        self.assertEval(
+            'Closure([#a, #b]: (TupleConstructor pair)[#a, #b])',
+            '''
+            env e {
+                typedef lst(t) {pair(t, lst(t)) | null }
+            }
+
+            e.pair;
+            '''
+        )

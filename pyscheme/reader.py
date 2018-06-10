@@ -66,6 +66,7 @@ class Tokeniser:
         'int': 'KW_INT',
         'char': 'KW_CHAR',
         'bool': 'KW_BOOL',
+        'string': 'KW_STRING',
         '_': 'WILDCARD',
     }
 
@@ -78,6 +79,7 @@ class Tokeniser:
 
     literals = (
         '@@', '@',
+        '->',
         '==', '>=', '<=', '>', '<', '!=',
         '**', '+', '-', '*', '/', '%',
         '{', '}',
@@ -193,17 +195,18 @@ class Reader:
 
         sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
 
-        sub_function_arg : simple_subfunction_arg '@' sub_function_arg
-                         | simple_subfunction_arg
+        sub_function_arg : sub_function_arg_2 '@' sub_function_arg
+                         | sub_function_arg_2
 
         sub_function_arg_2 : '[' [ sub_function_arg { ',' sub_function_arg } ] ']'
                            | sub_function_arg_3
 
         sub_function_arg_3 : symbol [ '(' sub_function_arg_list ')' ]
-                           | number
-                           | string
-                           | char
-                           | boolean
+                           | NUMBER
+                           | STRING
+                           | CHAR
+                           | BOOLEAN
+                           | WILDCARD
 
         statements : expression
                    | expression ';' statements
@@ -253,10 +256,10 @@ class Reader:
                    | atom
 
         atom : symbol
-             | number
-             | string
-             | char
-             | boolean
+             | NUMBER
+             | STRING
+             | CHAR
+             | BOOLEAN
              | NOTHING
              | lst
              | FN formals body
@@ -267,7 +270,6 @@ class Reader:
              | '(' expression ')'
 
         symbol : ID
-               | WILDCARD
 
         formals : '(' fargs ')'
 
@@ -275,6 +277,7 @@ class Reader:
               | farg { ',' fargs }
 
         farg : symbol [ ':' symbol ]
+             | WIDCARD
 
         symbols : empty
                 | symbol { ',' symbols }
@@ -292,6 +295,7 @@ class Reader:
              | 'KW_INT'
              | 'KW_CHAR'
              | 'KW_BOOL'
+             | 'KW_STRING'
              | symbol [ '(' type { ',' type } ')' ]
     """
 
@@ -516,10 +520,11 @@ class Reader:
     def sub_function_arg_3(self, fail=True):
         """
         sub_function_arg_3 : symbol [ '(' sub_function_arg_list ')' ]
-                           | number
-                           | string
-                           | char
-                           | boolean
+                           | NUMBER
+                           | STRING
+                           | CHAR
+                           | BOOLEAN
+                           | WILDCARD
         """
         self.debug("sub_function_arg_3", fail=fail)
 
@@ -538,6 +543,10 @@ class Reader:
         boolean = self.boolean(False)
         if boolean is not None:
             return boolean
+
+        wildcard = self.wildcard(False)
+        if wildcard is not None:
+            return wildcard
 
         symbol = self.symbol(False)
         if symbol is not None:
@@ -715,10 +724,10 @@ class Reader:
     def atom(self, fail=True) -> Maybe[expr.Expr]:
         """
             atom : symbol
-                   | number
-                   | string
-                   | char
-                   | boolean
+                   | NUMBER
+                   | STRING
+                   | CHAR
+                   | BOOLEAN
                    | NOTHING
                    | lst
                    | FN formals body
@@ -799,14 +808,11 @@ class Reader:
     def symbol(self, fail=True) -> Maybe[expr.Symbol]:
         """
             symbol : ID
-                   | WILDCARD
         """
         self.debug("symbol", fail=fail)
         identifier = self.swallow('ID')
         if identifier:
             return expr.Symbol(identifier.value)
-        elif self.swallow('WILDCARD'):
-            return expr.Wildcard()
         elif fail:
             self.error("expected id")
         else:
@@ -848,6 +854,15 @@ class Reader:
             return expr.Char(char.value)
         elif fail:
             self.error("expected char")
+        else:
+            return None
+
+    def wildcard(self, fail=True):
+        wildcard = self.swallow('WILDCARD')
+        if wildcard is not None:
+            return expr.Wildcard()
+        if fail:
+            self.error("expected '_'")
         else:
             return None
 
@@ -907,8 +922,13 @@ class Reader:
     def farg(self, fail=True):
         """
         farg : symbol [ ':' symbol ]
+             | WILDCARD
         """
         self.debug("farg")
+        wildcard = self.wildcard(False)
+        if wildcard is not None:
+            return wildcard
+
         symbol = self.symbol(fail)
         if symbol is None:
             return None
@@ -1014,6 +1034,7 @@ class Reader:
              | 'KW_INT'
              | 'KW_CHAR'
              | 'KW_BOOL'
+             | 'KW_STRING'
              | symbol [ '(' type { ',' type } ')' ]
         """
         self.debug("type")
@@ -1030,6 +1051,8 @@ class Reader:
             return expr.CharType()
         if self.swallow('KW_BOOL'):
             return expr.BoolType()
+        if self.swallow('KW_STRING'):  # convenient shorthand
+            return expr.ListType(expr.Pair(expr.CharType(), expr.Null()))
         symbol = self.symbol()
         if self.swallow('('):
             types = self.types()

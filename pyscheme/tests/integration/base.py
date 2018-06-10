@@ -17,6 +17,7 @@
 
 from unittest import TestCase
 from pyscheme.repl import Repl
+import pyscheme.expr as expr
 import io
 
 
@@ -26,6 +27,7 @@ class Base(TestCase):
     def eval(cls, text: str, error_file: io.StringIO) -> str:
         in_file = io.StringIO(text)
         out_file = io.StringIO()
+        expr.Symbol.reset()
         repl = Repl(in_file, out_file, error_file)
         repl.run()
         return (out_file.getvalue(), error_file.getvalue())

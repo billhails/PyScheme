@@ -290,7 +290,7 @@ class TestInference(TestCase):
 
     def test_composite_with_call_type(self):
         self.assertTypes(
-            ['lst(#a)', '(lst(#a) -> int)'],
+            ['lst(#a)', 'nothing', '(lst(#b) -> int)'],
             '''
                 typedef lst(t) { pair(t, lst(t)) | null }
 
@@ -298,6 +298,8 @@ class TestInference(TestCase):
                     (null) { 0 }
                     (pair(h, t)) { 1 + len(t) }
                 }
+                
+                len;
             
             '''
         )
@@ -357,8 +359,11 @@ class TestInference(TestCase):
         )
 
     def test_filter_type(self):
-        self.assertType(
-            '((#a -> bool) -> (list(#a) -> list(#a)))',
+        self.assertTypes(
+            [
+                'nothing',
+                '((#a -> bool) -> (list(#a) -> list(#a)))',
+            ],
             '''
                 fn filter {
                     (f, []) { [] }
@@ -371,7 +376,7 @@ class TestInference(TestCase):
                     }
                 }
 
-                filter
+                filter;
             
             '''
         )
@@ -383,6 +388,59 @@ class TestInference(TestCase):
             {
                 fn ge(a, b) { a >= b }
                 ge
+            }
+            '''
+        )
+
+    def test_env(self):
+        self.assertTypes(
+            [
+                'nothing',
+                '(#a -> (lst(#a) -> lst(#a)))'
+            ],
+            '''
+            env e {
+                typedef lst(t) {pair(t, lst(t)) | null }
+            }
+
+            e.pair;
+            '''
+        )
+
+    def test_meta(self):
+        self.assertType(
+            '(expression(#a) -> (expression(#a) -> expression(#a)))',
+            '''
+            {
+                typedef expression(t) {
+                    plus(expression(t), expression(t)) |
+                    minus(expression(t), expression(t)) |
+                    times(expression(t), expression(t)) |
+                    divide(expression(t), expression(t)) |
+                    number(t) |
+                    symbol(list(char))
+                }
+
+                plus;
+            }
+            '''
+        )
+
+    def test_meta_2(self):
+        self.assertType(
+            '(expression -> (expression -> expression))',
+            '''
+            {
+                typedef expression {
+                    plus(expression, expression) |
+                    minus(expression, expression) |
+                    times(expression, expression) |
+                    divide(expression, expression) |
+                    number(int) |
+                    symbol(list(char))
+                }
+
+                plus;
             }
             '''
         )

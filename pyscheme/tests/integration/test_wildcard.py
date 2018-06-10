@@ -29,7 +29,7 @@ class TestWildcard(Base):
         self.assertEval(
             'hello',
             '''
-            fn ignore(_, _, foo) { foo }
+            fn ignore (_, _, foo) { foo }
             
             ignore(true, 10, "hello");
             '''
