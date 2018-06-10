@@ -53,11 +53,11 @@ class TestComposite(Base):
 
             fn insert {
                 (t, leaf) { branch(leaf, t, leaf) }
-                (t, branch(left, u, right)) {
+                (t, x = branch(left, u, right)) {
                     if (t < u) {
                         branch(insert(t, left), u, right)
                     } else if (t == u) {
-                        branch(left, u, right)
+                        x
                     } else {
                         branch(left, u, insert(t, right))
                     }

@@ -463,14 +463,35 @@ class TypedSymbol(Expr):
         return str(self._symbol) + ':' + str(self._type_symbol)
 
     def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        symbol = self.symbol()
         arg_type = env[self.type_symbol()]
-        env[symbol] = arg_type
+        env[self.symbol()] = arg_type
         non_generic.add(arg_type)
         return arg_type
 
     __repr__ = __str__
 
+
+class As(Expr):
+    def __init__(self, symbol: Symbol, definition: Expr):
+        self._symbol = symbol
+        self._definition = definition
+
+    def __str__(self):
+        return str(self._symbol) + ' = ' + str(self._definition)
+
+    __repr__ = __str__
+
+    def analyse_farg(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        arg_type = self._definition.analyse_farg(env, non_generic)
+        env[self._symbol] = arg_type
+        non_generic.add(arg_type)
+        return arg_type
+
+    def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
+              amb: types.Amb) -> types.Promise:
+        def match_continuation(val, amb):
+            return lambda: env.define(self._symbol, other, ret, amb)
+        return self._definition.match(other, env, match_continuation, amb)
 
 class LinkedList(Expr):
     @classmethod
