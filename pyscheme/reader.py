@@ -59,7 +59,6 @@ class Tokeniser:
         'back': 'BACK',
         'spawn': 'SPAWN',
         'define': 'DEFINE',
-        'prototype': 'PROTOTYPE',
         'env': 'ENV',
         'typedef': 'TYPEDEF',
         'nothing': 'NOTHING',
