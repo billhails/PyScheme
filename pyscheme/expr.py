@@ -1818,7 +1818,7 @@ class CharType(Type):
 
 class BoolType(Type):
     def __init__(self):
-        Type.__init__(self, Symbol("bool"))
+        Type.__init__(self, Symbol("bool"), Null())
 
     def get_or_make_type(self, env):
         return Boolean.type()
