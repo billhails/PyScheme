@@ -60,7 +60,10 @@ class Tokeniser:
         'spawn': 'SPAWN',
         'define': 'DEFINE',
         'prototype': 'PROTOTYPE',
+        'load': 'LOAD',
+        'as': 'AS',
         'env': 'ENV',
+        'extends': 'EXTENDS',
         'typedef': 'TYPEDEF',
         'nothing': 'NOTHING',
         'list': 'KW_LIST',
@@ -179,7 +182,7 @@ class Reader:
                   | FN symbol formals body
                   | FN symbol composite_body
                   | typedef
-                  | ENV symbol body
+                  | ENV symbol [EXTENDS package] body
                   | nest
 
         nest : body
@@ -213,11 +216,18 @@ class Reader:
                    | expression ';' statements
                    | definition
                    | definition ';' statements
+                   | load
+                   | load ';' statements
                    | construct
                    | construct statements
+                   | empty
 
         expression : binop_and THEN expression
                    | binop_and
+
+        load : LOAD package [AS symbol]
+
+        package : symbol {'.' symbol}
 
         definition : DEFINE symbol '=' expression
 
@@ -265,7 +275,7 @@ class Reader:
              | lst
              | FN formals body
              | FN composite_body
-             | ENV body
+             | ENV [EXTENDS package] body
              | BACK
              | SPAWN
              | '(' expression ')'
@@ -344,7 +354,7 @@ class Reader:
                       | FN symbol '(' formals ')' body
                       | FN symbol composite_body
                       | typedef
-                      | ENV symbol body
+                      | ENV symbol [EXTENDS package] body
                       | nest
         """
         self.debug("construct", fail=fail)
@@ -379,8 +389,12 @@ class Reader:
                 self.pushback(env)
                 return None
             else:
+                if self.swallow('EXTENDS'):
+                    package = self.package()
+                else:
+                    package = expr.Null()
                 body = self.body()
-                return expr.Definition(symbol, expr.Env(body))
+                return expr.Definition(symbol, expr.Env(body, package))
 
         return self.nest(fail)
 
@@ -568,8 +582,11 @@ class Reader:
                        | expression ';' statements
                        | definition
                        | definition ';' statements
+                       | load
+                       | load ';' statements
                        | construct
                        | construct statements
+                       | empty
         """
         self.debug("statements")
         definition = self.definition(False)
@@ -590,7 +607,40 @@ class Reader:
             else:
                 return expr.Pair(expression, expr.Null())
 
+        load = self.load(False)
+        if load is not None:
+            if self.swallow(';'):
+                return expr.Pair(load, self.statements())
+            else:
+                return expr.Pair(load, expr.Null())
+
         return expr.Null()
+
+    def load(self, fail=True) -> Maybe[expr.Expr]:
+        """
+        load : LOAD package [AS symbol]
+        """
+        if self.swallow('LOAD'):
+            package = self.package()
+            if self.swallow('AS'):
+                alias = self.symbol()
+            else:
+                alias = expr.Null()
+            return expr.Load(package, alias, lambda input: self.clone(input))
+        else:
+            if fail:
+                self.error("expected 'LOAD'")
+            else:
+                return None
+
+    def package(self, fail=True) -> Maybe[expr.LinkedList]:
+        symbol = self.symbol(fail)
+        if symbol is None:
+            return None
+        if self.swallow('.'):
+            return expr.Pair(symbol, self.package())
+        else:
+            return expr.Pair(symbol, expr.Null())
 
     def definition(self, fail=True):
         """
@@ -733,7 +783,7 @@ class Reader:
                    | lst
                    | FN formals body
                    | FN composite_body
-                   | ENV body
+                   | ENV [EXTENDS package] body
                    | BACK
                    | SPAWN
                    | '(' expression ')'
@@ -775,8 +825,11 @@ class Reader:
                 return expr.Lambda(formals, body)
 
         if self.swallow('ENV'):
-            body = self.body()
-            return expr.Env(body)
+            if self.swallow('EXTENDS'):
+                package = self.package()
+            else:
+                package = expr.Null()
+            return expr.Env(self.body(), package)
 
         token = self.swallow('BACK')
         if token:
@@ -1153,3 +1206,6 @@ class Reader:
             for k in kwargs:
                 print(k + '=' + str(kwargs[k]), end=' ')
             print(self.tokeniser)
+
+    def clone(self, input: io.StringIO):
+        return Reader(Tokeniser(input), self.stderr)

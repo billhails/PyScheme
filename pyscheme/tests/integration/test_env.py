@@ -172,3 +172,67 @@ class TestEnv(Base):
             e.pair;
             '''
         )
+
+    def test_extended_env_1(self):
+        self.assertEval(
+            '10',
+            '''
+            {
+                env a {
+                    fn bar() { 10 }
+                    env b {
+                        fn foo() {
+                            bar()
+                        }
+                    }
+                }
+
+                env d extends a.b {
+                    fn baz() { foo() }
+                }
+
+                d.foo();
+            }
+            ''',
+            "environments extending others can see their contents"
+        )
+
+    def test_extended_env_2(self):
+        self.assertError(
+            'PySchemeTypeError: bool != int',
+            '''
+            {
+                env a {
+                    fn bar(n) { 10 + n }
+                    env b {
+                        fn foo(n) {
+                            bar(n)
+                        }
+                    }
+                }
+
+                env d extends a.b {
+                    fn baz(n) { foo(n) }
+                }
+
+                d.foo(true);
+            }
+            ''',
+            "environments extending others can typecheck their contents"
+        )
+
+    def test_extended_env_3(self):
+        self.assertEval(
+            '1',
+            '''
+            {
+                fn head(lst) {
+                    env extends globalenv {}.head(lst)
+                }
+                
+                head([1, 2, 3]);
+            }
+            ''',
+            "environments extending others can see their contents"
+        )
+

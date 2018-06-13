@@ -906,23 +906,56 @@ class EnvironmentWrapper(Expr):
 
 class Env(Expr):
     """Implements the 'env' construct
+
+    1. extend the current or specified environment.
+    2. evaluate the body in the new environment.
+    3. return the new environment in an EnvironmentWrapper expression
     """
 
-    def __init__(self, body: Sequence):
+    def __init__(self, body: Sequence, package: LinkedList):
         self._body = body
+        self._package = package
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         """evaluate the body in an extended env then return the extended env as the result
         """
-        new_env = env.extend()
+        new_env = None
 
-        def eval_continuation(val: Expr, amb: types.Amb) -> types.Promise:
+        def lookup_package(
+                package: LinkedList,
+                env: 'environment.Environment',
+                ret: types.Continuation,
+                amb: types.Amb
+        ) -> types.Promise:
+            if isinstance(package, Null):
+                return lambda: ret(env, amb)
+            else:
+                def next_step(env: EnvironmentWrapper, amb: types.Amb) -> types.Promise:
+                    return lookup_package(package.cdr(), env.env(), ret, amb)
+                return lambda: env.lookup(package.car(), next_step, amb)
+
+        def after_eval(_: Expr, amb: types.Amb) -> types.Promise:
+            nonlocal new_env
             return ret(EnvironmentWrapper(new_env), amb)
 
-        return self._body.eval(new_env, eval_continuation, amb)
+        def after_lookup(env: 'environment.Environment', amb: types.Amb) -> types.Promise:
+            nonlocal new_env
+            new_env = env.extend()
+            return self._body.eval(new_env, after_eval, amb)
+
+        return lookup_package(self._package, env, after_lookup, amb)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        new_env = env.extend()
+        def lookup_env(package: LinkedList, env: inference.TypeEnvironment) -> inference.TypeEnvironment:
+            if isinstance(package, Null):
+                return env
+            else:
+                new_env = env[(package.car())].prune().env()
+                if not isinstance(new_env, inference.TypeEnvironment):
+                    raise PySchemeInferenceError(str(package.car()) + " is not an environment, it is " + str(type(new_env)))
+                return lookup_env(package.cdr(), new_env)
+
+        new_env = lookup_env(self._package, env).extend()
         self._body.analyse_internal(new_env, non_generic.copy())
         return inference.EnvironmentType(new_env)
 
@@ -1822,3 +1855,17 @@ class BoolType(Type):
 
     def get_or_make_type(self, env):
         return Boolean.type()
+
+class Load(Expr):
+    """
+    load a.b.c
+        define a = env { define b = env { define c = globalenv { "content of ./a/b/c.fn" } } }
+    load a.b.c as d
+        define d = env { define b = env { define c = globalenv { "content of ./a/b/c.fn" } } }.b.c
+    load a as b
+        define b = globalenv { "content of ./a.fn" }
+    """
+    def __init__(self, package: LinkedList, alias: Symbol, get_reader: callable):
+        self.package = package
+        self.alias = alias
+        self.get_reader = get_reader

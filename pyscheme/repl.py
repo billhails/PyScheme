@@ -23,7 +23,7 @@ import pyscheme.environment as environment
 import pyscheme.expr as expr
 from io import StringIO
 import pyscheme.reader as reader
-from .inference import TypeEnvironment
+from .inference import TypeEnvironment, EnvironmentType
 from .exceptions import PySchemeError
 from . import ambivalence
 
@@ -72,11 +72,16 @@ class Repl:
             { expr.Symbol(k): v for k, v in operators.items() }
         )
 
+        globalenv = expr.Symbol("globalenv")
+        self.env.non_eval_context_define(globalenv, expr.EnvironmentWrapper(self.env))
+
         self.type_env = TypeEnvironment().extend()
 
         for k, v in operators.items():
             if v.static_type():
                 self.type_env[expr.Symbol(k)] = v.type()
+
+        self.type_env[globalenv] = EnvironmentType(self.type_env)
 
     def trampoline(self, threads: List['types.Promise']):
         while len(threads) > 0:
@@ -92,12 +97,15 @@ class Repl:
         result = self.reader.read()
         if result is None:
             return None  # stop the trampoline
+        return lambda: ret(result, amb)
+
+    def analyze(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         try:
-            result.analyse(self.type_env)
+            expr.analyse(self.type_env)
         except PySchemeError as e:
             self.error.write(str(e))
             return None
-        return lambda: ret(result, amb)
+        return lambda: ret(expr, amb)
 
     def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         return lambda: expr.eval(self.env, ret, amb)
@@ -114,8 +122,11 @@ class Repl:
         def eval_continuation(evaluated_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
             return lambda: self.print(evaluated_expr, print_continuation, amb)
 
+        def analyze_continuation(analyzed_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
+            return lambda: self.eval(analyzed_expr, eval_continuation, amb)
+
         def read_continuation(read_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
-            return lambda: self.eval(read_expr, eval_continuation, amb)
+            return lambda: self.analyze(read_expr, analyze_continuation, amb)
 
         return lambda: self.read(read_continuation, amb)
 

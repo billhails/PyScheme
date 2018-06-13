@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError
+from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError, PySchemeInternalError
 from . import expr
 from . import types
 from typing import Dict
@@ -81,6 +81,16 @@ class Frame(Environment):
     def contains(self, symbol: 'expr.Symbol'):
         return symbol in self._dictionary or self._parent.contains(symbol)
 
+    def non_eval_context_define(self, symbol: 'expr.Symbol', value: 'expr.Expr'):
+        """
+        do NOT call this in general.
+        it is for internal use by set-up code in the repl.
+        normal evaluation requires calling define() above.
+        """
+        if symbol in self._dictionary:
+            raise PySchemeInternalError("symbol already defined: " + str(symbol))
+        self._dictionary[symbol] = value
+        
     def __getitem__(self, symbol):
         if symbol in self._dictionary:
             return self._dictionary[symbol]

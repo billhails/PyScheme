@@ -5,3 +5,4 @@ htmlcov
 .idea
 parser.out
 parsetab.py
+.DS_Store
