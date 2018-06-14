@@ -31,7 +31,9 @@ class TestSort(Base):
                 fn qsort {
                     ([]) { [] }
                     (pivot @ rest) {
-                        qsort(filter(pivot >=, rest)) @@ [pivot] @@ qsort(filter(pivot <, rest))
+                        define lesser = filter(pivot >=, rest);
+                        define greater = filter(pivot <, rest);
+                        qsort(lesser) @@ [pivot] @@ qsort(greater);
                     }
                 }
 
@@ -44,6 +46,40 @@ class TestSort(Base):
                             filter(f, t)
                         }
                     }
+                }
+
+                qsort(unsorted);
+            }
+            '''
+        )
+
+    def test_sort_2(self):
+        self.assertEval(
+            '["everywhere", "goodbye", "hello", "here", "there"]',
+            '''
+            {
+                define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
+
+                fn qsort {
+                    ([]) { [] }
+                    (pivot @ rest) {
+                        partition(pivot, rest)
+                    }
+                }
+                
+                // only read the list once, breaking it into two lists
+                fn partition(pivot, rest) {
+                    fn helper {
+                        (pivot, [], lt, gt) { qsort(lt) @@ [pivot] @@ qsort(gt) }
+                        (pivot, h @ t, lt, gt) {
+                            if (pivot > h) {
+                                helper(pivot, t, h @ lt, gt)
+                            } else {
+                                helper(pivot, t, lt, h @ gt)
+                            }
+                        }
+                    }
+                    helper(pivot, rest, [], [])
                 }
 
                 qsort(unsorted);
