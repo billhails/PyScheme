@@ -201,6 +201,7 @@ class Reader:
 
         sub_function_arg : sub_function_arg_2 '@' sub_function_arg
                          | sub_function_arg_2
+                         | symbol '=' sub_function_arg
 
         sub_function_arg_2 : '[' [ sub_function_arg { ',' sub_function_arg } ] ']'
                            | sub_function_arg_3
@@ -501,8 +502,15 @@ class Reader:
         """
         sub_function_arg : subfunction_arg_2 '@' sub_function_arg
                          | subfunction_arg_2
+                         | symbol '=' sub_function_arg
         """
         self.debug("sub_function_arg", fail=fail)
+        id = self.swallow('ID')
+        if id is not None:
+            if self.swallow('='):
+                return expr.As(expr.Symbol(id.value), self.sub_function_arg())
+            else:
+                self.pushback(id)
         subfunction_arg_2 = self.sub_function_arg_2(fail)
         if subfunction_arg_2 is None:
             return None

@@ -76,65 +76,61 @@ class TestAmb(Base):
         self.assertEval(
             "40",
             """
-            
-            fn require(condition) {
-                condition or back
-            }
-
-            fn one_of(lst) {
-                require(length(lst) > 0);
-                head(lst) then one_of(tail(lst))
-            }
-            
-            fn member(item, lst) {
-                if (length(lst) > 0) {
-                    if (item == (head(lst))) {
-                        true
-                    } else {
-                        member(item, tail(lst));
+            {
+                fn require(condition) {
+                    condition or back
+                }
+    
+                fn one_of {
+                    ([]) { back }
+                    (h @ t) { h then one_of(t) }
+                }
+                
+                fn member {
+                    (item, []) { false }
+                    (item, h @ t) {
+                        if (item == h) {
+                            true
+                        } else {
+                            member(item, t);
+                        }
                     }
-                } else {
-                    false
                 }
-            }
-
-            fn exclude(items, lst) {
-                if (length(lst) > 0) {
-                    if (member(head(lst), items)) {
-                        exclude(items, tail(lst))
-                    } else {
-                        head(lst) @ exclude(items, tail(lst))
+    
+                fn exclude {
+                    (items, []) { [] }
+                    (items, h @ t) {
+                        if (member(h, items)) {
+                            exclude(items, t)
+                        } else {
+                            h @ exclude(items, t)
+                        }
                     }
-                } else {
-                    []
                 }
-            }
-            
-            fn some_of(lst) {
-                require(length(lst) > 0);
-                [head(lst)] then some_of(tail(lst)) then head(lst) @ some_of(tail(lst));
-            }
-
-            fn sum(lst) {
-                if (length(lst) == 0) {
-                    0
-                } else {
-                    head(lst) + sum(tail(lst))
+                
+                fn some_of {
+                    ([]) { back }
+                    (h @ t) { [h] then some_of(t) then h @ some_of(t) }
                 }
+    
+                fn sum {
+                    ([]) { 0 }
+                    (h @ t) { h + sum(t) }
+                }
+    
+                fn barrels_of_fun() {
+                    define barrels = [30, 32, 36, 38, 40, 62];
+                    define beer = one_of(barrels);
+                    define wine = exclude([beer], barrels);
+                    define barrel_1 = one_of(wine);
+                    define barrel_2 = one_of(exclude([barrel_1], wine));
+                    define purchase = some_of(exclude([barrel_1, barrel_2], wine));
+                    require((barrel_1 + barrel_2) * 2 == sum(purchase));
+                    beer;
+                }
+                
+                barrels_of_fun();
             }
-
-            fn barrels_of_fun() {
-                define barrels = [30, 32, 36, 38, 40, 62];
-                define beer = one_of(barrels);
-                define wine = exclude([beer], barrels);
-                define barrel_1 = one_of(wine);
-                define barrel_2 = one_of(exclude([barrel_1], wine));
-                define purchase = some_of(exclude([barrel_1, barrel_2], wine));
-                require((barrel_1 + barrel_2) * 2 == sum(purchase));
-                beer;
-            }
-            
-            barrels_of_fun();
             """
         )
 
@@ -158,7 +154,7 @@ class TestAmb(Base):
                     condition or back
                 }
                 
-                fn one_of {
+                fn one_of { // demonstrate implicit green cut in composite functions
                     ([]) { back }
                     (h @ t) { h then one_of(t) }
                 }
