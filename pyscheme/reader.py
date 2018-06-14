@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from .exceptions import PySchemeSyntaxError
-import pyscheme.expr as expr
+from . import expr
 from .types import Maybe
 import re
 import inspect
@@ -217,8 +217,6 @@ class Reader:
                    | expression ';' statements
                    | definition
                    | definition ';' statements
-                   | load
-                   | load ';' statements
                    | construct
                    | construct statements
                    | empty
@@ -231,6 +229,7 @@ class Reader:
         package : symbol {'.' symbol}
 
         definition : DEFINE symbol '=' expression
+                   | load
 
         binop_and : unop_not { AND binop_and }
                   | unop_not { OR binop_and }
@@ -500,24 +499,24 @@ class Reader:
 
     def sub_function_arg(self, fail=True):
         """
-        sub_function_arg : subfunction_arg_2 '@' sub_function_arg
-                         | subfunction_arg_2
+        sub_function_arg : sub_function_arg_2 '@' sub_function_arg
+                         | sub_function_arg_2
                          | symbol '=' sub_function_arg
         """
         self.debug("sub_function_arg", fail=fail)
-        id = self.swallow('ID')
-        if id is not None:
+        id_token = self.swallow('ID')
+        if id_token is not None:
             if self.swallow('='):
-                return expr.As(expr.Symbol(id.value), self.sub_function_arg())
+                return expr.As(expr.Symbol(id_token.value), self.sub_function_arg())
             else:
-                self.pushback(id)
-        subfunction_arg_2 = self.sub_function_arg_2(fail)
-        if subfunction_arg_2 is None:
+                self.pushback(id_token)
+        sub_function_arg_2 = self.sub_function_arg_2(fail)
+        if sub_function_arg_2 is None:
             return None
         if self.swallow('@'):
-            return expr.Pair(subfunction_arg_2, self.sub_function_arg())
+            return expr.Pair(sub_function_arg_2, self.sub_function_arg())
         else:
-            return subfunction_arg_2
+            return sub_function_arg_2
 
     def sub_function_arg_2(self, fail=True):
         """
@@ -590,8 +589,6 @@ class Reader:
                        | expression ';' statements
                        | definition
                        | definition ';' statements
-                       | load
-                       | load ';' statements
                        | construct
                        | construct statements
                        | empty
@@ -615,13 +612,6 @@ class Reader:
             else:
                 return expr.Pair(expression, expr.Null())
 
-        load = self.load(False)
-        if load is not None:
-            if self.swallow(';'):
-                return expr.Pair(load, self.statements())
-            else:
-                return expr.Pair(load, expr.Null())
-
         return expr.Null()
 
     def load(self, fail=True) -> Maybe[expr.Expr]:
@@ -634,7 +624,7 @@ class Reader:
                 alias = self.symbol()
             else:
                 alias = expr.Null()
-            return expr.Load(package, alias, lambda input: self.clone(input))
+            return expr.Load(package, alias, lambda input_fh: self.clone(input_fh))
         else:
             if fail:
                 self.error("expected 'LOAD'")
@@ -653,8 +643,13 @@ class Reader:
     def definition(self, fail=True):
         """
             definition : DEFINE symbol '=' expression
+                       | load
         """
         self.debug("definition", fail=fail)
+        load = self.load(fail)
+        if load is not None:
+            return load
+
         if self.swallow('DEFINE'):
             symbol = self.symbol()
             self.consume('=')

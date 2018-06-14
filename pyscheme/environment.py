@@ -18,7 +18,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError, PySchemeInternalError
-from . import expr
 from . import types
 from typing import Dict
 from . import ambivalence

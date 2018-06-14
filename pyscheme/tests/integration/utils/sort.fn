@@ -1,0 +1,20 @@
+
+fn qsort {
+    ([]) { [] }
+    (pivot @ rest) {
+        define lesser = filter(pivot >=, rest);
+        define greater = filter(pivot <, rest);
+        qsort(lesser) @@ [pivot] @@ qsort(greater);
+    }
+}
+
+fn filter {
+    (f, []) { [] }
+    (f, h @ t) {
+        if (f(h)) {
+            h @ filter(f, t)
+        } else {
+            filter(f, t)
+        }
+    }
+}
