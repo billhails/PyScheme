@@ -1,0 +1,3 @@
+[submodule "Bytecode-Interpreter"]
+	path = Bytecode-Interpreter
+	url = git@github.com:billhails/FN-Bytecode-Interpreter
