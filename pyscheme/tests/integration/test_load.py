@@ -34,13 +34,29 @@ class TestTestLoad(Base):
 
     def test_test_load_2(self):
         self.assertEval(
-            '[2, 3, 3, 4, 5, 6, 8]',
+            '[3, 4, 4, 5, 6, 7, 9]',
             '''
-            load utils.sort;
+            {
+                load utils.sort;
+                load utils.lists as lists;
 
-            define unsorted = [5, 4, 6, 2, 3, 3, 8];
+                define unsorted = [5, 4, 6, 2, 3, 3, 8];
 
-            utils.sort.qsort(unsorted);
+                lists.map(1+, utils.sort.qsort(unsorted));
+            }
             '''
         )
 
+    def test_test_load_3(self):
+        self.assertEval(
+            '10',
+            '''
+            {
+                load utils.lists as lists;
+
+                fn add(x, y) { x + y }
+
+                lists.reduce(add, 0, [1, 2, 3, 4]);
+            }
+            '''
+        )

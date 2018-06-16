@@ -15,13 +15,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-load utils.lists as lst;
+typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
 
-fn qsort {
-    ([]) { [] }
-    (pivot @ rest) {
-        define lesser = lst.filter(pivot >=, rest);
-        define greater = lst.filter(pivot <, rest);
-        qsort(lesser) @@ [pivot] @@ qsort(greater);
+fn insert {
+    (t, leaf) { branch(leaf, t, leaf) }
+    (t, branch(left, u, right)) {
+        if (t < u) {
+            branch(insert(t, left), u, right)
+        } else if (t == u) {
+            branch(left, u, right)
+        } else {
+            branch(left, u, insert(t, right))
+        }
     }
+}
+
+fn contains {
+    (t, leaf) { false }
+    (t, branch(left, u, right)) {
+        if (t < u) {
+            contains(t, left)
+        } else if (t == u) {
+            true
+        } else {
+            contains(t, right)
+        }
+    }
+}
+
+fn flatten {
+    (leaf) { [] }
+    (branch(l, u, r)) { flatten(l) @@ [u] @@ flatten(r) }
 }

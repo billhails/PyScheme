@@ -877,7 +877,7 @@ class Application(Expr):
 
 class Sequence(Expr):
     def __init__(self, exprs: LinkedList):
-        self._exprs = exprs
+        self._exprs = self.hoist_loads(exprs)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         # noinspection PyShadowingNames
@@ -893,6 +893,32 @@ class Sequence(Expr):
             return these_types.last()
         else:
             return Null.type()
+
+    def hoist_loads(self, exprs: LinkedList) -> LinkedList:
+        """
+        merges all load statements at this level into one
+        load statement at the front of the list
+        """
+        load = None
+
+        def hoist_recursive(lst: LinkedList) -> LinkedList:
+            nonlocal load
+            if isinstance(lst, Null):
+                return lst
+            elif isinstance(lst.car(), Load):
+                if load is None:
+                    load = lst.car()
+                else:
+                    load.merge(lst.car())
+                return hoist_recursive(lst.cdr())
+            else:
+                return Pair(lst.car(), hoist_recursive(lst.cdr()))
+
+        new_list = hoist_recursive(exprs)
+        if load is None:
+            return new_list
+        else:
+            return Pair(load, new_list)
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('{ ', ' ; ', ' }')
@@ -1891,108 +1917,142 @@ class Load(Expr):
         define d = env { define b = env { define c = env extends globalenv { "content of ./a/b/c.fn" } } }.b.c
     load a as b
         define b = env extends globalenv { "content of ./a.fn" }
+
+    however, it's more complicated than that:
+
+    load a.b.c
+    load a.b.d as d
+        define a = env { define b = env { define c = env extends globalenv { "content of ./a/b/c.fn" };
+                                          define d = env extends globalenv { "content of ./a/b/d.fn" } } }
+        define d = a.b.d;
     """
     loaded_packages = {}
 
     def __init__(self, package: LinkedList, alias: Symbol, get_reader: callable):
-        self.package = package
-        self.alias = alias
-        self.get_reader = get_reader
+        self.packages = [package]
+        self.aliases = {}
+        if not isinstance(alias, Null):
+            self.aliases[alias] = package
         self.wrapper = None
-        if not self.loaded():
-            self.load()
+        self.current = {}
+        if not self.loaded(package):
+            self.load(package, get_reader)
+        self.note_current_load(package)
+
+    def merge(self, other):
+        self.merge_packages(other)
+        self.merge_aliases(other)
+        self.merge_current(other)
+
+    def merge_packages(self, other: 'Load'):
+        self.packages += other.packages
+
+    def merge_aliases(self, other: 'Load'):
+        for alias in other.aliases.keys():
+            self.aliases[alias] = other.aliases[alias]
+
+    def merge_current(self, other: 'Load'):
+        def merge_recursive(a: dict, b: dict):
+            if isinstance(a, dict):
+                for key in b.keys():
+                    if key in a:
+                        merge_recursive(a[key], b[key])
+                    else:
+                        a[key] = b[key]
+
+        merge_recursive(self.current, other.current)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: self.make_wrapper().eval(env, ret, amb)
 
+    def note_current_load(self, package: LinkedList):
+        def note_recursive(package: LinkedList, dictionary: dict):
+            if isinstance(package.cdr(), Null):
+                dictionary[package.car()] = self.file_name(package)
+            else:
+                if package.car() not in dictionary:
+                    dictionary[package.car()] = {}
+                note_recursive(package.cdr(), dictionary[package.car()])
+
+        note_recursive(package, self.current)
+
     def make_wrapper(self):
         if self.wrapper is None:
-            if isinstance(self.alias, Null):
-                def make_wrapper_recursive(package):
-                    if isinstance(package.cdr(), Null):
-                        return Definition(
-                            package.car(),
-                            Env(
-                                self.get_content(),
-                                Pair(Symbol('globalenv'), Null())
-                            )
-                        )
-                    else:
-                        return Definition(
-                            package.car(),
-                            Env(
-                                Sequence(
-                                    Pair(
-                                        make_wrapper_recursive(package.cdr()),
-                                        Null(),
-                                    ),
-                                ),
-                                Null()
-                            )
-                        )
-
-                self.wrapper = make_wrapper_recursive(self.package)
-            else:  # alias is present
-                def make_wrapper_recursive(package) -> Expr:
-                    if isinstance(package, Null):
-                        return Env(
-                            self.get_content(),
-                            Pair(Symbol("globalenv"), Null())
-                        )
-                    else:
-                        return Env(
-                            Sequence(
-                                Pair(
-                                    Definition(
-                                        package.car(),
-                                        make_wrapper_recursive(package.cdr())
-                                    ),
-                                    Null()
+            def convert_current_to_environments(current: dict, path: list) -> Sequence:
+                if isinstance(current, dict):
+                    definitions = []
+                    for component in current.keys():
+                        definitions += [
+                            Definition(
+                                component,
+                                Env(
+                                    convert_current_to_environments(current[component], path + [component]),
+                                    Pair(Symbol("globalenv"), Null())
                                 )
-                            ),
-                            Null()
+                            )
+                        ]
+                    return Sequence(LinkedList.list(definitions))
+                else:
+                    return self.get_content(path[:-1] + [current])
+
+            def convert_path_to_env_access(path: LinkedList, result) -> Union[Symbol, EnvContext]:
+                if isinstance(path, Null):
+                    return result
+                else:
+                    return convert_path_to_env_access(path.cdr(), EnvContext(result, path.car()))
+
+            environments = convert_current_to_environments(self.current, [])
+            alias_definitions = []
+            for alias in self.aliases.keys():
+                alias_definitions += [
+                    Definition(
+                        alias,
+                        convert_path_to_env_access(
+                            self.aliases[alias].cdr(),
+                            self.aliases[alias].car()
                         )
+                    )
+                ]
 
-                def deref_recursive(package: LinkedList, wrapper) -> Expr:
-                    if isinstance(package, Null):
-                        return wrapper
-                    else:
-                        return deref_recursive(package.cdr(), EnvContext(wrapper, package.car()))
-
-                self.wrapper = Definition(
-                    self.alias,
-                    deref_recursive(self.package.cdr(), make_wrapper_recursive(self.package.cdr()))
+            if len(alias_definitions) > 0:
+                environments = Sequence(
+                    environments._exprs.append(LinkedList.list(alias_definitions))
                 )
-            debug(self.wrapper)
+
+            self.wrapper = environments
+
         return self.wrapper
 
-    def get_content(self) -> Sequence:
+    def get_content(self, path: list) -> Sequence:
         def get_content_recursive(package: LinkedList, packages: Union[dict, Sequence]) -> Sequence:
             if isinstance(package.cdr(), Null):
-                return packages[Symbol(str(package.car()) + ".fn")]
+                return packages[package.car()]
             else:
                 return get_content_recursive(package.cdr(), packages[package.car()])
 
-        return get_content_recursive(self.package, Load.loaded_packages)
+        return get_content_recursive(LinkedList.list(path), Load.loaded_packages)
 
-    def loaded(self) -> bool:
+    def file_name(self, pair: LinkedList) -> Symbol:
+        return Symbol(str(pair.car()) + ".fn")
+
+    def loaded(self, package: LinkedList) -> bool:
         def recursive_check(package: LinkedList, packages: dict) -> bool:
             if isinstance(package.cdr(), Null):
-                file = Symbol(str(package.car()) + ".fn")
+                file = self.file_name(package)
                 return file in packages
             elif package.car() in packages:
                 return recursive_check(package.cdr(), packages[package.car()])
             else:
                 return False
 
-        return recursive_check(self.package, Load.loaded_packages)
+        return recursive_check(package, Load.loaded_packages)
 
-    def load(self):
-        path = self.make_path()
+    def load(self, package: LinkedList, get_reader: callable):
+        path = self.make_path(package)
         if path.is_file():
             contents = []
             with path.open() as fh:
-                reader = self.get_reader(fh)
+                reader = get_reader(fh)
                 while True:
                     parsed_expr = reader.read()
                     if parsed_expr is None:
@@ -2001,18 +2061,18 @@ class Load(Expr):
 
             def recursive_set(package: LinkedList, packages: dict):
                 if isinstance(package.cdr(), Null):
-                    file = Symbol(str(package.car()) + ".fn")
+                    file = self.file_name(package)
                     packages[file] = Sequence(LinkedList.list(contents))
                 else:
                     if package.car() not in packages:
                         packages[package.car()] = {}
                     recursive_set(package.cdr(), packages[package.car()])
-            recursive_set(self.package, Load.loaded_packages)
+            recursive_set(package, Load.loaded_packages)
         else:
             raise FileNotFoundError(str(path))
 
-    def make_path(self) -> Path:
-        return Path(self.package.qualified_str('./', '/', '.fn'))
+    def make_path(self, package: LinkedList) -> Path:
+        return Path(package.qualified_str('./', '/', '.fn'))
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
         self.make_wrapper().prepare_analysis(env)

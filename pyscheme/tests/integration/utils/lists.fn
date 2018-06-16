@@ -15,13 +15,43 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-load utils.lists as lst;
-
-fn qsort {
-    ([]) { [] }
-    (pivot @ rest) {
-        define lesser = lst.filter(pivot >=, rest);
-        define greater = lst.filter(pivot <, rest);
-        qsort(lesser) @@ [pivot] @@ qsort(greater);
+fn map {
+    (f, []) { [] }
+    (f, h @ t) {
+        f(h) @ map(f, t)
     }
+}
+
+fn filter {
+    (f, []) { [] }
+    (f, h @ t) {
+        if (f(h)) {
+            h @ filter(f, t)
+        } else {
+            filter(f, t)
+        }
+    }
+}
+
+fn member {
+    (item, []) { false }
+    (item, h @ t) {
+        if (item == h) {
+            true
+        } else {
+            member(item, t);
+        }
+    }
+}
+
+fn exclude(items, lst) {
+    filter(fn (x) { not member(x, items) }, lst)
+}
+
+fn reduce(binop, final, lst) {
+    fn helper {
+        ([]) { final }
+        (h @ t) { binop(h, helper(t)) }
+    }
+    helper(lst)
 }
