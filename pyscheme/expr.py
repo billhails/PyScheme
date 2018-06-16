@@ -1613,6 +1613,7 @@ class TypeDef(TypeSystem):
         self.constructors = constructors
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
+        env[self.flat_type.symbol] = inference.TypeVariable()
         self.constructors.prepare_analysis(env)
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
@@ -1620,7 +1621,7 @@ class TypeDef(TypeSystem):
         new_non_generic = non_generic.copy()
         return_type = self.flat_type.make_type(new_env, new_non_generic)
         # we may be looked up as a type variable if there are no argument types
-        env[self.flat_type.symbol] = return_type
+        env[self.flat_type.symbol].unify(return_type)
         for constructor in self.constructors:
             debug("unifying", constructor.name, "in", env)
             env[constructor.name].unify(constructor.make_type(new_env, return_type, new_non_generic))

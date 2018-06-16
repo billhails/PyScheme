@@ -26,30 +26,56 @@ class TestMetacircular(Base):
 
     def test_metacircular_evaluator(self):
         self.assertEval(
-            '11',
+            'number[5]',
             '''
             {
+                // very simple environment
+                typedef environment { frame(string, expression, environment) | root }
+
                 // very simple AST
                 typedef expression {
-                    plus(expression, expression) |
-                    minus(expression, expression) |
-                    times(expression, expression) |
-                    divide(expression, expression) |
+                    addition(expression, expression) |
+                    subtraction(expression, expression) |
+                    multiplication(expression, expression) |
+                    division(expression, expression) |
                     number(int) |
-                    symbol(string)
+                    symbol(string) |
+                    conditional(expression, expression, expression) |
+                    lambda(expression, expression) |
+                    closure(expression, environment) |
+                    application(expression, expression)
                 }
-
-                // very simple environment
-                typedef environment { frame(string, int, environment) | root }
 
                 // an interpreter
                 fn eval {
-                    (plus(l, r), e) { eval(l, e) + eval(r, e) }
-                    (minus(l, r), e) { eval(l, e) - eval(r, e) }
-                    (times(l, r), e) { eval(l, e) * eval(r, e) }
-                    (divide(l, r), e) { eval(l, e) / eval(r, e) }
-                    (number(i), e) { i }
-                    (symbol(s), e) { lookup(s, e) }
+                    (addition(l, r), e)              { add(eval(l, e), eval(r, e)) }
+                    (subtraction(l, r), e)           { sub(eval(l, e), eval(r, e)) }
+                    (multiplication(l, r), e)        { mul(eval(l, e), eval(r, e)) }
+                    (division(l, r), e)              { div(eval(l, e), eval(r, e)) }
+                    (i = number(_), e)               { i }
+                    (symbol(s), e)                   { lookup(s, e) }
+                    (conditional(test, pro, con), e) { cond(test, pro, con, e) }
+                    (l = lambda(symbol(_), body), e) { closure(l, e) }
+                    (application(function, arg), e)  { apply(eval(function, e), eval(arg, e)) }
+                }
+                
+                // function application
+                fn apply {
+                    (closure(lambda(symbol(s), body), e), arg) {
+                        eval(body, frame(s, arg, e))
+                    }
+                }
+                
+                // built-ins
+                fn add { (number(a), number(b)) { number(a + b) } }
+                fn sub { (number(a), number(b)) { number(a - b) } }
+                fn mul { (number(a), number(b)) { number(a * b) } }
+                fn div { (number(a), number(b)) { number(a / b) } }
+                fn cond(test, pro, con, e) {
+                    fn {
+                        (number(0)) { eval(con, e) } // 0 is false
+                        (number(_)) { eval(pro, e) }
+                    }(eval(test, e))
                 }
 
                 // lookup access to the environment
@@ -64,71 +90,20 @@ class TestMetacircular(Base):
                     (s, root) { error("mce symbol not defined " @@ s) }
                 }
 
-                // try it out
+                // try it out: ((lambda (x) (if x (+ x 2) x)) a) |- a: 3
                 eval(
-                    plus(
-                        number(2),
-                        times(
-                            number(3),
-                            symbol("a")
-                        )
+                    application(
+                        lambda(
+                            symbol("x"),
+                            conditional(
+                                symbol("x"),
+                                addition(symbol("x"), number(2)),
+                                symbol("x")
+                            )
+                        ),
+                        symbol("a")
                     ),
-                    frame("a", 3, frame("a", 2, root))
-                );
-            }
-            '''
-        )
-
-    def test_metacircular_evaluator_2(self):
-        self.assertEval(
-            '11',
-            '''
-            {
-                // very simple AST
-                typedef expression {
-                    plus(expression, expression) |
-                    minus(expression, expression) |
-                    times(expression, expression) |
-                    divide(expression, expression) |
-                    number(int) |
-                    symbol(string)
-                }
-
-                // very simple environment
-                typedef environment { frame(string, expression, environment) | root }
-
-                // an interpreter
-                fn eval {
-                    (plus(l, r), e) { eval(l, e) + eval(r, e) }
-                    (minus(l, r), e) { eval(l, e) - eval(r, e) }
-                    (times(l, r), e) { eval(l, e) * eval(r, e) }
-                    (divide(l, r), e) { eval(l, e) / eval(r, e) }
-                    (number(i), e) { i }
-                    (symbol(s), e) { lookup(s, e) }
-                }
-
-                // lookup access to the environment
-                fn lookup {
-                    (s, frame(key, number(value), parent)) {
-                        if (s == key) {
-                            value
-                        } else {
-                            lookup(s, parent)
-                        }
-                    }
-                    (s, root) { error("mce symbol not defined " @@ s) }
-                }
-
-                // try it out
-                eval(
-                    plus(
-                        number(2),
-                        times(
-                            number(3),
-                            symbol("a")
-                        )
-                    ),
-                    frame("a", number(3), frame("a", number(2), root))
+                    frame("a", number(3), root)
                 );
             }
             '''

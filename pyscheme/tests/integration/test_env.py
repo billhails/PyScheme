@@ -227,9 +227,10 @@ class TestEnv(Base):
             '''
             {
                 fn head(lst) {
+                    // could just say `globalenv.head(lst)` for the same effect
                     env extends globalenv {}.head(lst)
                 }
-                
+
                 head([1, 2, 3]);
             }
             ''',
