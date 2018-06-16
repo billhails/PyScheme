@@ -24,8 +24,7 @@ from . import types
 from . import inference
 from . import ambivalence
 from pathlib import Path
-import io
-from typing import Callable, Union
+from typing import Union
 import inspect
 import os
 import sys
@@ -653,7 +652,7 @@ class Pair(LinkedList):
 
         type_so_far = inference.TypeVariable()
 
-        def analyse_recursive(pair: Pair) -> inference.Type:
+        def analyse_recursive(pair: LinkedList) -> inference.Type:
             if isinstance(pair, Null):
                 result_type = Pair.type(type_so_far)
                 result_type.unify(Null.type())
@@ -898,31 +897,34 @@ class Sequence(Expr):
         else:
             return Null.type()
 
-    def hoist_loads(self, exprs: LinkedList) -> LinkedList:
+    @classmethod
+    def hoist_loads(cls, exprs: LinkedList) -> LinkedList:
         """
         merges all load statements at this level into one
         load statement at the front of the list
         """
-        load = None
+        load = [None]
 
-        def hoist_recursive(lst: LinkedList) -> LinkedList:
-            nonlocal load
+        def hoist_recursive(lst: LinkedList, loaded: list) -> LinkedList:
             if isinstance(lst, Null):
                 return lst
             elif isinstance(lst.car(), Load):
-                if load is None:
-                    load = lst.car()
+                if loaded[0] is None:
+                    loaded[0] = lst.car()
                 else:
-                    load.merge(lst.car())
-                return hoist_recursive(lst.cdr())
+                    loaded[0].merge(lst.car())
+                return hoist_recursive(lst.cdr(), loaded)
             else:
-                return Pair(lst.car(), hoist_recursive(lst.cdr()))
+                return Pair(lst.car(), hoist_recursive(lst.cdr(), loaded))
 
-        new_list = hoist_recursive(exprs)
-        if load is None:
+        new_list = hoist_recursive(exprs, load)
+        if load[0] is None:
             return new_list
         else:
-            return Pair(load, new_list)
+            return Pair(load[0], new_list)
+
+    def get_exprs(self):
+        return self._exprs
 
     def __str__(self) -> str:
         return self._exprs.qualified_str('{ ', ' ; ', ' }')
@@ -1008,7 +1010,10 @@ class Env(Expr):
             else:
                 new_env = env[(package.car())].prune().env()
                 if not isinstance(new_env, inference.TypeEnvironment):
-                    raise PySchemeInferenceError(str(package.car()) + " is not an environment, it is " + str(type(new_env)))
+                    raise PySchemeInferenceError(
+                        str(package.car())
+                        + " is not an environment, it is "
+                        + str(type(new_env)))
                 return lookup_env(package.cdr(), new_env)
 
         new_env = lookup_env(self._package, env).extend()
@@ -1149,7 +1154,7 @@ class BinaryArithmetic(Primitive):
     """
 
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.Function(
             Number.type(),
             inference.Function(Number.type(), Number.type())
@@ -1165,27 +1170,33 @@ class Addition(BinaryArithmetic, metaclass=Singleton):
 
 
 class Subtraction(BinaryArithmetic, metaclass=Singleton):
+
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        # noinspection PyUnresolvedReferences
         return lambda: ret(args[0] - args[1], amb)
 
 
 class Multiplication(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        # noinspection PyUnresolvedReferences
         return lambda: ret(args[0] * args[1], amb)
 
 
 class Division(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        # noinspection PyUnresolvedReferences
         return lambda: ret(args[0] // args[1], amb)
 
 
 class Modulus(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        # noinspection PyUnresolvedReferences
         return lambda: ret(args[0] % args[1], amb)
 
 
 class Exponentiation(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        # noinspection PyUnresolvedReferences
         return lambda: ret(args[0] ** args[1], amb)
 
 
@@ -1242,7 +1253,7 @@ class BinaryLogic(SpecialForm):
     """
 
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.Function(
             Boolean.type(),
             inference.Function(Boolean.type(), Boolean.type())
@@ -1302,7 +1313,7 @@ class Or(BinaryLogic, metaclass=Singleton):
 
 class Xor(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         return BinaryLogic.type()
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
@@ -1314,7 +1325,7 @@ class Xor(Primitive, metaclass=Singleton):
 
 class Not(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.Function(Boolean.type(), Boolean.type())
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
@@ -1329,7 +1340,7 @@ class Then(SpecialForm, metaclass=Singleton):
     """
 
     @classmethod
-    def type(self):
+    def type(cls):
         typevar = inference.TypeVariable()
         return inference.Function(
             typevar,
@@ -1354,7 +1365,7 @@ class Back(SpecialForm, metaclass=Singleton):
     """
 
     @classmethod
-    def type(self):
+    def type(cls):
         return inference.TypeVariable()
 
     def apply(self,
@@ -1371,7 +1382,7 @@ class Back(SpecialForm, metaclass=Singleton):
 
 class Cons(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         '#t -> list(#t) -> list(#t)'
         t = inference.TypeVariable()
         list_t = inference.TypeOperator('list', t)
@@ -1386,7 +1397,7 @@ class Cons(Primitive, metaclass=Singleton):
 
 class Append(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         'list(#t) -> list(#t) -> list(#t)'
         list_t = Null.type()
         return inference.Function(list_t, inference.Function(list_t, list_t))
@@ -1400,7 +1411,7 @@ class Append(Primitive, metaclass=Singleton):
 
 class Head(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         'list(#t) -> #t'
         t = inference.TypeVariable()
         list_t = inference.TypeOperator('list', t)
@@ -1415,7 +1426,7 @@ class Head(Primitive, metaclass=Singleton):
 
 class Tail(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         'list(#t) -> list(#t)'
         list_t = Null.type()
         return inference.Function(list_t, list_t)
@@ -1429,7 +1440,7 @@ class Tail(Primitive, metaclass=Singleton):
 
 class Length(Primitive, metaclass=Singleton):
     @classmethod
-    def type(self):
+    def type(cls):
         'list(#t) -> int'
         return inference.Function(Null.type(), Number.type())
 
@@ -1442,7 +1453,7 @@ class Length(Primitive, metaclass=Singleton):
 
 class Print(Primitive):
     @classmethod
-    def type(self):
+    def type(cls):
         'string -> string'
         return inference.Function(
             LinkedList.type(Char.type()),
@@ -1466,7 +1477,7 @@ class Cont(Primitive):
     """
 
     @classmethod
-    def type(self):
+    def type(cls):
         '#t'
         return inference.TypeVariable()
 
@@ -1485,7 +1496,7 @@ class CallCC(SpecialForm, metaclass=Singleton):
     """
 
     @classmethod
-    def type(self):
+    def type(cls):
         '(#t -> #u) -> #u'
         t = inference.TypeVariable()
         u = inference.TypeVariable()
@@ -1535,7 +1546,7 @@ class Spawn(Primitive):
 
 class Error(SpecialForm):
     @classmethod
-    def type(self):
+    def type(cls):
         '#t'
         return inference.TypeVariable()
 
@@ -1779,7 +1790,6 @@ class NamedTuple(Expr):
     def __cmp__(self, other: 'NamedTuple'):
         return self.name.__cmp__(other.name) or self.values.__cmp__(other.values)
 
-
     def __eq__(self, other: 'NamedTuple'):
         return self.name == other.name and self.values == other.values
 
@@ -1868,7 +1878,7 @@ class ComponentClosure(Closure):
             elif type(aargs) is Null:  # currying
                 return lambda: ret(ComponentClosure(fargs, self._body, new_env), amb)
             else:
-                def next_continuation(val, amb) -> types.Promise:
+                def next_continuation(_, amb) -> types.Promise:
                     return lambda: apply_evaluated_recursive(fargs.cdr(), aargs.cdr(), ret, amb)
 
                 return lambda: fargs.car().match(aargs.car(), new_env, next_continuation, amb)
@@ -1911,6 +1921,7 @@ class BoolType(Type):
 
     def get_or_make_type(self, env):
         return Boolean.type()
+
 
 class Load(Expr):
     """
@@ -2020,14 +2031,15 @@ class Load(Expr):
 
             if len(alias_definitions) > 0:
                 environments = Sequence(
-                    environments._exprs.append(LinkedList.list(alias_definitions))
+                    environments.get_exprs().append(LinkedList.list(alias_definitions))
                 )
 
             self.wrapper = environments
 
         return self.wrapper
 
-    def get_content(self, path: list) -> Sequence:
+    @classmethod
+    def get_content(cls, path: list) -> Sequence:
         def get_content_recursive(package: LinkedList, packages: Union[dict, Sequence]) -> Sequence:
             if isinstance(package.cdr(), Null):
                 return packages[package.car()]
@@ -2036,16 +2048,17 @@ class Load(Expr):
 
         return get_content_recursive(LinkedList.list(path), Load.loaded_packages)
 
-    def file_name(self, pair: LinkedList) -> Symbol:
+    @classmethod
+    def file_name(cls, pair: LinkedList) -> Symbol:
         return Symbol(str(pair.car()) + ".fn")
 
     def loaded(self, package: LinkedList) -> bool:
-        def recursive_check(package: LinkedList, packages: dict) -> bool:
-            if isinstance(package.cdr(), Null):
-                file = self.file_name(package)
+        def recursive_check(pkg: LinkedList, packages: dict) -> bool:
+            if isinstance(pkg.cdr(), Null):
+                file = self.file_name(pkg)
                 return file in packages
-            elif package.car() in packages:
-                return recursive_check(package.cdr(), packages[package.car()])
+            elif pkg.car() in packages:
+                return recursive_check(pkg.cdr(), packages[pkg.car()])
             else:
                 return False
 
@@ -2063,20 +2076,21 @@ class Load(Expr):
                             break
                     contents += [parsed_expr]
 
-            def recursive_set(package: LinkedList, packages: dict):
-                if isinstance(package.cdr(), Null):
-                    file = self.file_name(package)
+            def recursive_set(pkg: LinkedList, packages: dict):
+                if isinstance(pkg.cdr(), Null):
+                    file = self.file_name(pkg)
                     packages[file] = Sequence(LinkedList.list(contents))
                 else:
-                    if package.car() not in packages:
-                        packages[package.car()] = {}
-                    recursive_set(package.cdr(), packages[package.car()])
+                    if pkg.car() not in packages:
+                        packages[pkg.car()] = {}
+                    recursive_set(pkg.cdr(), packages[pkg.car()])
             recursive_set(package, Load.loaded_packages)
         else:
             raise FileNotFoundError(str(path))
 
-    def make_path(self, package: LinkedList) -> Path:
-        return Path(package.qualified_str('./', '/', '.fn'))
+    @classmethod
+    def make_path(cls, package: LinkedList) -> Path:
+        return Path(package.qualified_str('', '/', '.fn'))
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
         self.make_wrapper().prepare_analysis(env)
