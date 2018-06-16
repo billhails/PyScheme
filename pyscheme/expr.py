@@ -26,6 +26,10 @@ from . import ambivalence
 from pathlib import Path
 import io
 from typing import Callable, Union
+import inspect
+import os
+import sys
+
 
 def debug(*args, **kwargs):
     if Config.debug:
@@ -2048,7 +2052,7 @@ class Load(Expr):
         return recursive_check(package, Load.loaded_packages)
 
     def load(self, package: LinkedList, get_reader: callable):
-        path = self.make_path(package)
+        path = self.get_data_dir().joinpath(self.make_path(package))
         if path.is_file():
             contents = []
             with path.open() as fh:
@@ -2079,3 +2083,16 @@ class Load(Expr):
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         return self.make_wrapper().analyse_internal(env, non_generic)
+
+    # this is just a stopgap while testing
+    def get_data_dir(self) -> Path:
+        return Path(self.get_script_dir()).parent.joinpath(Path('data'))
+
+    def get_script_dir(self, follow_symlinks=True):
+        if getattr(sys, 'frozen', False): # py2exe, PyInstaller, cx_Freeze
+            path = os.path.abspath(sys.executable)
+        else:
+            path = inspect.getabsfile(self.get_script_dir)
+        if follow_symlinks:
+            path = os.path.realpath(path)
+        return os.path.dirname(path)

@@ -20,6 +20,9 @@ from pyscheme.tests.integration.base import Base
 
 
 class TestTestLoad(Base):
+    """
+    The files being loaded are under PyScheme/data
+    """
     def test_test_load_1(self):
         self.assertEval(
             '[2, 3, 3, 4, 5, 6, 8]',

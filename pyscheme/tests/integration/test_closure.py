@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .base import Base
+from pyscheme.tests.integration.base import Base
 
 
 class TestClosure(Base):
