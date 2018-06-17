@@ -31,7 +31,7 @@ class TestMetacircular(Base):
             {
                 // very simple environment
                 typedef environment { frame(string, expression, environment) | root }
-
+            
                 // very simple AST
                 typedef expression {
                     addition(expression, expression) |
@@ -45,7 +45,7 @@ class TestMetacircular(Base):
                     closure(expression, environment) |
                     application(expression, expression)
                 }
-
+            
                 // an interpreter
                 fn eval {
                     (addition(l, r), e)              { add(eval(l, e), eval(r, e)) }
@@ -77,7 +77,7 @@ class TestMetacircular(Base):
                         (number(_)) { eval(pro, e) }
                     }(eval(test, e))
                 }
-
+            
                 // lookup access to the environment
                 fn lookup {
                     (s, frame(key, value, parent)) {
@@ -89,7 +89,7 @@ class TestMetacircular(Base):
                     }
                     (s, root) { error("mce symbol not defined " @@ s) }
                 }
-
+            
                 // try it out: ((lambda (x) (if x (+ x 2) x)) a) |- a: 3
                 eval(
                     application(

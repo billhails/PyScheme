@@ -76,6 +76,7 @@ class Tokeniser:
 
     regexes = {
         r'([a-zA-Z_][a-zA-Z_0-9]*)': 'ID',
+        r'(#[a-zA-Z_][a-zA-Z_0-9]*)': 'TYPE_ID',
         r'(\d+)': 'NUMBER',
         r'"((\\.|[^"])*)"': 'STRING',
         r"'(\\.|[^'])'": 'CHAR',
@@ -182,6 +183,7 @@ class Reader:
                   | FN symbol formals body
                   | FN symbol composite_body
                   | typedef
+                  | prototype
                   | ENV symbol [EXTENDS package] body
                   | nest
 
@@ -301,13 +303,27 @@ class Reader:
 
         type_constructor : symbol [ '(' type { ',' type } ')' ]
 
-        type : 'NOTHING'
-             | 'KW_LIST' '(' type ')'
-             | 'KW_INT'
-             | 'KW_CHAR'
-             | 'KW_BOOL'
-             | 'KW_STRING'
-             | symbol [ '(' type { ',' type } ')' ]
+        type : type_clause [ '->' type ]
+
+        type_clause : 'NOTHING'
+                    | 'KW_LIST' '(' type ')'
+                    | 'KW_INT'
+                    | 'KW_CHAR'
+                    | 'KW_BOOL'
+                    | 'KW_STRING'
+                    | [ '#' ] symbol
+                    | symbol '(' type { ',' type } ')'
+                    | '(' type ')'
+
+        prototype : PROTOTYPE symbol '{' prototype_body '}'
+
+        prototype_body : empty
+                       | single_prototype
+                       | single_prototype { prototype_body }
+
+        single_prototype : symbol ':' type ';'
+                         | prototype
+
     """
 
     def __init__(self, tokeniser: Tokeniser, stderr: io.StringIO):
@@ -354,6 +370,7 @@ class Reader:
                       | FN symbol '(' formals ')' body
                       | FN symbol composite_body
                       | typedef
+                      | prototype
                       | ENV symbol [EXTENDS package] body
                       | nest
         """
@@ -381,6 +398,10 @@ class Reader:
         typedef = self.typedef(False)
         if typedef is not None:
             return typedef
+
+        prototype = self.prototype(False)
+        if prototype is not None:
+            return prototype
 
         env = self.swallow('ENV')
         if env is not None:
@@ -1084,17 +1105,31 @@ class Reader:
         else:
             return expr.Pair(the_type, expr.Null())
 
-    def type(self) -> expr.Type:
+    def type(self, fail=True):
         """
-        type : 'NOTHING'
-             | 'KW_LIST' '(' type ')'
-             | 'KW_INT'
-             | 'KW_CHAR'
-             | 'KW_BOOL'
-             | 'KW_STRING'
-             | symbol [ '(' type { ',' type } ')' ]
+        type : type_clause [ '->' type ]
         """
-        self.debug("type")
+        type_clause = self.type_clause(fail)
+        if type_clause is None:
+            return None
+        if self.swallow('->'):
+            return expr.Type(expr.Symbol('->'), expr.LinkedList.list([type_clause, self.type()]))
+        else:
+            return type_clause
+
+    def type_clause(self, fail=True) -> Maybe[expr.Type]:
+        """
+        type_clause : 'NOTHING'
+                    | 'KW_LIST' '(' type ')'
+                    | 'KW_INT'
+                    | 'KW_CHAR'
+                    | 'KW_BOOL'
+                    | 'KW_STRING'
+                    | type_var
+                    | symbol '(' type { ',' type } ')'
+                    | '(' type ')'
+        """
+        self.debug("type_clause")
         if self.swallow('NOTHING'):
             return expr.NothingType()
         if self.swallow('KW_LIST'):
@@ -1110,15 +1145,85 @@ class Reader:
             return expr.BoolType()
         if self.swallow('KW_STRING'):  # convenient shorthand
             return expr.ListType(expr.Pair(expr.CharType(), expr.Null()))
-        symbol = self.symbol()
+        type_var = self.type_var(False)
+        if type_var is not None:
+            return type_var
+        symbol = self.symbol(False)
+        if symbol is not None:
+            if self.swallow('('):
+                types = self.types()
+                self.consume(')')
+            else:
+                types = expr.Null()
+            return expr.Type(symbol, types)
         if self.swallow('('):
-            types = self.types()
+            type = self.type()
             self.consume(')')
+            return type
+        if fail:
+            self.error("cannot parse type clause")
         else:
-            types = expr.Null()
-        return expr.Type(symbol, types)
+            return None
 
-    # utils
+    def type_var(self, fail=True):
+        """
+        type_var : TYPE_ID
+        """
+        self.debug("type_var")
+        identifier = self.swallow('TYPE_ID')
+        if identifier:
+            return expr.TypeVar(expr.Symbol(identifier.value))
+        elif fail:
+            self.error("expected #id")
+        else:
+            return None
+
+    def prototype(self, fail=True) -> Maybe[expr.Prototype]:
+        """
+        prototype : PROTOTYPE symbol '{' prototype_body '}'
+        """
+        self.debug("prototype")
+        if not self.swallow('PROTOTYPE'):
+            if fail:
+                self.error("expected 'prototype'")
+            else:
+                return None
+        symbol = self.symbol()
+        self.consume('{')
+        prototype_body = self.prototype_body()
+        self.consume('}')
+        return expr.Prototype(symbol, expr.Sequence(prototype_body))
+
+    def prototype_body(self) -> expr.LinkedList:
+        """
+        prototype_body : empty
+                       | single_prototype
+                       | single_prototype { prototype_body }
+        """
+        self.debug("prototype_body")
+        single_prototype = self.single_prototype(False)
+        if single_prototype is None:
+            return expr.Null()
+        if self.swallow(';'):
+            return expr.Pair(single_prototype, self.prototype_body())
+        else:
+            return expr.Pair(single_prototype, expr.Null())
+
+    def single_prototype(self, fail=True) -> Maybe[expr.PrototypeComponent]:
+        """
+        single_prototype : symbol ':' type
+                         | prototype
+        """
+        self.debug("single_prototype")
+        symbol = self.symbol(False)
+        if symbol is not None:
+            self.consume(':')
+            type = self.type()
+            self.consume(';')
+            return expr.PrototypeComponent(symbol, type)
+        return self.prototype(fail)
+
+    ####################### utils ###########################
 
     def rassoc_binop(self, m_lhs, ops, m_rhs, fail) -> Maybe[expr.Expr]:
         lhs = m_lhs(fail)

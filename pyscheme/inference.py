@@ -137,6 +137,8 @@ class EnvironmentType(Type):
     def unify_internal(self, other, seen):
         if isinstance(other, TypeVariable):
             other.unify_internal(self, seen)
+        elif isinstance(other, PrototypeType):
+            other.env().unify_half(self.env(), seen)
         elif isinstance(other, EnvironmentType):
             self.env().unify_internal(other.env(), seen)
         else:
@@ -144,6 +146,16 @@ class EnvironmentType(Type):
 
     def __str__(self):
         return "env " + str(self._env) + self._env.dump_dict()
+
+
+class PrototypeType(EnvironmentType):
+    def unify_internal(self, other, seen):
+        if isinstance(other, TypeVariable):
+            other.unify_internal(self, seen)
+        elif isinstance(other, EnvironmentType):
+            self.env().unify_half(other.env(), seen)
+        else:
+            raise PySchemeTypeError(self, other)
 
 
 class TypeOperator(Type):
@@ -223,6 +235,9 @@ class TypeEnvironment:
     def __getitem__(self, symbol: 'expr.Symbol'):
         raise SymbolNotFoundError(symbol)
 
+    def unify_half(self, other, seen):
+        pass
+
     def __contains__(self, symbol: 'expr.Symbol') -> bool:
         return False
 
@@ -245,14 +260,14 @@ class TypeFrame(TypeEnvironment):
         self._id = TypeEnvironment.counter
 
     def unify_internal(self, other, seen):
-        if self in seen or other in seen:
-            return
-        seen.add(self)
-        seen.add(other)
         self.unify_half(other, seen)
         other.unify_half(self, seen)
 
     def unify_half(self, other, seen):
+        if self in seen or other in seen:
+            return
+        seen.add(other)
+        seen.add(self)
         definitions = self.flatten()
         for k, v in definitions.items():
             v.unify(other[k], seen)
@@ -277,7 +292,6 @@ class TypeFrame(TypeEnvironment):
 
     def in_current_frame(self, name: 'expr.Symbol'):
         return name in self._dictionary
-
 
     def __getitem__(self, symbol: 'expr.Symbol') -> Type:
         if symbol in self._dictionary:

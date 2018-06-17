@@ -1701,17 +1701,56 @@ class TypeConstructor(TypeSystem):
     __repr__ = __str__
 
 
+class Prototype(TypeSystem):
+    """
+    A prototype declaration of an environment type
+    """
+    def __init__(self, name: Symbol, components: Sequence):
+        self.name = name
+        self.components = components
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        new_env = env.extend()
+        self.components.analyse_internal(new_env, non_generic.copy())
+        val = inference.PrototypeType(new_env)
+        env[self.name] = val
+        return val
+
+    def __str__(self):
+        return "prototype " + str(self.name) + ' ' + str(self.components)
+
+    def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb):
+        return lambda: ret(Nothing(), amb)
+
+    __repr__ = __str__
+
+class PrototypeComponent(TypeSystem):
+    """
+    a component of a prototype, i.e. "name: type"
+    """
+    def __init__(self, name: Symbol, type: 'Type'):
+        self.name = name
+        self.type = type
+
+    def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
+        env[self.name] = self.type.make_type(env.extend({}), non_generic)
+        return env[self.name]
+
+    def __str__(self):
+        return str(self.name) + ' : ' + str(self.type)
+
+    __repr__ = __str__
+
 class Type(TypeSystem):
     """
     represents a type as argument to a type constructor
     in the body of a typedef
     """
-
     def __init__(self, name: Symbol, components: LinkedList):
         self.name = name
         self.components = components
 
-    def make_type(self, env: inference.TypeEnvironment, non_generic: set):
+    def make_type(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         # self is either a type variable or a concrete type, predefined or typedef'd
         # possibly even the type currently being defined.
         components = self.components.map(lambda component: component.make_type(env, non_generic))
@@ -1730,9 +1769,26 @@ class Type(TypeSystem):
         return env[self.name]
 
     def __str__(self):
-        return str(self.name) + ('' if type(self.components) is Null else str(self.components))
+        if str(self.name).isalnum():
+            return str(self.name) + ('' if type(self.components) is Null else str(self.components))
+        else:  # looks like an op
+            num_components = len(self.components)
+            if num_components == 2:
+                return '(' + str(self.components[0]) + ' ' + str(self.name) + ' ' + str(self.components[1]) + ')'
+            else:
+                return str(self.name) + ('' if num_components == 0 else str(self.components))
 
     __repr__ = __str__
+
+
+class TypeVar(Type):
+    def __init__(self, name: Symbol):
+        super(TypeVar, self).__init__(name, Null())
+
+    def get_or_make_type(self, env):
+        if self.name not in env:
+            env[self.name] = inference.TypeVariable()
+        return env[self.name]
 
 
 class TupleConstructor(Primitive):
