@@ -113,8 +113,8 @@ class TestReader(TestCase):
 
     def test_parse_typedef_1(self):
         self.assertParse(
-            ['typedef(lst[t] : [pair[t, lst[t]], null])'],
-            "typedef lst(t) { pair(t, lst(t)) | null }"
+            ['typedef(lst[#t] : [pair[#t, lst[#t]], null])'],
+            "typedef lst(#t) { pair(#t, lst(#t)) | null }"
             #                 ----              ----    : type constructors
             #        ------        -  ------            : types
             #             -        -      -             : typevars
@@ -128,14 +128,14 @@ class TestReader(TestCase):
 
     def test_parse_typedef_3(self):
         self.assertParse(
-            ['typedef(union[t, u] : [first[t], second[u]])'],
-            "typedef union(t, u) { first(t) | second(u) }"
+            ['typedef(union[#t, #u] : [first[#t], second[#u]])'],
+            "typedef union(#t, #u) { first(#t) | second(#u) }"
         )
 
     def test_parse_typedef_4(self):
         self.assertParse(
-            ['typedef(funny[t, u] : [pair[t, lst[lst[u]]]])'],
-            "typedef funny(t, u) { pair(t, lst(lst(u))) }"
+            ['typedef(funny[#t, #u] : [pair[#t, lst[lst[#u]]]])'],
+            "typedef funny(#t, #u) { pair(#t, lst(lst(#u))) }"
         )
 
     def test_parse_composite_1(self):

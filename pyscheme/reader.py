@@ -305,13 +305,13 @@ class Reader:
 
         type : type_clause [ '->' type ]
 
-        type_clause : 'NOTHING'
-                    | 'KW_LIST' '(' type ')'
-                    | 'KW_INT'
-                    | 'KW_CHAR'
-                    | 'KW_BOOL'
-                    | 'KW_STRING'
-                    | [ '#' ] symbol
+        type_clause : NOTHING
+                    | KW_LIST '(' type ')'
+                    | KW_INT
+                    | KW_CHAR
+                    | KW_BOOL
+                    | KW_STRING
+                    | type_var
                     | symbol '(' type { ',' type } ')'
                     | '(' type ')'
 
@@ -323,6 +323,8 @@ class Reader:
 
         single_prototype : symbol ':' type ';'
                          | prototype
+
+        type_var : TYPE_VAR
 
     """
 
@@ -896,6 +898,19 @@ class Reader:
         else:
             return None
 
+    def type_symbol(self, fail=True) -> Maybe[expr.Symbol]:
+        """
+            type_symbol : TYPE_ID
+        """
+        self.debug("type_symbol", fail=fail)
+        identifier = self.swallow('TYPE_ID')
+        if identifier:
+            return expr.Symbol(identifier.value)
+        elif fail:
+            self.error("expected #id")
+        else:
+            return None
+
     def number(self, fail=True) -> Maybe[expr.Constant]:
         """
             number : NUMBER
@@ -1030,14 +1045,14 @@ class Reader:
         else:
             return expr.Pair(expression, expr.Null())
 
-    def symbols(self):
+    def type_symbols(self):
         """
-        symbols : symbol {, symbol }
+        type_symbols : type_symbol {, type_symbol }
         """
-        self.debug("symbols")
-        symbol = self.symbol()
+        self.debug("type_symbols")
+        symbol = self.type_symbol()
         if self.swallow(','):
-            return expr.Pair(symbol, self.symbols())
+            return expr.Pair(symbol, self.type_symbols())
         else:
             return expr.Pair(symbol, expr.Null())
 
@@ -1059,12 +1074,12 @@ class Reader:
 
     def flat_type(self) -> expr.FlatType:
         """
-        flat_type : symbol [ '(' symbol { ',' symbol } ')' ]
+        flat_type : symbol [ '(' type_symbol { ',' type_symbol } ')' ]
         """
         self.debug("flat_type")
         type_name = self.symbol()
         if self.swallow('('):
-            formals = self.symbols()
+            formals = self.type_symbols()
             self.consume(')')
         else:
             formals = expr.Null()

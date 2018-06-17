@@ -181,7 +181,7 @@ class TestInference(Base):
         self.assertEval(
             "true",
             """
-            typedef named_list(t) { named(list(char), list(t)) }
+            typedef named_list(#t) { named(list(char), list(#t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named("hello", [1, 2, 3]));
@@ -193,7 +193,7 @@ class TestInference(Base):
         self.assertEval(
             "false",
             """
-            typedef named_list(t) { named(list(char), list(t)) }
+            typedef named_list(#t) { named(list(char), list(#t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named("goodbye", [1, 2, 3]));
@@ -205,7 +205,7 @@ class TestInference(Base):
         self.assertError(
             "PySchemeTypeError: bool != list(char)",
             """
-            typedef named_list(t) { named(list(char), list(t)) }
+            typedef named_list(#t) { named(list(char), list(#t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named(false, [1, 2, 3]));
@@ -217,7 +217,7 @@ class TestInference(Base):
         self.assertError(
             "PySchemeTypeError: bool != int",
             """
-            typedef named_list(t) { named(list(char), list(t)) }
+            typedef named_list(#t) { named(list(char), list(#t)) }
             fn (x) {
                 x == named("hello", [1, 2, 3])
             }(named("hello", [true, false]));
@@ -243,7 +243,7 @@ class TestInference(Base):
             'pr[2, pr[4, pr[6, nll]]]',
             '''
             {
-                typedef lst(t) { pr(t, lst(t)) | nll }
+                typedef lst(#t) { pr(#t, lst(#t)) | nll }
                 
                 fn map {
                     (f, nll) { nll }

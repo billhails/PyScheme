@@ -57,7 +57,7 @@ class TestTypedef(Base):
         self.assertEval(
             "pair[1, null]",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             
             pair(1, null);
             
@@ -69,7 +69,7 @@ class TestTypedef(Base):
         self.assertEval(
             "true",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             
             pair(1, null) == pair(1, null);
             """,
@@ -80,7 +80,7 @@ class TestTypedef(Base):
         self.assertEval(
             "ok",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             
             if (pair(1, null) == pair(2, null)) {
                 "nok"
@@ -95,7 +95,7 @@ class TestTypedef(Base):
         self.assertError(
             "PySchemeTypeError: bool != int",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             
             pair(1, null) == pair(true, null);
             """,
@@ -106,7 +106,7 @@ class TestTypedef(Base):
         self.assertEval(
             "pair[1, pair[2, null]]",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             
             pair(1, pair(2, null));
             """,
@@ -117,7 +117,7 @@ class TestTypedef(Base):
         self.assertError(
             "PySchemeTypeError: bool != int",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             
             pair(1, pair(true, null));
             """,
@@ -128,7 +128,7 @@ class TestTypedef(Base):
         self.assertError(
             "PySchemeTypeError: lst(int) != colour",
             """
-            typedef lst(t) { pair(t, lst(t)) | null }
+            typedef lst(#t) { pair(#t, lst(#t)) | null }
             typedef colour { red | green }
 
             red == pair(1, null);
@@ -166,7 +166,7 @@ class TestTypedef(Base):
         self.assertEval(
             'group[1, 2]',
             '''
-            typedef some(n) { group(n, n) }
+            typedef some(#n) { group(#n, #n) }
             
             define start = group(1);
             
@@ -180,7 +180,7 @@ class TestTypedef(Base):
             'pair[1, pair[2, pair[3, pair[4, pair[5, pair[6, null]]]]]]',
             '''
             {
-                typedef lst(t) { pair(t, lst(t)) | null }
+                typedef lst(#t) { pair(#t, lst(#t)) | null }
                 
                 fn append {
                     (null, ys) { ys }

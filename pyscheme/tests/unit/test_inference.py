@@ -209,7 +209,7 @@ class TestInference(TestCase):
             '(list(char) -> (list(#a) -> named_list(#a)))',
             '''
             {
-            typedef named_list(t) { named(list(char), list(t)) }
+            typedef named_list(#t) { named(list(char), list(#t)) }
             named;
             }
             '''
@@ -234,7 +234,7 @@ class TestInference(TestCase):
             '((#a -> #b) -> (l(#a) -> l(#b)))',
             '''
             {
-                typedef l(t) { p(t, l(t)) | n }
+                typedef l(#t) { p(#t, l(#t)) | n }
                 fn map {
                     (f, n)       { n }
                     (f, p(h, t)) { p(f(h), map(f, t)) }
@@ -263,7 +263,7 @@ class TestInference(TestCase):
             '(l(#a) -> int)',
             '''
             {
-                typedef l(t) { p(t, l(t)) | n }
+                typedef l(#t) { p(#t, l(#t)) | n }
                 fn len {
                     (n) { 0 }
                     (p(h, t)) { 1 + len(t) }
@@ -278,7 +278,7 @@ class TestInference(TestCase):
             'int',
             '''
             {
-                typedef lst(t) { pair(t, lst(t)) | null }
+                typedef lst(#t) { pair(#t, lst(#t)) | null }
                 fn len {
                     (null) { 0 }
                     (pair(h, t)) { 1 + len(t) }
@@ -292,7 +292,7 @@ class TestInference(TestCase):
         self.assertTypes(
             ['lst(#a)', 'nothing', '(lst(#b) -> int)'],
             '''
-                typedef lst(t) { pair(t, lst(t)) | null }
+                typedef lst(#t) { pair(#t, lst(#t)) | null }
 
                 fn len {
                     (null) { 0 }
@@ -400,7 +400,7 @@ class TestInference(TestCase):
             ],
             '''
             env e {
-                typedef lst(t) {pair(t, lst(t)) | null }
+                typedef lst(#t) {pair(#t, lst(#t)) | null }
             }
 
             e.pair;
@@ -412,12 +412,12 @@ class TestInference(TestCase):
             '(expression(#a) -> (expression(#a) -> expression(#a)))',
             '''
             {
-                typedef expression(t) {
-                    plus(expression(t), expression(t)) |
-                    minus(expression(t), expression(t)) |
-                    times(expression(t), expression(t)) |
-                    divide(expression(t), expression(t)) |
-                    number(t) |
+                typedef expression(#t) {
+                    plus(expression(#t), expression(#t)) |
+                    minus(expression(#t), expression(#t)) |
+                    times(expression(#t), expression(#t)) |
+                    divide(expression(#t), expression(#t)) |
+                    number(#t) |
                     symbol(list(char))
                 }
 

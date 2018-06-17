@@ -25,7 +25,7 @@ class TestComposite(Base):
         self.assertEval(
             'branch[branch[branch[leaf, 1, leaf], 2, leaf], 3, branch[leaf, 4, leaf]]',
             '''
-            typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+            typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
 
             fn insert {
                 (t, leaf) { branch(leaf, t, leaf) }
@@ -49,7 +49,7 @@ class TestComposite(Base):
         self.assertEval(
             '[1, 2, 3, 4]',
             '''
-            typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+            typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
 
             fn insert {
                 (t, leaf) { branch(leaf, t, leaf) }
@@ -79,7 +79,7 @@ class TestComposite(Base):
             'some["there"]',
             '''
             {
-                typedef tree(t) { branch(tree(t), int, t, tree(t)) | leaf }
+                typedef tree(#t) { branch(tree(#t), int, #t, tree(#t)) | leaf }
 
                 fn insert {
                     (index, val, leaf) { branch(leaf, index, val, leaf) }
@@ -94,7 +94,7 @@ class TestComposite(Base):
                     }
                 }
 
-                typedef t_or_fail(t) {some(t) | fail}
+                typedef t_or_fail(#t) {some(#t) | fail}
 
                 fn retrieve {
                     (index, leaf) { fail }
@@ -125,7 +125,7 @@ class TestComposite(Base):
             'branch[branch[leaf, true, leaf], true, branch[leaf, true, leaf]]',
             '''
             {
-                typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+                typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
                 
                 fn complete {
                     (v, 0) { leaf }
@@ -142,7 +142,7 @@ class TestComposite(Base):
             "branch[leaf, 1, branch[leaf, 2, leaf]]",
             """
             {
-                typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+                typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
                 
                 fn insert {
                     (t, leaf) { branch(leaf, t, leaf) }

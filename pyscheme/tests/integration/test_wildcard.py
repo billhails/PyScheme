@@ -54,7 +54,7 @@ class TestWildcard(Base):
         self.assertEval(
             '2',
             '''
-            typedef tree(t) { branch(tree(t), t, tree(t)) | leaf }
+            typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
 
             fn ignore {
                 (leaf) { 0 }

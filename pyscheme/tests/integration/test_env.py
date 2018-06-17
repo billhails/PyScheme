@@ -122,7 +122,7 @@ class TestEnv(Base):
             'pair[2, pair[3, null]]',
             '''
             env e {
-                typedef lst(t) {pair(t, lst(t)) | null }
+                typedef lst(#t) {pair(#t, lst(#t)) | null }
 
                 fn map {
                     (f, null) { null }
@@ -144,7 +144,7 @@ class TestEnv(Base):
             'Closure([e:e]: { define l = e.pair[1, e.pair[2, e.null]] ; e.map[Lambda [#c]: { { +[1, #c] } }, l] })',
             '''
             env e {
-                typedef lst(t) {pair(t, lst(t)) | null }
+                typedef lst(#t) {pair(#t, lst(#t)) | null }
 
                 fn map {
                     (f, null) { null }
@@ -166,7 +166,7 @@ class TestEnv(Base):
             'Closure([#a, #b]: (TupleConstructor pair)[#a, #b])',
             '''
             env e {
-                typedef lst(t) {pair(t, lst(t)) | null }
+                typedef lst(#t) {pair(#t, lst(#t)) | null }
             }
 
             e.pair;
