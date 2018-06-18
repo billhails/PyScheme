@@ -68,7 +68,10 @@ class Frame(Environment):
                ret: 'types.Continuation',
                amb: ambivalence.Amb) -> 'types.Promise':
         if symbol in self._dictionary:
-            raise SymbolAlreadyDefinedError
+            if value != self._dictionary[symbol]:
+                return lambda: amb()
+            else:
+                return lambda: ret(symbol, amb)
         else:
             self._dictionary[symbol] = value
 

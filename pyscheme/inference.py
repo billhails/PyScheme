@@ -20,7 +20,7 @@
 
 from typing import Dict
 from . import expr
-from .exceptions import SymbolNotFoundError, SymbolAlreadyDefinedError, PySchemeInferenceError, PySchemeTypeError
+from .exceptions import TypeSymbolNotFoundError, TypeSymbolAlreadyDefinedError, PySchemeInferenceError, PySchemeTypeError
 from typing import Union
 
 TypeOrVar = Union['TypeVariable', 'Type']
@@ -233,7 +233,7 @@ class TypeEnvironment:
         return False
 
     def __getitem__(self, symbol: 'expr.Symbol'):
-        raise SymbolNotFoundError(symbol)
+        raise TypeSymbolNotFoundError(symbol)
 
     def unify_half(self, other, seen):
         pass
@@ -304,7 +304,7 @@ class TypeFrame(TypeEnvironment):
 
     def __setitem__(self, symbol: 'expr.Symbol', typevar: Type):
         if symbol in self._dictionary:
-            raise SymbolAlreadyDefinedError(symbol)
+            self._dictionary[symbol].unify(typevar)
         else:
             self._dictionary[symbol] = typevar
 

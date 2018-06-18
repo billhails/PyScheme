@@ -55,7 +55,7 @@ class TestMetacircular(Base):
                     (i = number(_), e)               { i }
                     (symbol(s), e)                   { lookup(s, e) }
                     (conditional(test, pro, con), e) { cond(test, pro, con, e) }
-                    (l = lambda(symbol(_), body), e) { closure(l, e) }
+                    (l = lambda(_, _), e)            { closure(l, e) }
                     (application(function, arg), e)  { apply(eval(function, e), eval(arg, e)) }
                 }
                 
@@ -80,14 +80,9 @@ class TestMetacircular(Base):
             
                 // lookup access to the environment
                 fn lookup {
-                    (s, frame(key, value, parent)) {
-                        if (s == key) {
-                            value
-                        } else {
-                            lookup(s, parent)
-                        }
-                    }
-                    (s, root) { error("mce symbol not defined " @@ s) }
+                    (s, frame(s, value, _))  { value }
+                    (s, frame(_, _, parent)) { lookup(s, parent) }
+                    (s, root)                { error("mce symbol not defined " @@ s) }
                 }
             
                 // try it out: ((lambda (x) (if x (+ x 2) x)) a) |- a: 3

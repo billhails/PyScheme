@@ -87,14 +87,9 @@ class TestAmb(Base):
                 }
                 
                 fn member {
-                    (item, []) { false }
-                    (item, h @ t) {
-                        if (item == h) {
-                            true
-                        } else {
-                            member(item, t);
-                        }
-                    }
+                    (item, [])       { false }
+                    (item, item @ _) { true }
+                    (item, _ @ tail) { member(item, tail) }
                 }
     
                 fn exclude {
@@ -161,7 +156,8 @@ class TestAmb(Base):
                 
                 fn member {
                     (x, []) { false }
-                    (x, h @ t) { x == h or member(x, t) }
+                    (x, x @ t) { true }
+                    (x, h @ t) { member(x, t) }
                 }
 
                 fn exclude {

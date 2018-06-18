@@ -28,5 +28,3 @@ class TestError(Base):
             test_error("message 2");
             '''
         )
-
-

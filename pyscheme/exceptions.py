@@ -32,9 +32,19 @@ class SymbolNotFoundError(SymbolError):
         return 'SymbolNotFoundError: ' + str(self._symbol)
 
 
+class TypeSymbolNotFoundError(SymbolError):
+    def __str__(self):
+        return 'TypeSymbolNotFoundError: ' + str(self._symbol)
+
+
 class SymbolAlreadyDefinedError(SymbolError):
     def __str__(self):
         return 'SymbolAlreadyDefinedError: ' + str(self._symbol)
+
+
+class TypeSymbolAlreadyDefinedError(SymbolError):
+    def __str__(self):
+        return 'TypeSymbolAlreadyDefinedError: ' + str(self._symbol)
 
 
 class NonBooleanExpressionError(PySchemeError):
