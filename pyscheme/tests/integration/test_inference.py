@@ -145,7 +145,7 @@ class TestInference(Base):
 
     def test_inference_130(self):
         self.assertError(
-            "SymbolNotFoundError: nosumhere",
+            "TypeSymbolNotFoundError: nosumhere",
             """
             env e1 {
                 fn sum(x, y) { x + y }

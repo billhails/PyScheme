@@ -18,7 +18,7 @@
 from unittest import TestCase
 import pyscheme.repl as repl
 import io
-from pyscheme.exceptions import SymbolNotFoundError, PySchemeInferenceError, PySchemeTypeError
+from pyscheme.exceptions import TypeSymbolNotFoundError, PySchemeInferenceError, PySchemeTypeError
 from pyscheme.inference import TypeVariable
 
 
@@ -153,7 +153,7 @@ class TestInference(TestCase):
         self.assertTypeFailure(PySchemeTypeError, 'fn (f) { [f(3), f(true)] };')
 
     def test_undefined_symbol(self):
-        self.assertTypeFailure(SymbolNotFoundError, '[f(3), f(true)];')
+        self.assertTypeFailure(TypeSymbolNotFoundError, '[f(3), f(true)];')
 
     def test_occurs_check(self):
         self.assertTypeFailure(PySchemeInferenceError, 'fn (f) { f(f) };')

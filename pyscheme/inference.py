@@ -241,6 +241,9 @@ class TypeEnvironment:
     def __contains__(self, symbol: 'expr.Symbol') -> bool:
         return False
 
+    def set_or_error(self, symbol: 'expr.Symbol', typevar: Type):
+        pass
+
     def __setitem__(self, symbol: 'expr.Symbol', typevar: Type):
         pass
 
@@ -301,6 +304,12 @@ class TypeFrame(TypeEnvironment):
 
     def __contains__(self, symbol: 'expr.Symbol') -> bool:
         return symbol in self._dictionary or symbol in self._parent
+
+    def set_or_error(self, symbol: 'expr.Symbol', typevar: Type):
+        if symbol in self._dictionary:
+            raise TypeSymbolAlreadyDefinedError(symbol)
+        else:
+            self._dictionary[symbol] = typevar
 
     def __setitem__(self, symbol: 'expr.Symbol', typevar: Type):
         if symbol in self._dictionary:

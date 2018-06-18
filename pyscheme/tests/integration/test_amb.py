@@ -88,7 +88,7 @@ class TestAmb(Base):
                 
                 fn member {
                     (item, [])       { false }
-                    (item, item @ _) { true }
+                    (item, item @ t) { true }
                     (item, _ @ tail) { member(item, tail) }
                 }
     

@@ -32,7 +32,7 @@ class Environment:
     def lookup(self, symbol, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
         raise SymbolNotFoundError(symbol)
 
-    def define(self, symbol, value, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def define(self, symbol, value, ret: 'types.Continuation', amb: 'types.Amb', error=False) -> 'types.Promise':
         pass
 
     def contains(self, symbol: 'expr.Symbol'):
@@ -66,10 +66,14 @@ class Frame(Environment):
     def define(self, symbol: 'expr.Symbol',
                value: 'expr.Expr',
                ret: 'types.Continuation',
-               amb: ambivalence.Amb) -> 'types.Promise':
+               amb: ambivalence.Amb,
+               error: bool=False) -> 'types.Promise':
         if symbol in self._dictionary:
             if value != self._dictionary[symbol]:
-                return lambda: amb()
+                if error:
+                    raise SymbolAlreadyDefinedError(symbol)
+                else:
+                    return lambda: amb()
             else:
                 return lambda: ret(symbol, amb)
         else:

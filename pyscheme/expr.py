@@ -263,6 +263,9 @@ class Wildcard(Constant):
         """
         return lambda: ret(self, amb)
 
+    def __len__(self):
+        return 1
+
 
 class Boolean(Constant):
     @classmethod
@@ -1035,7 +1038,7 @@ class Definition(Expr):
             def ret_nothing(_: Expr, amb: types.Amb) -> types.Promise:
                 return lambda: ret(Nothing(), amb)
 
-            return lambda: env.define(self._symbol, value, ret_nothing, amb)
+            return lambda: env.define(self._symbol, value, ret_nothing, amb, True)
 
         return lambda: self._value.eval(env, define_continuation, amb)
 
@@ -1043,7 +1046,7 @@ class Definition(Expr):
         if env.noted_type_constructor(self._symbol):
             raise PySchemeInferenceError("attempt to override type constructor " + str(self._symbol))
         debug("pre-installing", self._symbol, "in", env)
-        env[self._symbol] = inference.TypeVariable()
+        env.set_or_error(self._symbol, inference.TypeVariable())
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         defn_type = self._value.analyse_internal(env, non_generic)
