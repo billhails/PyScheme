@@ -139,3 +139,16 @@ class TestCurrying(Base):
             ''',
             'application with no args is a no-op'
         )
+
+    def test_over_application(self):
+        self.assertEval(
+            '12',
+            '''
+            fn adder(x) {
+                fn (y) { x + y }
+            }
+            
+            adder(5, 7);
+            ''',
+            'over application works'
+        )

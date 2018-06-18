@@ -28,7 +28,7 @@ class TestTypedef(Base):
             
             red;
             ''',
-            "type constructors with no args are values"
+            "type constructors with no arguments are constants"
         )
 
     def test_typedef_33(self):

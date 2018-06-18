@@ -98,3 +98,31 @@ class TestPrototype(Base):
             """,
             ""
         )
+
+    def test_prototype_182(self):
+        self.assertEval(
+            '[2, 3, 4]',
+            '''
+            prototype foo {
+                prototype bar {
+                    map: (#a -> #b) -> list(#a) -> list(#b);
+                };
+            }
+
+            env a {
+                env bar {
+                    fn map {
+                        (f, []) { [] }
+                        (f, h @ t) { f(h) @ map(f, t) }
+                    }
+                }
+            }
+
+            fn x (e: foo, f) {
+                e.bar.map(f, [1, 2, 3])
+            }
+
+            x(a, 1+);
+            ''',
+            'nested prototype'
+        )

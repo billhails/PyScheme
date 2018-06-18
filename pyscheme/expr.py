@@ -1724,6 +1724,7 @@ class Prototype(TypeSystem):
 
     __repr__ = __str__
 
+
 class PrototypeComponent(TypeSystem):
     """
     a component of a prototype, i.e. "name: type"
@@ -1733,13 +1734,14 @@ class PrototypeComponent(TypeSystem):
         self.type = type
 
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
-        env[self.name] = self.type.make_type(env.extend({}), non_generic)
+        env[self.name] = self.type.make_type(env.extend(), non_generic)
         return env[self.name]
 
     def __str__(self):
         return str(self.name) + ' : ' + str(self.type)
 
     __repr__ = __str__
+
 
 class Type(TypeSystem):
     """

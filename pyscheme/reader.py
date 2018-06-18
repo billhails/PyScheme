@@ -297,7 +297,7 @@ class Reader:
 
         typedef : TYPEDEF flat_type '{' type_body '}'
 
-        flat_type : symbol [ '(' symbols ')' ]
+        flat_type : symbol [ '(' type_symbols ')' ]
 
         type_body : type_constructor { '|' type_constructor }
 
@@ -318,7 +318,6 @@ class Reader:
         prototype : PROTOTYPE symbol '{' prototype_body '}'
 
         prototype_body : empty
-                       | single_prototype
                        | single_prototype { prototype_body }
 
         single_prototype : symbol ':' type ';'
@@ -911,6 +910,12 @@ class Reader:
         else:
             return None
 
+    def type_symbol_type(self, fail):
+        type_symbol = self.type_symbol(fail)
+        if type_symbol is None:
+            return None
+        return expr.Type(type_symbol, expr.Null())
+
     def number(self, fail=True) -> Maybe[expr.Constant]:
         """
             number : NUMBER
@@ -1064,7 +1069,7 @@ class Reader:
         if self.swallow('TYPEDEF'):
             flat_type = self.flat_type()
             self.consume('{')
-            type_body = self.type_body()
+            type_body = self.type_body(self.type_symbol_type)
             self.consume('}')
             return expr.TypeDef(flat_type, type_body)
         if fail:
@@ -1085,54 +1090,54 @@ class Reader:
             formals = expr.Null()
         return expr.FlatType(type_name, formals)
 
-    def type_body(self) -> expr.LinkedList:
+    def type_body(self, typevar_parser: callable) -> expr.LinkedList:
         """
         type_body : type_constructor { '|' type_constructor }
         """
         self.debug("type_body")
-        type_constructor = self.type_constructor()
+        type_constructor = self.type_constructor(typevar_parser)
         if self.swallow('|'):
-            return expr.Pair(type_constructor, self.type_body())
+            return expr.Pair(type_constructor, self.type_body(typevar_parser))
         else:
             return expr.Pair(type_constructor, expr.Null())
 
-    def type_constructor(self) -> expr.TypeConstructor:
+    def type_constructor(self, typevar_parser: callable) -> expr.TypeConstructor:
         """
         type_constructor :  symbol [ '(' type { ',' type } ')' ]
         """
         self.debug("type_constructor")
         symbol = self.symbol()
         if self.swallow('('):
-            types = self.types()
+            types = self.types(typevar_parser)
             self.consume(')')
         else:
             types = expr.Null()
         return expr.TypeConstructor(symbol, types)
 
-    def types(self):
+    def types(self, typevar_parser: callable):
         """
         types : type { ',' type }
         """
         self.debug("types")
-        the_type = self.type()
+        the_type = self.type(typevar_parser)
         if self.swallow(','):
-            return expr.Pair(the_type, self.types())
+            return expr.Pair(the_type, self.types(typevar_parser))
         else:
             return expr.Pair(the_type, expr.Null())
 
-    def type(self, fail=True):
+    def type(self, typevar_parser: callable, fail=True):
         """
         type : type_clause [ '->' type ]
         """
-        type_clause = self.type_clause(fail)
+        type_clause = self.type_clause(typevar_parser, fail)
         if type_clause is None:
             return None
         if self.swallow('->'):
-            return expr.Type(expr.Symbol('->'), expr.LinkedList.list([type_clause, self.type()]))
+            return expr.Type(expr.Symbol('->'), expr.LinkedList.list([type_clause, self.type(typevar_parser)]))
         else:
             return type_clause
 
-    def type_clause(self, fail=True) -> Maybe[expr.Type]:
+    def type_clause(self, typevar_parser: callable, fail=True) -> Maybe[expr.Type]:
         """
         type_clause : 'NOTHING'
                     | 'KW_LIST' '(' type ')'
@@ -1149,7 +1154,7 @@ class Reader:
             return expr.NothingType()
         if self.swallow('KW_LIST'):
             self.consume('(')
-            type_of = self.type()
+            type_of = self.type(typevar_parser)
             self.consume(')')
             return expr.ListType(expr.Pair(type_of, expr.Null()))
         if self.swallow('KW_INT'):
@@ -1160,19 +1165,19 @@ class Reader:
             return expr.BoolType()
         if self.swallow('KW_STRING'):  # convenient shorthand
             return expr.ListType(expr.Pair(expr.CharType(), expr.Null()))
-        type_var = self.type_var(False)
+        type_var = typevar_parser(False)
         if type_var is not None:
             return type_var
         symbol = self.symbol(False)
         if symbol is not None:
             if self.swallow('('):
-                types = self.types()
+                types = self.types(typevar_parser)
                 self.consume(')')
             else:
                 types = expr.Null()
             return expr.Type(symbol, types)
         if self.swallow('('):
-            type = self.type()
+            type = self.type(typevar_parser)
             self.consume(')')
             return type
         if fail:
@@ -1198,21 +1203,20 @@ class Reader:
         prototype : PROTOTYPE symbol '{' prototype_body '}'
         """
         self.debug("prototype")
-        if not self.swallow('PROTOTYPE'):
-            if fail:
-                self.error("expected 'prototype'")
-            else:
-                return None
-        symbol = self.symbol()
-        self.consume('{')
-        prototype_body = self.prototype_body()
-        self.consume('}')
-        return expr.Prototype(symbol, expr.Sequence(prototype_body))
+        if self.swallow('PROTOTYPE'):
+            symbol = self.symbol()
+            self.consume('{')
+            prototype_body = self.prototype_body()
+            self.consume('}')
+            return expr.Prototype(symbol, expr.Sequence(prototype_body))
+        elif fail:
+            self.error("expected 'prototype'")
+        else:
+            return None
 
     def prototype_body(self) -> expr.LinkedList:
         """
         prototype_body : empty
-                       | single_prototype
                        | single_prototype { prototype_body }
         """
         self.debug("prototype_body")
@@ -1233,12 +1237,12 @@ class Reader:
         symbol = self.symbol(False)
         if symbol is not None:
             self.consume(':')
-            type = self.type()
+            the_type = self.type(self.type_var)
             self.consume(';')
-            return expr.PrototypeComponent(symbol, type)
+            return expr.PrototypeComponent(symbol, the_type)
         return self.prototype(fail)
 
-    ####################### utils ###########################
+    # utils
 
     def rassoc_binop(self, m_lhs, ops, m_rhs, fail) -> Maybe[expr.Expr]:
         lhs = m_lhs(fail)
@@ -1279,7 +1283,8 @@ class Reader:
             expr.Application(expr.Symbol(token.value), expr.LinkedList.list([lhs, rhs]))
         )
 
-    def make_closure(self, argument: expr.Symbol, body: expr.Application):
+    @classmethod
+    def make_closure(cls, argument: expr.Symbol, body: expr.Application):
         return expr.Lambda(expr.LinkedList.list([argument]), expr.Sequence(expr.LinkedList.list([body])))
 
     @classmethod
@@ -1330,5 +1335,5 @@ class Reader:
                 print(k + '=' + str(kwargs[k]), end=' ')
             print(self.tokeniser)
 
-    def clone(self, input: io.StringIO):
-        return Reader(Tokeniser(input), self.stderr)
+    def clone(self, the_input: io.StringIO):
+        return Reader(Tokeniser(the_input), self.stderr)
