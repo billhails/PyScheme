@@ -34,14 +34,9 @@ fn filter {
 }
 
 fn member {
-    (item, []) { false }
-    (item, h @ t) {
-        if (item == h) {
-            true
-        } else {
-            member(item, t);
-        }
-    }
+    (item, [])       { false }
+    (item, item @ t) { true }
+    (item, _ @ t)    { member(item, t) }
 }
 
 fn exclude(items, lst) {
