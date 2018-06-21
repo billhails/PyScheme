@@ -126,12 +126,12 @@ class TestComposite(Base):
             '''
             {
                 typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
-                
+
                 fn complete {
                     (v, 0) { leaf }
                     (v, n) { branch(complete(v, n-1), v, complete(v, n-1)) }
                 }
-                
+
                 complete(true, 2);
             }
             '''
@@ -143,7 +143,7 @@ class TestComposite(Base):
             """
             {
                 typedef tree(#t) { branch(tree(#t), #t, tree(#t)) | leaf }
-                
+
                 fn insert {
                     (t, leaf) { branch(leaf, t, leaf) }
                     (t, branch(left, u, right)) {
@@ -154,12 +154,28 @@ class TestComposite(Base):
                         }
                     }
                 }
-                
+
                 define i1 = insert(1, leaf);
                 define i2 = insert(2);
-    
+
                 i2(i1);
             }
             """,
             "composites can be curried, but only within a single expression"
+        )
+
+    def test_wildcard_list(self):
+        self.assertEval(
+            'true',
+            '''
+            {
+                fn member {
+                    (s, [])    { false }
+                    (s, s @ _) { true }
+                    (s, _ @ t) { member(s, t) }
+                }
+
+                member(2, [1, 2, 3]);
+            }
+            '''
         )

@@ -1,0 +1,22 @@
+typedef expr {
+    num(int) |
+    str(string) |
+    boolean(bool) |
+    cond(expr, expr, expr) |
+    function(list(lambda)) |
+    application(expr, list(expr)) |
+    arith(arith_op, expr, expr) |
+    logic(logic_op, expr, expr)
+}
+
+typedef lambda {
+    func(list(expr), list(expr))
+}
+
+typedef arith_op {
+    add | sub | mul | div | mod | pow
+}
+
+typedef logic_op {
+    and | or | xor
+}

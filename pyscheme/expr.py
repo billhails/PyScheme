@@ -248,7 +248,7 @@ class Number(Constant):
         return Number(self._value ** power.value())
 
 
-class Wildcard(Constant):
+class Wildcard(Constant, metaclass=Singleton):
     def __init__(self):
         super(Wildcard, self).__init__('_')
 
@@ -266,6 +266,11 @@ class Wildcard(Constant):
     def __len__(self):
         return 1
 
+    def trailing_str(self, _, end: str):
+        return " . " + str(self) + end
+
+    def trailing_repr(self, _, end: str):
+        return " . " + repr(self) + end
 
 class Boolean(Constant):
     @classmethod
@@ -664,6 +669,8 @@ class Pair(LinkedList):
                 result_type = Pair.type(type_so_far)
                 env[pair] = result_type
                 return result_type
+            elif isinstance(pair, Wildcard):
+                return Pair.type(type_so_far)
             elif isinstance(pair, Pair):
                 arg_type = pair.car().analyse_farg(env, non_generic)
                 type_so_far.unify(arg_type)

@@ -173,6 +173,8 @@ class TypeOperator(Type):
             if self.name != other.name or len(self.types) != len(other.types):
                 raise PySchemeTypeError(self, other)
             for p, q in zip(self.types, other.types):
+                if p is None:
+                    print("attempt to unify None with", q, "in", self, other)
                 p.unify(q, seen)
         else:
             raise PySchemeTypeError(self, other)
