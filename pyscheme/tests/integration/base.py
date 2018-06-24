@@ -18,6 +18,7 @@
 from unittest import TestCase
 from pyscheme.repl import Repl
 import pyscheme.expr as expr
+from pyscheme.exceptions import PySchemeRunTimeError
 import io
 
 
@@ -41,3 +42,12 @@ class Base(TestCase):
         error_file = io.StringIO()
         result = self.eval(text, error_file)
         self.assertEqual(expected, result[1].rstrip(), msg)
+
+    def assertRunTimeError(self, expected: str, text: str, msg: str=''):
+        error_file = io.StringIO()
+        error = ''
+        try:
+            result = self.eval(text, error_file)
+        except PySchemeRunTimeError as e:
+            error = e.message
+        self.assertEqual(error, expected)

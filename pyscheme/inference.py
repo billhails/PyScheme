@@ -255,6 +255,9 @@ class TypeEnvironment:
     def __repr__(self):
         return "Root"
 
+    def dump(self):
+        pass
+
 
 class TypeFrame(TypeEnvironment):
     def __init__(self, parent: TypeEnvironment, dictionary: Dict['expr.Symbol', Type]):
@@ -327,3 +330,7 @@ class TypeFrame(TypeEnvironment):
 
     def __hash__(self):
         return id(self)
+
+    def dump(self):
+        for k, v in self._dictionary.items():
+            print("type:", k, v)

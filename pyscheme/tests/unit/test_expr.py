@@ -221,14 +221,8 @@ class TestList(TestCase):
     def test_car(self):
         self.assertEqual(self.a, self.list.car(), "car of list should be a")
 
-    def test_car2(self):
-        self.assertEqual(self.null, self.null.car(), "car of null should be null")
-
     def test_cdr(self):
         self.assertEqual(self.b, self.list.cdr().car(), "car of cdr of list should be b")
-
-    def test_cdr2(self):
-        self.assertEqual(self.null, self.null.cdr(), "cdr of null should be null")
 
     def test_len(self):
         self.assertEqual(3, len(self.list), "list should be length three")

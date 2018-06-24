@@ -18,7 +18,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from . import environment
-from .exceptions import NonBooleanExpressionError, PySchemeInternalError, MissingPrototypeError, PySchemeInferenceError
+from .exceptions import NonBooleanExpressionError, PySchemeInternalError, MissingPrototypeError,\
+    PySchemeInferenceError, PySchemeRunTimeError
 from .trace import trace
 from .singleton import Singleton, FlyWeight
 from . import types
@@ -168,11 +169,19 @@ class Expr:
     def compile(self):
         pass
 
+    def cursory_type(self):
+        """
+        an interrim type for prepare_analysis
+        """
+        return inference.TypeVariable()
+
 
 class Nothing(Expr, metaclass=Singleton):
     """
     analogous to Python's 'None'
     """
+    def __init__(self):
+        pass
 
     @classmethod
     def type(cls):
@@ -550,7 +559,7 @@ class LinkedList(Expr):
         if self.is_string():
             return self.qualified_str('', '', '')
         else:
-            return self.qualified_repr('[', ', ', ']')
+            return self.qualified_str('[', ', ', ']')
 
     def __repr__(self):
         if self.is_string():
@@ -698,6 +707,8 @@ class Pair(LinkedList):
             raise TypeError
         if item < 0:
             raise KeyError
+        if item >= self._len:
+            raise KeyError
         val = self
         while item > 0:
             val = val.cdr()
@@ -723,10 +734,10 @@ class Null(LinkedList, metaclass=Singleton):
         return True
 
     def car(self) -> Expr:
-        return self
+        raise PySchemeRunTimeError("cannot take the car of null")
 
     def cdr(self) -> LinkedList:
-        return self
+        raise PySchemeRunTimeError("cannot take the cdr of null")
 
     def last(self) -> Expr:
         return self
@@ -841,7 +852,7 @@ class Lambda(Expr):
         else:
             closure = self.closure(self._args, self._body, env)
             closure.set_name(self.name)
-            return lambda: ret(self.closure(self._args, self._body, env), amb)
+            return lambda: ret(closure, amb)
 
     def closure(self, args: LinkedList, body: Expr, env: 'environment.Environment') -> 'Closure':
         """
@@ -855,7 +866,7 @@ class Lambda(Expr):
         new_non_generic = non_generic.copy()
 
         def analyse_recursive(args: LinkedList) -> inference.Type:
-            if type(args) is Null:
+            if isinstance(args, Null):
                 self._body.prepare_analysis(new_env)
                 return self._body.analyse_internal(new_env, new_non_generic)
             else:
@@ -911,11 +922,14 @@ class Sequence(Expr):
         self._exprs = self.hoist_loads(exprs)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        # noinspection PyShadowingNames
-        def take_last_continuation(expr: LinkedList, amb: types.Amb) -> types.Promise:
-            return lambda: ret(expr.last(), amb)
+        if len(self._exprs) > 0:
+            # noinspection PyShadowingNames
+            def take_last_continuation(expr: LinkedList, amb: types.Amb) -> types.Promise:
+                return lambda: ret(expr.last(), amb)
 
-        return self._exprs.eval(env, take_last_continuation, amb)
+            return self._exprs.eval(env, take_last_continuation, amb)
+        else:
+            return lambda: ret(Nothing(), amb)
 
     @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
@@ -924,7 +938,7 @@ class Sequence(Expr):
             these_types = self._exprs.map(lambda expr: expr.analyse_internal(env, non_generic))
             return these_types.last()
         else:
-            return Null.type()
+            return Nothing.type()
 
     @classmethod
     def hoist_loads(cls, exprs: LinkedList) -> LinkedList:
@@ -972,7 +986,9 @@ class Nest(Expr):
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         new_env = env.extend()
         self._body.prepare_analysis(new_env)
-        return self._body.analyse_internal(new_env, non_generic.copy())
+        result = self._body.analyse_internal(new_env, non_generic.copy())
+        new_env.dump()
+        return result
 
     def __str__(self):
         return str(self._body)
@@ -1075,7 +1091,7 @@ class Definition(Expr):
         if env.noted_type_constructor(self._symbol):
             raise PySchemeInferenceError("attempt to override type constructor " + str(self._symbol))
         debug("pre-installing", self._symbol, "in", env)
-        env.set_or_error(self._symbol, inference.TypeVariable())
+        env.set_or_error(self._symbol, self._value.cursory_type())
 
     @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
@@ -1709,7 +1725,6 @@ class TypeConstructor(TypeSystem):
         return make_type_recursive(self.arg_types)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        print(self.name)
         if len(self.arg_types) == 0:
             return lambda: env.define(self.name, NamedTuple(self.name, Null()), ret, amb)
         else:
@@ -1722,7 +1737,7 @@ class TypeConstructor(TypeSystem):
             args = make_args(len(self.arg_types))
 
             def make_closure() -> Closure:
-                return Closure(
+                closure = Closure(
                     args,
                     Application(
                         TupleConstructor(self.name, len(self.arg_types)),
@@ -1730,6 +1745,8 @@ class TypeConstructor(TypeSystem):
                     ),
                     env
                 )
+                closure.set_name('*' + str(self.name))
+                return closure
 
             return lambda: env.define(self.name, make_closure(), ret, amb)
 

@@ -140,7 +140,7 @@ class TestAmb(Base):
         Where does everyone live?
         """
         self.assertEval(
-            '[result["baker", 3], result["cooper", 2], result["fletcher", 4], result["miller", 5], result["smith", 1]]',
+            '[result[baker, 3], result[cooper, 2], result[fletcher, 4], result[miller, 5], result[smith, 1]]',
             '''
             {
                 typedef named_result { result(list(char), int) }

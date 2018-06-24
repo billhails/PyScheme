@@ -49,7 +49,7 @@ class TestStrings(Base):
 
     def test_strings_50(self):
         self.assertEval(
-            '["h", "e", "l", "l", "o"]',
+            '[h, e, l, l, o]',
             """
             {
                 fn map {

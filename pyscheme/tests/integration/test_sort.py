@@ -23,7 +23,7 @@ class TestSort(Base):
 
     def test_sort(self):
         self.assertEval(
-            '["everywhere", "goodbye", "hello", "here", "there"]',
+            '[everywhere, goodbye, hello, here, there]',
             '''
             {
                 define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
@@ -55,7 +55,7 @@ class TestSort(Base):
 
     def test_sort_2(self):
         self.assertEval(
-            '["everywhere", "goodbye", "hello", "here", "there"]',
+            '[everywhere, goodbye, hello, here, there]',
             '''
             {
                 define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];

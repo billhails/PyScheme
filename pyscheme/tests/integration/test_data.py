@@ -158,8 +158,8 @@ class TestOperations(Base):
         )
 
     def test_tail3(self):
-        self.assertEval(
-            "[]",
+        self.assertRunTimeError(
+            "cannot take the cdr of null",
             "tail([]);"
         )
 

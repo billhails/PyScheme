@@ -104,14 +104,12 @@ class TestMetacircular(Base):
             '''
         )
 
+
     def test_metacircular_compiler(self):
         self.assertEval(
             'number[5]',
             '''
             {
-                // very simple environment
-                typedef Environment(#t) { frame(string, #t, Environment) | root }
-
                 // very simple AST
                 typedef Expression {
                     addition(Expression, Expression) |
@@ -180,7 +178,9 @@ class TestMetacircular(Base):
                     assign(Register, Value) |
                     set(Location, Value) |
                     test(Location, Value, Label) |
-                    tag(Label)
+                    tag(Label) |
+                    save(Register) |
+                    restore(Register)
                 }
 
                 typedef InstructionSequence {
@@ -203,8 +203,42 @@ class TestMetacircular(Base):
                     preserving([continue], seq, compile_linkage(linkage))
                 }
                 
-                fn preserving(registers, instructions, linkage_instructions) {
-                    // TODO
+                fn preserving {
+                    ([], seq1, seq2) {
+                        append_instruction_sequences([seq1, seq2])
+                    }
+                    (_, empty, seq2) {
+                        seq2
+                    }
+                    (first_reg @ rest_regs, seq1 = sequence(needed, modified, seq), seq2) {
+                        if(needs_register(seq2, first_reg) and modifies_register(seq1, first_reg)) {
+                            preserving(
+                                rest_regs,
+                                sequence(
+                                    union([first_reg], needed),
+                                    difference(modified, [first_reg]),
+                                    [save(first_reg)] @@ seq @@ [restore(first_reg)]
+                                ),
+                                seq2
+                            )
+                        } else {
+                            preserving(rest_regs, seq1, seq2)
+                        }
+                    }
+                }
+                
+                fn needs_register {
+                    (empty, reg) { false }
+                    (sequence(needed, _, _), reg) {
+                        member(reg, needed)
+                    }
+                }
+
+                 fn modifies_register {
+                    (empty, reg) { false }
+                    (sequence(_, modifies, _), reg) {
+                        member(reg, modifies)
+                    }
                 }
 
                 // a compiler
@@ -249,7 +283,7 @@ class TestMetacircular(Base):
                         append_instruction_sequences(
                             [
                                 compile(l, val1, next),
-                                compile(l, val2, next),
+                                compile(r, val2, next),
                                 sequence(
                                     [val1, val2],
                                     [target],
@@ -358,9 +392,9 @@ class TestMetacircular(Base):
                                         [envt],
                                         [target],
                                         [assign(target, value_procedure(proc_entry, envt))]
-                                    ),
-                                    compile_lambda_body(arg, body, proc_entry)
-                                )
+                                    )
+                                ),
+                                compile_lambda_body(arg, body, proc_entry)
                             ),
                             label_instruction_sequence(after_lambda, empty)
                         ]
@@ -433,7 +467,8 @@ class TestMetacircular(Base):
                                         )
                                     )
                                 )
-                            )
+                            ),
+                            label_instruction_sequence(after_call, empty)
                         ]
                     )
                 }
@@ -473,13 +508,6 @@ class TestMetacircular(Base):
                     
                 }
                 
-                fn append_instruction_sequences {
-                    ([]) { empty }
-                    (h @ t) {
-                        append_two_sequences(h, append_instruction_sequences(t))
-                    }
-                }
-                
                 fn append_two_sequences {
                     (empty, b) { b }
                     (a, empty) { a }
@@ -489,6 +517,13 @@ class TestMetacircular(Base):
                             union(used1, used2),
                             instr1 @@ instr2
                         )
+                    }
+                }
+                
+                fn append_instruction_sequences {
+                    ([]) { empty }
+                    (h @ t) {
+                        append_two_sequences(h, append_instruction_sequences(t))
                     }
                 }
                 

@@ -110,7 +110,7 @@ class TestInference(TestCase):
 
     def test_polymorphic_len(self):
         self.assertType(
-            '(list(#a) -> int)',
+            '(list(#b) -> int)',
             '''
             {
                 fn len(lst) {
@@ -127,7 +127,7 @@ class TestInference(TestCase):
 
     def test_polymorphic_map(self):
         self.assertType(
-            '((#a -> #b) -> (list(#a) -> list(#b)))',
+            '((#c -> #d) -> (list(#c) -> list(#d)))',
             '''
             {
                 fn map(func, lst) {
@@ -206,7 +206,7 @@ class TestInference(TestCase):
 
     def test_builtin_type(self):
         self.assertType(
-            '(list(char) -> (list(#a) -> named_list(#a)))',
+            '(list(char) -> (list(#b) -> named_list(#b)))',
             '''
             {
             typedef named_list(#t) { named(list(char), list(#t)) }
@@ -217,7 +217,7 @@ class TestInference(TestCase):
 
     def test_composite_type(self):
         self.assertType(
-            '((#a -> #b) -> (list(#a) -> list(#b)))',
+            '((#c -> #d) -> (list(#c) -> list(#d)))',
             '''
             {
                 fn map {
@@ -231,7 +231,7 @@ class TestInference(TestCase):
 
     def test_composite_with_user_types(self):
         self.assertType(
-            '((#a -> #b) -> (l(#a) -> l(#b)))',
+            '((#c -> #d) -> (l(#c) -> l(#d)))',
             '''
             {
                 typedef l(#t) { p(#t, l(#t)) | n }
@@ -260,7 +260,7 @@ class TestInference(TestCase):
 
     def test_composite_with_constants_2(self):
         self.assertType(
-            '(l(#a) -> int)',
+            '(l(#b) -> int)',
             '''
             {
                 typedef l(#t) { p(#t, l(#t)) | n }
@@ -306,7 +306,7 @@ class TestInference(TestCase):
 
     def test_filter(self):
         self.assertType(
-            '((#a -> bool) -> (list(#a) -> list(#a)))',
+            '((#b -> bool) -> (list(#b) -> list(#b)))',
             '''
             {
                 fn filter {
@@ -326,7 +326,7 @@ class TestInference(TestCase):
 
     def test_qsort(self):
         self.assertType(
-            '(list(#a) -> list(#a))',
+            '(list(#e) -> list(#e))',
             '''
             {
                 fn qsort {
@@ -383,7 +383,7 @@ class TestInference(TestCase):
 
     def test_ge(self):
         self.assertType(
-            '(#a -> (#a -> bool))',
+            '(#b -> (#b -> bool))',
             '''
             {
                 fn ge(a, b) { a >= b }
@@ -409,7 +409,7 @@ class TestInference(TestCase):
 
     def test_meta(self):
         self.assertType(
-            '(expression(#a) -> (expression(#a) -> expression(#a)))',
+            '(expression(#b) -> (expression(#b) -> expression(#b)))',
             '''
             {
                 typedef expression(#t) {
@@ -441,6 +441,24 @@ class TestInference(TestCase):
                 }
 
                 plus;
+            }
+            '''
+        )
+
+    def test_inference_multiple_functions(self):
+        self.assertType(
+            '(int -> (int -> int))',
+            '''
+            {
+                fn add (x, y) {
+                    x + y
+                }
+                
+                 fn f1 (a, b) {
+                    add(a, b)
+                }
+                
+               f1
             }
             '''
         )

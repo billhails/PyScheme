@@ -77,6 +77,7 @@ class PySchemeTypeError(PySchemeError):
         self.trace :list = trace.stack.copy()
 
     def tr(self):
+        return ''
         res = '  trace -\n'
         for s in self.trace:
             res += str(s)
@@ -85,6 +86,14 @@ class PySchemeTypeError(PySchemeError):
 
     def __str__(self):
         return 'PySchemeTypeError: ' + str(self.type1) + " != " + str(self.type2) + self.tr()
+
+
+class PySchemeRunTimeError(PySchemeError):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return 'PySchemeRunTimeError: ' + self.message
 
 
 class PySchemeInferenceError(PySchemeError):
