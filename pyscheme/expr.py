@@ -19,6 +19,7 @@
 
 from . import environment
 from .exceptions import NonBooleanExpressionError, PySchemeInternalError, MissingPrototypeError, PySchemeInferenceError
+from .trace import trace
 from .singleton import Singleton, FlyWeight
 from . import types
 from . import inference
@@ -40,6 +41,8 @@ class Config:
 
 
 class Expr:
+    current_analysis = None
+
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         return lambda: ret(self, amb)
 
@@ -129,6 +132,7 @@ class Expr:
         self.prepare_analysis(env)
         return self.analyse_internal(env, non_generic)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return self.type()
 
@@ -160,6 +164,9 @@ class Expr:
 
     def __ne__(self, other):
         return self.__cmp__(other) != 0
+
+    def compile(self):
+        pass
 
 
 class Nothing(Expr, metaclass=Singleton):
@@ -425,6 +432,7 @@ class Symbol(Constant, metaclass=FlyWeight):
     def trailing_repr(self, _: str, end: str) -> str:
         return ' . ' + repr(self) + end
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return self.get_type(env, non_generic)
 
@@ -639,6 +647,7 @@ class Pair(LinkedList):
 
         return lambda: self.car().match(other.car(), env, car_continuation, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         self_type = inference.TypeOperator('list', self._car.analyse_internal(env, non_generic))
         rest_type = self.cdr().analyse_internal(env, non_generic)
@@ -800,6 +809,7 @@ class Conditional(Expr):
 
         return self._test.eval(env, test_continuation, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         boolean_type = Boolean.type()
         test_type = self._test.analyse_internal(env, non_generic)
@@ -820,11 +830,17 @@ class Lambda(Expr):
     def __init__(self, args: LinkedList, body: Expr):
         self._args = args
         self._body = body
+        self.name = "lambda"
+
+    def set_name(self, name: str):
+        self.name = name
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         if len(self._args) == 0:
             return lambda: self._body.eval(env, ret, amb)  # conform to type-checker's expectations
         else:
+            closure = self.closure(self._args, self._body, env)
+            closure.set_name(self.name)
             return lambda: ret(self.closure(self._args, self._body, env), amb)
 
     def closure(self, args: LinkedList, body: Expr, env: 'environment.Environment') -> 'Closure':
@@ -833,6 +849,7 @@ class Lambda(Expr):
         """
         return Closure(args, body, env)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         new_env = env.extend()
         new_non_generic = non_generic.copy()
@@ -867,6 +884,7 @@ class Application(Expr):
 
         return self._operation.eval(env, evaluated_op_continuation, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         result_type = inference.TypeVariable()
 
@@ -899,6 +917,7 @@ class Sequence(Expr):
 
         return self._exprs.eval(env, take_last_continuation, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         if len(self._exprs) > 0:
             self._exprs.prepare_analysis(env)
@@ -949,6 +968,7 @@ class Nest(Expr):
         """
         return self._body.eval(env.extend(), ret, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         new_env = env.extend()
         self._body.prepare_analysis(new_env)
@@ -968,6 +988,7 @@ class EnvironmentWrapper(Expr):
     def env(self):
         return self._env
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         return inference.EnvironmentType(env)
 
@@ -1013,6 +1034,7 @@ class Env(Expr):
 
         return lookup_package(self._package, env, after_lookup, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         def lookup_env(package: LinkedList, env: inference.TypeEnvironment) -> inference.TypeEnvironment:
             if isinstance(package, Null):
@@ -1055,6 +1077,7 @@ class Definition(Expr):
         debug("pre-installing", self._symbol, "in", env)
         env.set_or_error(self._symbol, inference.TypeVariable())
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         defn_type = self._value.analyse_internal(env, non_generic)
         debug("unifying", self._symbol, "in", env)
@@ -1080,6 +1103,7 @@ class EnvContext(Expr):
 
         return self._env.eval(env, env_continuation, amb)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         lhs = self._env.analyse_internal(env, non_generic)
         if type(lhs) is inference.TypeVariable:
@@ -1130,8 +1154,13 @@ class Closure(Primitive):
         self._args = args
         self._body = body
         self._env = env
+        self.name = 'lambda'
+
+    def set_name(self, name: str):
+        self.name = name
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        print(self.name, args)
         formal_args = self._args
         actual_args = args
         dictionary = {}
@@ -1626,6 +1655,7 @@ class TypeDef(TypeSystem):
         env[self.flat_type.symbol] = inference.TypeVariable()
         self.constructors.prepare_analysis(env)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         new_env = env.extend()
         new_non_generic = non_generic.copy()
@@ -1679,6 +1709,7 @@ class TypeConstructor(TypeSystem):
         return make_type_recursive(self.arg_types)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
+        print(self.name)
         if len(self.arg_types) == 0:
             return lambda: env.define(self.name, NamedTuple(self.name, Null()), ret, amb)
         else:
@@ -1719,6 +1750,7 @@ class Prototype(TypeSystem):
         self.name = name
         self.components = components
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         new_env = env.extend()
         self.components.analyse_internal(new_env, non_generic.copy())
@@ -1743,6 +1775,7 @@ class PrototypeComponent(TypeSystem):
         self.name = name
         self.type = type
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set) -> inference.Type:
         env[self.name] = self.type.make_type(env.extend(), non_generic)
         return env[self.name]
@@ -1870,10 +1903,15 @@ class Composite(Primitive):
 
     def __init__(self, components: LinkedList):
         self.components = components
+        self.name = 'anon'
+
+    def set_name(self, name: str):
+        self.name = name
 
     def __str__(self):
         return "fn " + self.components.qualified_str('{', ' ', '}')
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         last_type = None
         for component in self.components:
@@ -1885,7 +1923,9 @@ class Composite(Primitive):
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: types.Amb) -> types.Promise:
         def post_eval_continuation(evaluated_components, amb) -> types.Promise:
-            return lambda: ret(CompositeClosure(evaluated_components), amb)
+            closure = CompositeClosure(evaluated_components)
+            closure.set_name(self.name)
+            return lambda: ret(closure, amb)
 
         return lambda: self.components.eval(env, post_eval_continuation, amb)
 
@@ -1909,8 +1949,13 @@ class CompositeClosure(Closure):
 
     def __init__(self, components):
         self.components = components
+        self.name = 'unknown'
+
+    def set_name(self, name: str):
+        self.name = name
 
     def apply_evaluated_args(self, args, ret: types.Continuation, amb: ambivalence.Amb):
+        print(self.name, args)
         def try_recursive(components: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
             if type(components) is Null:
                 return amb
@@ -2164,6 +2209,7 @@ class Load(Expr):
     def prepare_analysis(self, env: inference.TypeEnvironment):
         self.make_wrapper().prepare_analysis(env)
 
+    @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         return self.make_wrapper().analyse_internal(env, non_generic)
 

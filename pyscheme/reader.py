@@ -179,13 +179,15 @@ class Reader:
             | construct
             | EOF
 
-        construct : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
+        construct : conditional
                   | FN symbol formals body
                   | FN symbol composite_body
                   | typedef
                   | prototype
                   | ENV symbol [EXTENDS package] body
                   | nest
+
+        conditional : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
 
         nest : body
 
@@ -280,6 +282,7 @@ class Reader:
              | ENV [EXTENDS package] body
              | BACK
              | SPAWN
+             | conditional
              | '(' expression ')'
 
         symbol : ID
@@ -376,10 +379,9 @@ class Reader:
                       | nest
         """
         self.debug("construct", fail=fail)
-        if self.swallow('IF'):
-            test = self.test()
-            consequent = self.nest()
-            return expr.Conditional(test, consequent, self.alternative())
+        conditional = self.conditional(False)
+        if conditional is not None:
+            return conditional
 
         fn = self.swallow('FN')
         if fn is not None:
@@ -391,10 +393,13 @@ class Reader:
                 formals = self.formals(False)
                 if formals is None:
                     composite_body = self.composite_body()
+                    composite_body.set_name(symbol.value())
                     return expr.Definition(symbol, composite_body)
                 else:
                     body = self.body()
-                    return expr.Definition(symbol, expr.Lambda(formals, body))
+                    fn = expr.Lambda(formals, body)
+                    fn.set_name(symbol.value())
+                    return expr.Definition(symbol, fn)
 
         typedef = self.typedef(False)
         if typedef is not None:
@@ -419,6 +424,20 @@ class Reader:
                 return expr.Definition(symbol, expr.Env(body, package))
 
         return self.nest(fail)
+
+    def conditional(self, fail=True):
+        """
+        conditional : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
+        """
+        self.debug("conditional", fail=fail)
+        if self.swallow('IF'):
+            test = self.test()
+            consequent = self.nest()
+            return expr.Conditional(test, consequent, self.alternative())
+        elif fail:
+            self.error("expected 'if'")
+        else:
+            return None
 
     def alternative(self):
         self.consume('ELSE')
@@ -811,6 +830,7 @@ class Reader:
                    | ENV [EXTENDS package] body
                    | BACK
                    | SPAWN
+                   | conditional
                    | '(' expression ')'
         """
         self.debug("atom", fail=fail)
@@ -863,6 +883,10 @@ class Reader:
         token = self.swallow('SPAWN')
         if token:
             return self.apply_token(token)
+
+        conditional = self.conditional(False)
+        if conditional is not None:
+            return conditional
 
         if self.swallow('('):
             expression = self.expression()

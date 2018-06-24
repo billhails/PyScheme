@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import pyscheme.trace as trace
 
 class PySchemeError(Exception):
     pass
@@ -73,9 +74,17 @@ class PySchemeTypeError(PySchemeError):
     def __init__(self, type1, type2):
         self.type1 = type1
         self.type2 = type2
+        self.trace :list = trace.stack.copy()
+
+    def tr(self):
+        res = '  trace -\n'
+        for s in self.trace:
+            res += str(s)
+            res += "\n"
+        return res
 
     def __str__(self):
-        return 'PySchemeTypeError: ' + str(self.type1) + " != " + str(self.type2)
+        return 'PySchemeTypeError: ' + str(self.type1) + " != " + str(self.type2) + self.tr()
 
 
 class PySchemeInferenceError(PySchemeError):
