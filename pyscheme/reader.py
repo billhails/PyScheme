@@ -66,6 +66,7 @@ class Tokeniser:
         'extends': 'EXTENDS',
         'typedef': 'TYPEDEF',
         'nothing': 'NOTHING',
+        'switch': 'SWITCH',
         'list': 'KW_LIST',
         'int': 'KW_INT',
         'char': 'KW_CHAR',
@@ -180,14 +181,21 @@ class Reader:
             | EOF
 
         construct : conditional
-                  | FN symbol formals body
-                  | FN symbol composite_body
+                  | switch
+                  | defn
                   | typedef
                   | prototype
-                  | ENV symbol [EXTENDS package] body
+                  | denv
                   | nest
 
         conditional : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
+
+        switch : SWITCH '(' actuals ')' composite_body
+
+        defn : FN symbol formals body
+             | FN symbol composite_body
+
+        denv : ENV symbol [EXTENDS package] body
 
         nest : body
 
@@ -283,6 +291,7 @@ class Reader:
              | BACK
              | SPAWN
              | conditional
+             | switch
              | '(' expression ')'
 
         symbol : ID
@@ -370,25 +379,74 @@ class Reader:
 
     def construct(self, fail=True):
         """
-            construct : IF '(' expression ')' nest ELSE { IF '(' expression ')' nest ELSE } nest
-                      | FN symbol '(' formals ')' body
-                      | FN symbol composite_body
-                      | typedef
-                      | prototype
-                      | ENV symbol [EXTENDS package] body
-                      | nest
+        construct : conditional
+                  | switch
+                  | defn
+                  | typedef
+                  | prototype
+                  | denv
+                  | nest
         """
         self.debug("construct", fail=fail)
+
         conditional = self.conditional(False)
         if conditional is not None:
             return conditional
+
+        switch = self.switch(False)
+        if switch is not None:
+            return switch
+
+        defn = self.defn(False)
+        if defn is not None:
+            return defn
+
+        typedef = self.typedef(False)
+        if typedef is not None:
+            return typedef
+
+        prototype = self.prototype(False)
+        if prototype is not None:
+            return prototype
+
+        denv = self.denv(False)
+        if denv is not None:
+            return denv
+
+        return self.nest(fail)
+
+    def switch(self, fail=True):
+        """
+        switch : SWITCH '(' actuals ')' composite_body
+        """
+        self.debug('switch', fail=fail)
+        if self.swallow('SWITCH'):
+            self.consume('(')
+            actuals = self.exprs()
+            self.consume(')')
+            body = self.composite_body()
+            return expr.Application(body, actuals)
+        elif fail:
+            self.error("expected 'switch")
+        else:
+            return None
+
+    def defn(self, fail=True):
+        """
+        defn : FN symbol '(' formals ')' body
+             | FN symbol composite_body
+        """
+        self.debug("defn", fail=fail)
 
         fn = self.swallow('FN')
         if fn is not None:
             symbol = self.symbol(False)
             if symbol is None:
                 self.pushback(fn)
-                return None
+                if fail:
+                    self.error('expected symbol')
+                else:
+                    return None
             else:
                 formals = self.formals(False)
                 if formals is None:
@@ -401,16 +459,18 @@ class Reader:
                     fn.set_name(symbol.value())
                     return expr.Definition(symbol, fn)
 
-        typedef = self.typedef(False)
-        if typedef is not None:
-            return typedef
-
-        prototype = self.prototype(False)
-        if prototype is not None:
-            return prototype
+    def denv(self, fail=True):
+        """
+        denv : ENV symbol [EXTENDS package] body
+        """
+        self.debug('env', fail=fail)
 
         env = self.swallow('ENV')
-        if env is not None:
+        if env is None:
+            if fail:
+                self.error("expected 'env'")
+            else:
+                return None
             symbol = self.symbol(False)
             if symbol is None:
                 self.pushback(env)
@@ -422,8 +482,6 @@ class Reader:
                     package = expr.Null()
                 body = self.body()
                 return expr.Definition(symbol, expr.Env(body, package))
-
-        return self.nest(fail)
 
     def conditional(self, fail=True):
         """
@@ -831,6 +889,7 @@ class Reader:
                    | BACK
                    | SPAWN
                    | conditional
+                   | switch
                    | '(' expression ')'
         """
         self.debug("atom", fail=fail)
@@ -868,6 +927,10 @@ class Reader:
             else:
                 body = self.body()
                 return expr.Lambda(formals, body)
+
+        switch = self.switch(False)
+        if switch is not None:
+            return switch
 
         if self.swallow('ENV'):
             if self.swallow('EXTENDS'):
