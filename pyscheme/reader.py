@@ -287,12 +287,14 @@ class Reader:
              | lst
              | FN formals body
              | FN composite_body
-             | ENV [EXTENDS package] body
+             | env
              | BACK
              | SPAWN
              | conditional
              | switch
              | '(' expression ')'
+
+        env : ENV [extends package] body
 
         symbol : ID
 
@@ -463,6 +465,31 @@ class Reader:
         """
         denv : ENV symbol [EXTENDS package] body
         """
+        self.debug('denv', fail=fail)
+
+        denv = self.swallow('ENV')
+        if denv is None:
+            if fail:
+                self.error("expected 'env'")
+            else:
+                return None
+
+        symbol = self.symbol(False)
+        if symbol is None:
+            self.pushback(denv)
+            return None
+        else:
+            if self.swallow('EXTENDS'):
+                package = self.package()
+            else:
+                package = expr.Null()
+            body = self.body()
+            return expr.Definition(symbol, expr.Env(body, package))
+
+    def env(self, fail=True):
+        """
+        env : ENV [EXTENDS package] body
+        """
         self.debug('env', fail=fail)
 
         env = self.swallow('ENV')
@@ -471,17 +498,12 @@ class Reader:
                 self.error("expected 'env'")
             else:
                 return None
-            symbol = self.symbol(False)
-            if symbol is None:
-                self.pushback(env)
-                return None
-            else:
-                if self.swallow('EXTENDS'):
-                    package = self.package()
-                else:
-                    package = expr.Null()
-                body = self.body()
-                return expr.Definition(symbol, expr.Env(body, package))
+        if self.swallow('EXTENDS'):
+            package = self.package()
+        else:
+            package = expr.Null()
+        body = self.body()
+        return expr.Env(body, package)
 
     def conditional(self, fail=True):
         """
@@ -885,7 +907,7 @@ class Reader:
                    | lst
                    | FN formals body
                    | FN composite_body
-                   | ENV [EXTENDS package] body
+                   | env
                    | BACK
                    | SPAWN
                    | conditional
@@ -932,12 +954,9 @@ class Reader:
         if switch is not None:
             return switch
 
-        if self.swallow('ENV'):
-            if self.swallow('EXTENDS'):
-                package = self.package()
-            else:
-                package = expr.Null()
-            return expr.Env(self.body(), package)
+        env = self.env(False)
+        if env is not None:
+            return env
 
         token = self.swallow('BACK')
         if token:
