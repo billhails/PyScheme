@@ -26,15 +26,15 @@ class TestEnv(Base):
             "5",
             '''
             env e { // need a prototype env
-                define x = 0;
-                define y = 0;
+                x = 0;
+                y = 0;
             }
             fn (a:e) {
                 a.x + a.y
             }(
                 env {
-                    define x = 2;
-                    define y = 3
+                    x = 2;
+                    y = 3
                 }
             );
             ''',
@@ -46,7 +46,7 @@ class TestEnv(Base):
             '11',
             """
                 env {
-                    define x = 11
+                    x = 11
                 }.x;
             """,
             'enviroments can be declared and accessed anonymously'
@@ -98,8 +98,8 @@ class TestEnv(Base):
         self.assertError(
             'TypeSymbolAlreadyDefinedError: x',
             '''
-            define x = 10;
-            define x = 10;
+            x = 10;
+            x = 10;
             '''
         )
 
@@ -108,9 +108,9 @@ class TestEnv(Base):
             '10',
             '''
             {
-                define x = 10;
+                x = 10;
                 {
-                    define x = 12;
+                    x = 12;
                 }
                 x;
             }
@@ -131,7 +131,7 @@ class TestEnv(Base):
             }
 
             fn test(e:e) {
-                define l = e.pair(1, e.pair(2, e.null));
+                 l = e.pair(1, e.pair(2, e.null));
                 e.map(1 +, l)
             }
 
@@ -153,7 +153,7 @@ class TestEnv(Base):
             }
 
             fn test(e:e) {
-                define l = e.pair(1, e.pair(2, e.null));
+                l = e.pair(1, e.pair(2, e.null));
                 e.map(1 +, l)
             }
 

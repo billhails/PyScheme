@@ -58,7 +58,7 @@ class TestAmb(Base):
                 }
                 
                 {
-                    define x = one_of([1, 2, 3, 4, 5]);
+                    x = one_of([1, 2, 3, 4, 5]);
                     require(x == 4);
                     x;
                 }
@@ -114,12 +114,12 @@ class TestAmb(Base):
                 }
     
                 fn barrels_of_fun() {
-                    define barrels = [30, 32, 36, 38, 40, 62];
-                    define beer = one_of(barrels);
-                    define wine = exclude([beer], barrels);
-                    define barrel_1 = one_of(wine);
-                    define barrel_2 = one_of(exclude([barrel_1], wine));
-                    define purchase = some_of(exclude([barrel_1, barrel_2], wine));
+                    barrels = [30, 32, 36, 38, 40, 62];
+                    beer = one_of(barrels);
+                    wine = exclude([beer], barrels);
+                    barrel_1 = one_of(wine);
+                    barrel_2 = one_of(exclude([barrel_1], wine));
+                    purchase = some_of(exclude([barrel_1, barrel_2], wine));
                     require((barrel_1 + barrel_2) * 2 == sum(purchase));
                     beer;
                 }
@@ -175,12 +175,12 @@ class TestAmb(Base):
                     if (n < 0) { 0 - n } else { n }
                 }
                 
-                define floors = [1, 2, 3, 4, 5];
-                define baker = one_of(floors);
-                define cooper = one_of(exclude([baker], floors));
-                define fletcher = one_of(exclude([baker, cooper], floors));
-                define miller = one_of(exclude([baker, cooper, fletcher], floors));
-                define smith = head(exclude([baker, cooper, fletcher, miller], floors));
+                floors = [1, 2, 3, 4, 5];
+                baker = one_of(floors);
+                cooper = one_of(exclude([baker], floors));
+                fletcher = one_of(exclude([baker, cooper], floors));
+                miller = one_of(exclude([baker, cooper, fletcher], floors));
+                smith = head(exclude([baker, cooper, fletcher, miller], floors));
                 require(baker != 5);
                 require(cooper != 1);
                 require(fletcher != 5);

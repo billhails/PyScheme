@@ -168,7 +168,7 @@ class TestTypedef(Base):
             '''
             typedef some(#n) { group(#n, #n) }
             
-            define start = group(1);
+            start = group(1);
             
             start(2);
             ''',
@@ -187,8 +187,8 @@ class TestTypedef(Base):
                     (pair(h, t), ys) { pair(h, append(t, ys)) }
                 }
                 
-                define xs = pair(1, pair(2, pair(3, null)));
-                define ys = pair(4, pair(5, pair(6, null)));
+                xs = pair(1, pair(2, pair(3, null)));
+                ys = pair(4, pair(5, pair(6, null)));
                 
                 append(xs, ys);
             }

@@ -20,6 +20,7 @@ import pyscheme.repl as repl
 import io
 from pyscheme.exceptions import TypeSymbolNotFoundError, PySchemeInferenceError, PySchemeTypeError
 from pyscheme.inference import TypeVariable
+import re
 
 
 class TestInference(TestCase):
@@ -38,6 +39,27 @@ class TestInference(TestCase):
         self.error = None
         self.repl = None
 
+    def normalize_type(self, type_str: str) -> str:
+        """
+        convert a string like ...#b...#b...#c... to ...#0...#0...#1...
+        """
+        seen = {}
+        counter = 0
+
+        def replace(matchobj):
+            nonlocal seen
+            nonlocal counter
+            id = matchobj.group(0)
+            if id not in seen:
+                seen[id] = '#' + str(counter)
+                counter += 1
+            return seen[id]
+
+        return re.sub(r'(#\w+)', replace, type_str)
+
+    def assertEqualTypes(self, type1: str, type2: str):
+        self.assertEqual(self.normalize_type(type1), self.normalize_type(type2))
+
     def assertType(self, expected_type: str, expression: str):
         self.input.write(expression)
         self.input.seek(0)
@@ -45,7 +67,7 @@ class TestInference(TestCase):
         if result is None:
             self.fail("parse of '" + expression + "' failed: " + self.error.getvalue())
         analysis = result.analyse(self.repl.type_env)
-        self.assertEqual(expected_type, str(analysis))
+        self.assertEqualTypes(expected_type, str(analysis))
 
     def assertTypes(self, expected_types: list, expression: str):
         self.input.write(expression)
@@ -56,7 +78,8 @@ class TestInference(TestCase):
             if result is None:
                 break
             analysis += [str(result.analyse(self.repl.type_env))]
-        self.assertEqual(expected_types, analysis)
+        for pair in zip(expected_types, analysis):
+            self.assertEqualTypes(pair[0], pair[1])
 
     def assertTypeFailure(self, expected_exception, expression: str):
         self.input.write(expression)
@@ -165,7 +188,7 @@ class TestInference(TestCase):
             {
                 typedef colour { red | green }
                 {
-                    define red = 5;
+                    red = 5;
                 }
             }
             '''
@@ -332,8 +355,8 @@ class TestInference(TestCase):
                 fn qsort {
                     ([]) { [] }
                     (pivot @ rest) {
-                        define lesser = filter(ge(pivot), rest);
-                        define greater = filter(lt(pivot), rest);
+                        lesser = filter(ge(pivot), rest);
+                        greater = filter(lt(pivot), rest);
                         qsort(lesser) @@ [pivot] @@ qsort(greater)
                     }
                 }

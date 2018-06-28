@@ -28,7 +28,7 @@ class TestCurrying(Base):
                     x + y
                 }
                 
-                define add2 = add(2);
+                add2 = add(2);
                 
                 add2(8);
             '''

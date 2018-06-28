@@ -169,8 +169,8 @@ class TestInference(Base):
                 a.x + a.y
             }(
                 env {
-                    define x = 2;
-                    define y = 3
+                    x = 2;
+                    y = 3
                 }
             );
             """,

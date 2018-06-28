@@ -26,13 +26,13 @@ class TestSort(Base):
             '[everywhere, goodbye, hello, here, there]',
             '''
             {
-                define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
+                unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
 
                 fn qsort {
                     ([]) { [] }
                     (pivot @ rest) {
-                        define lesser = filter(pivot >=, rest);
-                        define greater = filter(pivot <, rest);
+                        lesser = filter(pivot >=, rest);
+                        greater = filter(pivot <, rest);
                         qsort(lesser) @@ [pivot] @@ qsort(greater);
                     }
                 }
@@ -58,7 +58,7 @@ class TestSort(Base):
             '[everywhere, goodbye, hello, here, there]',
             '''
             {
-                define unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
+                unsorted = ["hello", "goodbye", "here", "there", "everywhere"];
 
                 fn qsort {
                     ([]) { [] }

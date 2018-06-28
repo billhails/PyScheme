@@ -146,7 +146,7 @@ class TestMetacircular(Base):
             
             env t extends compiler {
                 // try it out: ((lambda (x) (if x (+ x 2) x)) 3)
-                define result = compile(
+                result = compile(
                     application(
                         lambda(
                             variable("x"),

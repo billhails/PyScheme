@@ -240,8 +240,13 @@ class Reader:
 
         package : symbol {'.' symbol}
 
-        definition : DEFINE symbol '=' expression
+        definition : define
+                   | implicit_define
                    | load
+
+        define : DEFINE symbol '=' expression
+
+        implicit_define : symbol '=' expression
 
         binop_and : unop_not { AND binop_and }
                   | unop_not { OR binop_and }
@@ -763,7 +768,8 @@ class Reader:
 
     def definition(self, fail=True):
         """
-            definition : DEFINE symbol '=' expression
+            definition : define
+                       | implicit_define
                        | load
         """
         self.debug("definition", fail=fail)
@@ -771,16 +777,54 @@ class Reader:
         if load is not None:
             return load
 
+        define = self.define(False)
+        if define is not None:
+            return define
+
+        define = self.implicit_define(False)
+        if define is not None:
+            return define
+
+        if fail:
+            self.error("expected definition")
+        else:
+            return None
+
+    def define(self, fail=True):
+        """
+        define : DEFINE symbol '=' expression
+        """
+        self.debug("define", fail=fail)
         if self.swallow('DEFINE'):
             symbol = self.symbol()
             self.consume('=')
             expression = self.expression()
             return expr.Definition(symbol, expression)
+        if fail:
+            self.error("expected define")
         else:
+            return None
+
+    def implicit_define(self, fail=True):
+        """
+        implicit_define : symbol '=' expression
+        """
+        self.debug("implicit_define", fail=fail)
+        identifier = self.swallow('ID')
+        if identifier is None:
             if fail:
-                self.error("expected 'define'")
-            else:
-                return None
+                self.error("expected identifier")
+            return None
+
+        eq = self.swallow('=')
+        if eq is None:
+            if fail:
+                self.error("expected '='")
+            self.pushback(identifier)
+            return None
+
+        expression = self.expression()
+        return expr.Definition(expr.Symbol(identifier.value), expression)
 
     def expression(self, fail=True) -> Maybe[expr.Expr]:
         """

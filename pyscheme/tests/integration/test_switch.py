@@ -24,8 +24,8 @@ class TestSwitch(Base):
         self.assertEval(
             'true',
             '''
-            define a = [1, 2];
-            define b = [1, 2];
+            a = [1, 2];
+            b = [1, 2];
             switch (a, b) {
                 ([], [])       { false }
                 (h @ t, [])    { false }

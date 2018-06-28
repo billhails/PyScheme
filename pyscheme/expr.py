@@ -36,10 +36,13 @@ def debug(*args, **kwargs):
     if Config.debug:
         print(*args, **kwargs)
 
+def hlDebug(*args, **kwargs):
+    if Config.hlDebug:
+        print(*args, **kwargs)
 
 class Config:
     debug = False
-
+    hlDebug = False
 
 class Expr:
     current_analysis = None
@@ -987,7 +990,7 @@ class Nest(Expr):
         new_env = env.extend()
         self._body.prepare_analysis(new_env)
         result = self._body.analyse_internal(new_env, non_generic.copy())
-        new_env.dump()
+        if Config.hlDebug: new_env.dump()
         return result
 
     def __str__(self):
@@ -1176,7 +1179,7 @@ class Closure(Primitive):
         self.name = name
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: types.Amb) -> types.Promise:
-        print(self.name, args)
+        hlDebug(self.name, args)
         formal_args = self._args
         actual_args = args
         dictionary = {}
@@ -1972,7 +1975,7 @@ class CompositeClosure(Closure):
         self.name = name
 
     def apply_evaluated_args(self, args, ret: types.Continuation, amb: ambivalence.Amb):
-        print(self.name, args)
+        hlDebug(self.name, args)
         def try_recursive(components: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
             if type(components) is Null:
                 return amb

@@ -17,7 +17,7 @@ typedef Register {
     envt | val | continue | argl | proc | val1 | val2
 }
 
-define all_regs = [envt, val, continue, argl, proc, val1, val2];
+all_regs = [envt, val, continue, argl, proc, val1, val2];
 
 // binary operators
 typedef Binop {
@@ -219,18 +219,18 @@ fn compile_definition(v, expr, target, linkage) {
 }
 
 fn compile_conditional(t3st, consequent, alternative, target, linkage) {
-    define t_branch = label("true-branch");
-    define f_branch = label("false-branch");
-    define after_if = label("after-if");
-    define consequent_linkage =
+    t_branch = label("true-branch");
+    f_branch = label("false-branch");
+    after_if = label("after-if");
+    consequent_linkage =
         if (linkage == next) {
             jump(after_if)
         } else {
             linkage
         };
-    define p_code = compile(t3st, val, next);
-    define c_code = compile(consequent, target, consequent_linkage);
-    define a_code = compile(alternative, target, linkage);
+    p_code = compile(t3st, val, next);
+    c_code = compile(consequent, target, consequent_linkage);
+    a_code = compile(alternative, target, linkage);
     preserving(
         [envt, continue],
         p_code,
@@ -263,9 +263,9 @@ fn label_instruction_sequence {
 }
 
 fn compile_lambda (arg, body, target, linkage) {
-    define proc_entry = label("entry");
-    define after_lambda = label("after-lambda");
-    define lambda_linkage =
+    proc_entry = label("entry");
+    after_lambda = label("after-lambda");
+    lambda_linkage =
         if (linkage == next) {
             jump(after_lambda)
         } else {
@@ -307,8 +307,8 @@ fn compile_lambda_body(arg, body, proc_entry) {
 }
 
 fn compile_application(func, arg, target, linkage) {
-    define proc_code = compile(func, proc, next);
-    define arg_code = compile(arg, val, next);
+    proc_code = compile(func, proc, next);
+    arg_code = compile(arg, val, next);
     preserving(
         [envt, continue],
         proc_code,
@@ -321,10 +321,10 @@ fn compile_application(func, arg, target, linkage) {
 }
 
 fn compile_procedure_call(target, linkage) {
-    define primitive_branch = label("primitive-branch");
-    define compiled_branch = label("compiled-branch");
-    define after_call = label("after-call");
-    define compiled_linkage =
+    primitive_branch = label("primitive-branch");
+    compiled_branch = label("compiled-branch");
+    after_call = label("after-call");
+    compiled_linkage =
         if (linkage == next) {
             jump(after_call)
         } else {
@@ -383,7 +383,7 @@ fn compile_proc_appl {
         error("MCC - return linkage, but target is not val")
     }
     (target, linkage) {
-        define proc_return = label("proc-return");
+        proc_return = label("proc-return");
         sequence(
             [proc],
             all_regs,

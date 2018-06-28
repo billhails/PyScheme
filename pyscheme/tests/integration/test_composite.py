@@ -155,8 +155,8 @@ class TestComposite(Base):
                     }
                 }
 
-                define i1 = insert(1, leaf);
-                define i2 = insert(2);
+                i1 = insert(1, leaf);
+                i2 = insert(2);
 
                 i2(i1);
             }

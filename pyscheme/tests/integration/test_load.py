@@ -29,7 +29,7 @@ class TestTestLoad(Base):
             '''
             load utils.sort as sort;
 
-            define unsorted = [5, 4, 6, 2, 3, 3, 8];
+            unsorted = [5, 4, 6, 2, 3, 3, 8];
 
             sort.qsort(unsorted);
             '''
@@ -43,7 +43,7 @@ class TestTestLoad(Base):
                 load utils.sort;
                 load utils.lists as lists;
 
-                define unsorted = [5, 4, 6, 2, 3, 3, 8];
+                unsorted = [5, 4, 6, 2, 3, 3, 8];
 
                 lists.map(1+, utils.sort.qsort(unsorted));
             }
