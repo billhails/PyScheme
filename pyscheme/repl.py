@@ -65,8 +65,7 @@ class Repl:
                     "spawn": expr.Spawn(),            # bool
                     "error": expr.Error(
                         lambda val, amb:
-                        lambda: self.repl(lambda:
-                                          None))      # _
+                            lambda: self.repl(ambivalence.Amb(lambda: None))) # _
                 }
         self.env = environment.Environment().extend(
             { expr.Symbol(k): v for k, v in operators.items() }
@@ -93,13 +92,13 @@ class Repl:
                 else:
                     threads += [next]
 
-    def read(self, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def read(self, ret: 'types.Continuation', amb: ambivalence.Amb) -> 'types.Promise':
         result = self.reader.read()
         if result is None:
             return None  # stop the trampoline
         return lambda: ret(result, amb)
 
-    def analyze(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def analyze(self, expr: expr.Expr, ret: 'types.Continuation', amb: ambivalence.Amb) -> 'types.Promise':
         try:
             expr.analyse(self.type_env)
         except PySchemeError as e:
@@ -107,25 +106,25 @@ class Repl:
             return None
         return lambda: ret(expr, amb)
 
-    def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def eval(self, expr: expr.Expr, ret: 'types.Continuation', amb: ambivalence.Amb) -> 'types.Promise':
         return lambda: expr.eval(self.env, ret, amb)
 
-    def print(self, exp: expr.Expr, ret: 'types.Continuation', amb: 'types.Amb') -> 'types.Promise':
+    def print(self, exp: expr.Expr, ret: 'types.Continuation', amb: ambivalence.Amb) -> 'types.Promise':
         if type(exp) is not expr.Nothing:
             self.output.write(str(exp) + "\n")
         return lambda: ret(exp, amb)
 
-    def repl(self, amb: 'types.Amb') -> 'types.Promise':
-        def print_continuation(expr, amb: 'types.Amb') -> 'types.Promise':
+    def repl(self, amb: ambivalence.Amb) -> 'types.Promise':
+        def print_continuation(expr, amb: ambivalence.Amb) -> 'types.Promise':
             return lambda: self.repl(ambivalence.Amb(lambda: None))
 
-        def eval_continuation(evaluated_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
+        def eval_continuation(evaluated_expr: expr.Expr, amb: ambivalence.Amb) -> 'types.Promise':
             return lambda: self.print(evaluated_expr, print_continuation, amb)
 
-        def analyze_continuation(analyzed_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
+        def analyze_continuation(analyzed_expr: expr.Expr, amb: ambivalence.Amb) -> 'types.Promise':
             return lambda: self.eval(analyzed_expr, eval_continuation, amb)
 
-        def read_continuation(read_expr: expr.Expr, amb: 'types.Amb') -> 'types.Promise':
+        def read_continuation(read_expr: expr.Expr, amb: ambivalence.Amb) -> 'types.Promise':
             return lambda: self.analyze(read_expr, analyze_continuation, amb)
 
         return lambda: self.read(read_continuation, amb)

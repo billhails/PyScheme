@@ -49,6 +49,7 @@ class TestCurrying(Base):
         self.assertEval(
             '[2, 3, 4, 5]',
             '''
+            {
                 fn map(fun, lst) {
                     if (lst == []) {
                         []
@@ -62,6 +63,7 @@ class TestCurrying(Base):
                 }
 
                 map(add(1), [1, 2, 3, 4]);
+            }
             '''
         )
 

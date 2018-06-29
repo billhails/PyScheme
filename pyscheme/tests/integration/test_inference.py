@@ -93,7 +93,7 @@ class TestInference(Base):
 
     def test_inference_8(self):
         self.assertEval(
-            "Closure([f]: { Lambda [g]: { { Lambda [arg]: { { g[f[arg]] } } } } })",
+            "CompositeClosure{[ComponentClosure([f]:{fn{ComponentLambda[g]:{{fn{ComponentLambda[arg]:{{g[f[arg]]}}}}}}})]}",
             '''
             fn (f) { fn (g) { fn (arg) { g(f(arg)) } } };
             ''',

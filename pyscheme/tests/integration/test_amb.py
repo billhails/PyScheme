@@ -51,12 +51,12 @@ class TestAmb(Base):
                 fn require(x) {
                     x or back
                 }
-                
+
                 fn one_of(lst) {
                     require(length(lst) > 0);
                     head(lst) then one_of(tail(lst));
                 }
-                
+
                 {
                     x = one_of([1, 2, 3, 4, 5]);
                     require(x == 4);
@@ -80,18 +80,18 @@ class TestAmb(Base):
                 fn require(condition) {
                     condition or back
                 }
-    
+
                 fn one_of {
                     ([]) { back }
                     (h @ t) { h then one_of(t) }
                 }
-                
+
                 fn member {
                     (item, [])       { false }
                     (item, item @ t) { true }
                     (item, _ @ tail) { member(item, tail) }
                 }
-    
+
                 fn exclude {
                     (items, []) { [] }
                     (items, h @ t) {
@@ -102,17 +102,17 @@ class TestAmb(Base):
                         }
                     }
                 }
-                
+
                 fn some_of {
                     ([]) { back }
                     (h @ t) { [h] then some_of(t) then h @ some_of(t) }
                 }
-    
+
                 fn sum {
                     ([]) { 0 }
                     (h @ t) { h + sum(t) }
                 }
-    
+
                 fn barrels_of_fun() {
                     barrels = [30, 32, 36, 38, 40, 62];
                     beer = one_of(barrels);
@@ -123,7 +123,7 @@ class TestAmb(Base):
                     require((barrel_1 + barrel_2) * 2 == sum(purchase));
                     beer;
                 }
-                
+
                 barrels_of_fun();
             }
             """

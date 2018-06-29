@@ -141,7 +141,18 @@ class TestEnv(Base):
 
     def test_typedef_in_env_2(self):
         self.assertEval(
-            'Closure([e:e]: { define l = e.pair[1, e.pair[2, e.null]] ; e.map[Lambda [#c]: { { +[1, #c] } }, l] })',
+            '''
+            CompositeClosure{
+                [
+                    ComponentClosure(
+                        [e:e]:{
+                            definel=e.pair[1,e.pair[2,e.null]];
+                            e.map[fn{ComponentLambda[#c]:{{+[1,#c]}}},l]
+                        }
+                    )
+                ]
+            }
+            ''',
             '''
             env e {
                 typedef lst(#t) {pair(#t, lst(#t)) | null }

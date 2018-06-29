@@ -192,7 +192,7 @@ class Reader:
 
         switch : SWITCH '(' actuals ')' composite_body
 
-        defn : FN symbol formals body
+        defn : FN symbol sub_function
              | FN symbol composite_body
 
         denv : ENV symbol [EXTENDS package] body
@@ -209,7 +209,8 @@ class Reader:
 
         sub_function_arguments : '(' sub_function_arg_list ')'
 
-        sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
+        sub_function_arg_list : empty
+                              | sub_function_arg { ',' sub_function_arg }
 
         sub_function_arg : sub_function_arg_2 '@' sub_function_arg
                          | sub_function_arg_2
@@ -218,7 +219,8 @@ class Reader:
         sub_function_arg_2 : '[' [ sub_function_arg { ',' sub_function_arg } ] ']'
                            | sub_function_arg_3
 
-        sub_function_arg_3 : symbol [ '(' sub_function_arg_list ')' ]
+        sub_function_arg_3 : symbol [ sub_function_arguments ]
+                           | symbol [ ':' symbol ]
                            | NUMBER
                            | STRING
                            | CHAR
@@ -290,7 +292,7 @@ class Reader:
              | BOOLEAN
              | NOTHING
              | lst
-             | FN formals body
+             | FN sub_function
              | FN composite_body
              | env
              | BACK
@@ -440,31 +442,32 @@ class Reader:
 
     def defn(self, fail=True):
         """
-        defn : FN symbol '(' formals ')' body
+        defn : FN symbol sub_function
              | FN symbol composite_body
         """
         self.debug("defn", fail=fail)
 
         fn = self.swallow('FN')
-        if fn is not None:
-            symbol = self.symbol(False)
-            if symbol is None:
-                self.pushback(fn)
-                if fail:
-                    self.error('expected symbol')
-                else:
-                    return None
+        if fn is None:
+            if fail:
+                self.error("expected 'fn'")
+            return None
+
+        symbol = self.symbol(False)
+        if symbol is None:
+            self.pushback(fn)
+            if fail:
+                self.error('expected symbol')
             else:
-                formals = self.formals(False)
-                if formals is None:
-                    composite_body = self.composite_body()
-                    composite_body.set_name(symbol.value())
-                    return expr.Definition(symbol, composite_body)
-                else:
-                    body = self.body()
-                    fn = expr.Lambda(formals, body)
-                    fn.set_name(symbol.value())
-                    return expr.Definition(symbol, fn)
+                return None
+
+        sub_function = self.sub_function(False)
+        if sub_function is not None:
+            composite_body = expr.Composite(expr.Pair(sub_function, expr.Null()))
+        else:
+            composite_body = self.composite_body()
+        composite_body.set_name(symbol.value())
+        return expr.Definition(symbol, composite_body)
 
     def denv(self, fail=True):
         """
@@ -612,10 +615,11 @@ class Reader:
 
     def sub_function_arg_list(self, fail=True) -> expr.LinkedList:
         """
-        sub_function_arg_list : sub_function_arg [ ',' sub_function_arg_list ]
+        sub_function_arg_list : empty
+                              | sub_function_arg { ',' sub_function_arg }
         """
         self.debug("sub_function_arg_list", fail=fail)
-        sub_function_arg = self.sub_function_arg(fail)
+        sub_function_arg = self.sub_function_arg(False)
         if sub_function_arg is None:
             return expr.Null()
         if self.swallow(','):
@@ -667,7 +671,8 @@ class Reader:
 
     def sub_function_arg_3(self, fail=True):
         """
-        sub_function_arg_3 : symbol [ '(' sub_function_arg_list ')' ]
+        sub_function_arg_3 : symbol [ sub_function_arguments ]
+                           | symbol [ ':' symbol ]
                            | NUMBER
                            | STRING
                            | CHAR
@@ -700,7 +705,11 @@ class Reader:
         if symbol is not None:
             arg_list = self.sub_function_arguments(False)
             if arg_list is None:
-                return symbol
+                if self.swallow(':'):
+                    f_type = self.symbol()
+                    return expr.TypedSymbol(symbol, f_type)
+                else:
+                    return symbol
             else:
                 return expr.NamedTuple(symbol, arg_list)
 
@@ -949,7 +958,7 @@ class Reader:
                    | BOOLEAN
                    | NOTHING
                    | lst
-                   | FN formals body
+                   | FN sub_function
                    | FN composite_body
                    | env
                    | BACK
@@ -987,12 +996,11 @@ class Reader:
             return lst
 
         if self.swallow('FN'):
-            formals = self.formals(False)
-            if formals is None:
-                return self.composite_body()
+            sub_function = self.sub_function(False)
+            if sub_function is not None:
+                return expr.Composite(expr.Pair(sub_function, expr.Null()))
             else:
-                body = self.body()
-                return expr.Lambda(formals, body)
+                return self.composite_body()
 
         switch = self.switch(False)
         if switch is not None:
@@ -1435,7 +1443,16 @@ class Reader:
 
     @classmethod
     def make_closure(cls, argument: expr.Symbol, body: expr.Application):
-        return expr.Lambda(expr.LinkedList.list([argument]), expr.Sequence(expr.LinkedList.list([body])))
+        return expr.Composite(
+            expr.Pair(
+                expr.ComponentLambda(
+                    expr.LinkedList.list([argument]),
+                    expr.Sequence(expr.LinkedList.list([body]))
+                ),
+                expr.Null()
+            )
+        )
+        # return expr.Lambda(expr.LinkedList.list([argument]), expr.Sequence(expr.LinkedList.list([body])))
 
     @classmethod
     def apply_string(cls, name: str, *args):
