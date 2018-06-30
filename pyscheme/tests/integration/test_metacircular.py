@@ -60,22 +60,24 @@ class TestMetacircular(Base):
                 }
 
                 // function application
-                fn apply {
-                    (closure(lambda(symbol(s), body), e), arg) {
-                        eval(body, frame(s, arg, e))
-                    }
+                fn apply (closure(lambda(symbol(s), body), e), arg) {
+                    eval(body, frame(s, arg, e))
                 }
 
                 // built-ins
-                fn add { (number(a), number(b)) { number(a + b) } }
-                fn sub { (number(a), number(b)) { number(a - b) } }
-                fn mul { (number(a), number(b)) { number(a * b) } }
-                fn div { (number(a), number(b)) { number(a / b) } }
+                fn add (number(a), number(b)) { number(a + b) }
+                
+                fn sub (number(a), number(b)) { number(a - b) }
+                
+                fn mul (number(a), number(b)) { number(a * b) }
+                
+                fn div (number(a), number(b)) { number(a / b) }
+                
                 fn cond(test, pro, con, e) {
-                    fn {
+                    switch (eval(test, e)) {
                         (number(0)) { eval(con, e) } // 0 is false
                         (number(_)) { eval(pro, e) }
-                    }(eval(test, e))
+                    }
                 }
 
                 // lookup access to the environment
