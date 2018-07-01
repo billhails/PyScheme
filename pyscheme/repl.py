@@ -26,6 +26,7 @@ import pyscheme.reader as reader
 from .inference import TypeEnvironment, EnvironmentType
 from .exceptions import PySchemeError
 from . import ambivalence
+from pyscheme.ir.environment import Environment as CompileTimeEnvironment
 
 
 class Repl:
@@ -81,6 +82,10 @@ class Repl:
                 self.type_env[expr.Symbol(k)] = v.type()
 
         self.type_env[globalenv] = EnvironmentType(self.type_env)
+
+        self.compile_time_env = CompileTimeEnvironment().extend({expr.Symbol(k): v for k, v in operators.items()})
+        self.compile_time_env.install(globalenv, self.env[globalenv])
+
 
     def trampoline(self, threads: List['types.Promise']):
         while len(threads) > 0:

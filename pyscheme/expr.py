@@ -30,7 +30,8 @@ from typing import Union
 import inspect
 import os
 import sys
-
+import pyscheme.ir.tree as ir
+from pyscheme.ir.environment import Environment as CompileTimeEnvironment
 
 def debug(*args, **kwargs):
     if Config.debug:
@@ -178,8 +179,11 @@ class Expr:
     def __ne__(self, other):
         return self.__cmp__(other) != 0
 
-    def compile(self):
-        pass
+    def compile(self, env: CompileTimeEnvironment) -> ir.Tree:
+        raise PySchemeInternalError(str(type(self)) + " does not implement compile")
+
+    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment) -> ir.Tree:
+        raise PySchemeInternalError(str(type(self)) + " does not implement compile_with_operands")
 
     def cursory_type(self):
         """
@@ -275,6 +279,9 @@ class Number(Constant):
 
     def __pow__(self, power: Expr, modulo=None):
         return Number(self._value ** power.value())
+
+    def compile(self, env: CompileTimeEnvironment):
+        return ir.Int(self.value())
 
 
 class Wildcard(Constant, metaclass=Singleton):
@@ -433,6 +440,13 @@ class Symbol(Constant, metaclass=FlyWeight):
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         verify(amb)
         return lambda: env.lookup(self, ret, amb)
+
+    def compile_with_operands(self, operands, env):
+        data = env.lookup(self)
+        if data[2] is None:
+            ...
+        else:
+            return data[2].compile_with_operands(operands, env)
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
@@ -958,6 +972,9 @@ class Application(Expr):
 
     __repr__ = __str__
 
+    def compile(self, env: CompileTimeEnvironment):
+        return self._operation.compile_with_operands(self._operands, env)
+
 
 class Sequence(Expr):
     def __init__(self, exprs: LinkedList):
@@ -1280,11 +1297,21 @@ class BinaryArithmetic(Primitive):
     def static_type(self) -> bool:
         return True
 
+    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment):
+        return self.tree(operands[0].compile(env), operands[1].compile(env))
+
+
+    def tree(self, left: ir.Tree, right: ir.Tree) -> ir.Tree:
+        raise PySchemeInternalError(str(type(self)) + " does not implement tree()")
+
 
 class Addition(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb):
         verify(amb)
         return lambda: ret(args[0] + args[1], amb)
+
+    def tree(self, left: ir.Tree, right: ir.Tree):
+        return ir.Add(left, right)
 
 
 class Subtraction(BinaryArithmetic, metaclass=Singleton):
