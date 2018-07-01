@@ -107,7 +107,7 @@ class TestMetacircular(Base):
         )
 
 
-    def test_metacircular_compiler_it_takes_too_long(self):
+    def dont_test_metacircular_compiler_it_takes_too_long(self):
         self.assertEval(
             '''
             sequence[

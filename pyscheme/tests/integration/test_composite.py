@@ -76,7 +76,7 @@ class TestComposite(Base):
 
     def test_composite_3(self):
         self.assertEval(
-            'some["there"]',
+            'some[there]',
             '''
             {
                 typedef tree(#t) { branch(tree(#t), int, #t, tree(#t)) | leaf }
@@ -120,7 +120,7 @@ class TestComposite(Base):
             'btrees'
         )
 
-    def test_composite_3(self):
+    def test_composite_4(self):
         self.assertEval(
             'branch[branch[leaf, true, leaf], true, branch[leaf, true, leaf]]',
             '''

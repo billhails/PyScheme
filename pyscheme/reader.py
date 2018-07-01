@@ -305,14 +305,6 @@ class Reader:
 
         symbol : ID
 
-        formals : '(' fargs ')'
-
-        fargs : empty
-              | farg { ',' fargs }
-
-        farg : symbol [ ':' symbol ]
-             | WIDCARD
-
         symbols : empty
                 | symbol { ',' symbols }
 
@@ -1031,17 +1023,6 @@ class Reader:
         else:
             return None
 
-    def formals(self, fail=True) -> Maybe[expr.LinkedList]:
-        self.debug("formals")
-        if self.swallow('('):
-            symbols = self.fargs()
-            self.consume(')')
-            return symbols
-        elif fail:
-            self.error("expected '('")
-        else:
-            return None
-
     def symbol(self, fail=True) -> Maybe[expr.Symbol]:
         """
             symbol : ID
@@ -1159,40 +1140,6 @@ class Reader:
             self.error("expected '['")
         else:
             return None
-
-    def fargs(self) -> expr.LinkedList:
-        """
-            fargs : empty
-            fargs : farg [ ',' nfargs ]
-        """
-        self.debug("fargs")
-        farg = self.farg(False)
-        if farg is None:
-            return expr.Null()
-        if self.swallow(','):
-            fargs = self.fargs()
-            return expr.Pair(farg, fargs)
-        else:
-            return expr.LinkedList.list([farg])
-
-    def farg(self, fail=True):
-        """
-        farg : symbol [ ':' symbol ]
-             | WILDCARD
-        """
-        self.debug("farg")
-        wildcard = self.wildcard(False)
-        if wildcard is not None:
-            return wildcard
-
-        symbol = self.symbol(fail)
-        if symbol is None:
-            return None
-        if self.swallow(':'):
-            f_type = self.symbol()
-            return expr.TypedSymbol(symbol, f_type)
-        else:
-            return symbol
 
     def exprs(self) -> expr.LinkedList:
         """

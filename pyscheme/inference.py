@@ -213,12 +213,6 @@ class TypeEnvironment:
     def unify_internal(self, other, seen):
         pass
 
-    @classmethod
-    def next_id(cls):
-        my_id = TypeEnvironment.counter
-        TypeEnvironment.counter += 1
-        return my_id
-
     def flatten(self, definitions):
         pass
 
@@ -229,9 +223,6 @@ class TypeEnvironment:
         pass
 
     def noted_type_constructor(self, name: 'expr.Symbol'):
-        return False
-
-    def in_current_frame(self, name: 'expr.Symbol'):
         return False
 
     def __getitem__(self, symbol: 'expr.Symbol'):
@@ -297,9 +288,6 @@ class TypeFrame(TypeEnvironment):
 
     def dump_dict(self):
         return ''
-
-    def in_current_frame(self, name: 'expr.Symbol'):
-        return name in self._dictionary
 
     def __getitem__(self, symbol: 'expr.Symbol') -> Type:
         if symbol in self._dictionary:

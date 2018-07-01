@@ -18,6 +18,7 @@
 from unittest import TestCase
 import pyscheme.reader as reader
 import io
+from pyscheme.exceptions import PySchemeSyntaxError
 
 
 class TestReader(TestCase):
@@ -30,9 +31,27 @@ class TestReader(TestCase):
         for expect in expected:
             self.assertEqual(expect, str(parser.read()), message + ": " + code)
 
+    def assertSyntaxError(self, code, message=''):
+        input_file = io.StringIO(code)
+        stderr = io.StringIO()
+        tokeniser = reader.Tokeniser(input_file)
+        parser = reader.Reader(tokeniser, stderr)
+        exception_caught = False
+        try:
+            result = parser.read()
+        except PySchemeSyntaxError as e:
+            exception_caught = True
+        self.assertTrue(exception_caught, message)
+
     def test_parse_basic(self):
         self.assertParse(["1"], "1;")
 
+    def test_syntax_error(self):
+        self.assertSyntaxError(
+            '''
+            some garbage } nonsense
+            '''
+        )
     def test_parse_arithmetic(self):
         self.assertParse(
             ["(1 + (2 * 3))"],
@@ -169,4 +188,14 @@ class TestReader(TestCase):
                 (_ @ t) { 1 + len(t) }
             }
             """
+        )
+
+    def test_parse_sub_function_arg_2(self):
+        self.assertParse(
+            ['define foo = fn {ComponentLambda [[a, b]]: { { b } }}'],
+            '''
+            fn foo ([a, b]) {
+                b
+            }
+            '''
         )
