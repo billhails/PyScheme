@@ -61,7 +61,7 @@ class TestClosure(Base):
 
     def test_lambda_string(self):
         self.assertEval(
-            "CompositeClosure{[ComponentClosure([a]:{if(==[a,2]){{12}}else{{fn{ComponentLambda[]:{{14}}}}}})]}",
+            "CompositeClosure{[ComponentClosure([a]:{if((a==2)){{12}}else{{fn{ComponentLambda[]:{{14}}}}}})]}",
             """
                 fn (a) {
                     if (a == 2) {

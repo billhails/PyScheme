@@ -149,6 +149,9 @@ class Expr:
     def static_type(self) -> bool:
         return False
 
+    def looks_like_binop(self):
+        return False
+
     def __cmp__(self, other):
         if id(self) == id(other):
             return 0
@@ -469,6 +472,9 @@ class Symbol(Constant, metaclass=FlyWeight):
             env[self] = return_type
             non_generic.add(return_type)
         return return_type
+
+    def looks_like_binop(self):
+        return self._value == 'then' or not self._value.isalnum()
 
     @classmethod
     def generate(cls):
@@ -946,6 +952,8 @@ class Application(Expr):
         return result_type
 
     def __str__(self) -> str:
+        if self._operation.looks_like_binop() and len(self._operands) == 2:
+            return '(' + str(self._operands[0]) + ' ' + str(self._operation) + ' ' + str(self._operands[1]) + ')'
         return str(self._operation) + str(self._operands)
 
     __repr__ = __str__

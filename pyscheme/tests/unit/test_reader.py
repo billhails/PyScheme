@@ -35,7 +35,7 @@ class TestReader(TestCase):
 
     def test_parse_arithmetic(self):
         self.assertParse(
-            ["+[1, *[2, 3]]"],
+            ["(1 + (2 * 3))"],
             "1 + 2 * 3;",
             "basic arithmetic precedence works"
         )
@@ -43,8 +43,8 @@ class TestReader(TestCase):
     def test_parse_multiple(self):
         self.assertParse(
             [
-                "+[1, *[2, 3]]",
-                "+[5, 4]"
+                "(1 + (2 * 3))",
+                "(5 + 4)"
             ],
             "1 + 2 * 3;\n5 + 4;",
             "basic arithmetic precedence works"
@@ -65,19 +65,19 @@ class TestReader(TestCase):
 
     def test_parse_then_funcall(self):
         self.assertParse(
-            ["then[foo, bar[baz]]"],
+            ["(foo then bar[baz])"],
             "foo then bar(baz);"
         )
 
     def test_parse_lassoc_add(self):
         self.assertParse(
-            ["+[+[1, 2], 3]"],
+            ["((1 + 2) + 3)"],
             "1 + 2 + 3;"
         )
 
     def test_parse_lassoc_mul(self):
         self.assertParse(
-            ['%[*[/[1, 2], 3], 4]'],
+            ['(((1 / 2) * 3) % 4)'],
             "1 / 2 * 3 % 4;"
         )
 
@@ -89,19 +89,19 @@ class TestReader(TestCase):
 
     def test_parse_rassoc_then(self):
         self.assertParse(
-            ['then[a, then[b, c]]'],
+            ['(a then (b then c))'],
             'a then b then c;'
         )
 
     def test_parse_rassoc_cons(self):
         self.assertParse(
-            ['@[a, @@[b, c]]'],
+            ['(a @ (b @@ c))'],
             'a @ b @@ c;'
         )
 
     def test_parse_then_funcall_2(self):
         self.assertParse(
-            ["then[foo, bar][baz]"],
+            ["(foo then bar)[baz]"],
             "(foo then bar)(baz);"
         )
 
@@ -151,7 +151,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_2(self):
         self.assertParse(
-            ['define factorial = fn {ComponentLambda [0]: { { 1 } } ComponentLambda [n]: { { *[n, factorial[-[n, 1]]] } }}'],
+            ['define factorial = fn {ComponentLambda [0]: { { 1 } } ComponentLambda [n]: { { (n * factorial[(n - 1)]) } }}'],
             """
             fn factorial {
                 (0) { 1 }
@@ -162,7 +162,7 @@ class TestReader(TestCase):
 
     def test_parse_composite_3(self):
         self.assertParse(
-            ['define len = fn {ComponentLambda [[]]: { { 0 } } ComponentLambda [[_ . t]]: { { +[1, len[t]] } }}'],
+            ['define len = fn {ComponentLambda [[]]: { { 0 } } ComponentLambda [[_ . t]]: { { (1 + len[t]) } }}'],
             """
             fn len {
                 ([]) { 0 }

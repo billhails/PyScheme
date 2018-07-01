@@ -147,7 +147,7 @@ class TestEnv(Base):
                     ComponentClosure(
                         [e:e]:{
                             definel=e.pair[1,e.pair[2,e.null]];
-                            e.map[fn{ComponentLambda[#c]:{{+[1,#c]}}},l]
+                            e.map[fn{ComponentLambda[#c]:{{(1+#c)}}},l]
                         }
                     )
                 ]
