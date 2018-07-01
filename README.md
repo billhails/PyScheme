@@ -38,9 +38,7 @@ $ pip install coverage
 
 ## Test Coverage
 
-Once those packages are installed, to see test coverage just run the `coverage.sh` script (OSX/Unix), then open
-`htmlcov/index.html` in your browser. For other plarforms you can look at `coverage.sh` and see what it does (it's
-only a couple of lines of code.) If anyone wants to provide a `coverage.bat` or similar for other platforms please
-submit a PR.
+Once those packages are installed, to see test coverage just run the `run_coverage.py` script, then open
+`htmlcov/index.html` in your browser.
 
 I believe that the PyCharm Professional edition has built-in coverage support.
