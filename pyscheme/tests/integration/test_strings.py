@@ -62,3 +62,24 @@ class TestStrings(Base):
             """,
             ""
         )
+
+    def test_genstr(self):
+        self.assertEval(
+            'foo_0',
+            '''
+            genstr("foo_");
+            '''
+        )
+
+    def test_str(self):
+        self.assertEval(
+            'a is pair[red, pair[green, pair[blue, null]]]',
+            '''
+            {
+                typedef lst(#t) { pair(#t, lst(#t)) | null }
+                typedef colour { red | green | blue }
+                a = pair(red, pair(green, pair(blue, null)));
+                "a is " @@ str(a);
+            }
+            '''
+        )

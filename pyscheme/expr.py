@@ -30,7 +30,7 @@ from typing import Union
 import inspect
 import os
 import sys
-import pyscheme.ir.tree as ir
+import pyscheme.ir.tree as anf
 from pyscheme.ir.environment import Environment as CompileTimeEnvironment
 
 def debug(*args, **kwargs):
@@ -45,14 +45,10 @@ class Config:
     debug = False
     hlDebug = False
 
-def verify(amb: ambivalence.Amb):
-    assert isinstance(amb, ambivalence.Amb)
-
 class Expr:
     current_analysis = None
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(self, amb)
 
     def apply(self,
@@ -60,7 +56,6 @@ class Expr:
               env: 'environment.Environment',
               ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if len(args) == 0:
             return lambda: ret(self, amb)
         else:
@@ -89,7 +84,6 @@ class Expr:
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         raise PySchemeInferenceError("cannot match " + str(type(self)))
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
@@ -179,10 +173,21 @@ class Expr:
     def __ne__(self, other):
         return self.__cmp__(other) != 0
 
-    def compile(self, env: CompileTimeEnvironment) -> ir.Tree:
-        raise PySchemeInternalError(str(type(self)) + " does not implement compile")
+    def compile(self, env: CompileTimeEnvironment, result: anf.Temp=None) -> anf.Tree:
+        self.prepare_compilation(env)
+        return self.compile_internal(env, result)
 
-    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment) -> ir.Tree:
+    def prepare_compilation(self, env: CompileTimeEnvironment):
+        """
+        searches for definitions at the current level
+        and installs them in the current environment
+        """
+        pass
+
+    def compile_internal(self, env: CompileTimeEnvironment, result: anf.Temp=None) -> anf.Tree:
+        raise PySchemeInternalError(str(type(self)) + " does not implement compile_internal")
+
+    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment, result=None) -> anf.Tree:
         raise PySchemeInternalError(str(type(self)) + " does not implement compile_with_operands")
 
     def cursory_type(self):
@@ -231,7 +236,6 @@ class Constant(Expr):
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if self == other:
             return lambda: ret(self, amb)
         else:
@@ -280,8 +284,11 @@ class Number(Constant):
     def __pow__(self, power: Expr, modulo=None):
         return Number(self._value ** power.value())
 
-    def compile(self, env: CompileTimeEnvironment):
-        return ir.Int(self.value())
+    def compile_internal(self, env: CompileTimeEnvironment, result: anf.Temp=None):
+        if result is None:
+            return anf.Int(self.value())
+        else:
+            return anf.Assign(result, anf.Int(self.value()))
 
 
 class Wildcard(Constant, metaclass=Singleton):
@@ -297,7 +304,6 @@ class Wildcard(Constant, metaclass=Singleton):
         """
         always match
         """
-        verify(amb)
         return lambda: ret(self, amb)
 
     def __len__(self):
@@ -367,6 +373,12 @@ class T(Boolean, metaclass=Singleton):
         else:
             return 1
 
+    def compile_internal(self, env: CompileTimeEnvironment, result: anf.Temp=None):
+        if result is None:
+            return anf.Int(1)
+        else:
+            return anf.Assign(result, anf.Int(1))
+
 
 class F(Boolean, metaclass=Singleton):
     def __init__(self):
@@ -395,6 +407,12 @@ class F(Boolean, metaclass=Singleton):
             return 0
         else:
             return -1
+
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        if result is None:
+            return anf.Int(0)
+        else:
+            return anf.Assign(result, anf.Int(0))
 
 
 class U(Boolean, metaclass=Singleton):
@@ -438,19 +456,19 @@ class Symbol(Constant, metaclass=FlyWeight):
     counter = 0
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: env.lookup(self, ret, amb)
 
-    def compile_with_operands(self, operands, env):
+    def compile_with_operands(self, operands, env, result=None):
+        if result is None:
+            result = anf.Temp()
         data = env.lookup(self)
         if data[2] is None:
-            ...
+            return anf.Env(result, data[0], data[1])
         else:
-            return data[2].compile_with_operands(operands, env)
+            return data[2].compile_with_operands(operands, env, result)
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if env.contains(self) and type(env[self]) is NamedTuple:
             return lambda: env[self].match(other, env, ret, amb)
         else:
@@ -535,7 +553,6 @@ class TypedSymbol(Expr):
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: env.define(self.symbol(), other, ret, amb)
 
     __repr__ = __str__
@@ -559,9 +576,7 @@ class As(Expr):
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def match_continuation(_: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             return lambda: env.define(self._symbol, other, ret, amb)
         return self._definition.match(other, env, match_continuation, amb)
 
@@ -651,13 +666,10 @@ class Pair(LinkedList):
         return self._cdr
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         # noinspection PyShadowingNames
         def car_continuation(evaluated_car: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             # noinspection PyShadowingNames
             def cdr_continuation(evaluated_cdr: LinkedList, amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 return lambda: ret(Pair(evaluated_car, evaluated_cdr), amb)
 
             return lambda: self._cdr.eval(env, cdr_continuation, amb)
@@ -693,10 +705,8 @@ class Pair(LinkedList):
 
     def match(self, other: 'LinkedList', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         # noinspection PyShadowingNames
         def car_continuation(_, amb) -> types.Promise:
-            verify(amb)
             return lambda: self.cdr().match(other.cdr(), env, ret, amb)
 
         return lambda: self.car().match(other.car(), env, car_continuation, amb)
@@ -711,6 +721,10 @@ class Pair(LinkedList):
     def prepare_analysis(self, env: inference.TypeEnvironment):
         self.car().prepare_analysis(env)
         self.cdr().prepare_analysis(env)
+
+    def prepare_compilation(self, env: CompileTimeEnvironment):
+        self.car().prepare_compilation(env)
+        self.cdr().prepare_compilation(env)
 
     def map(self, fn: callable) -> LinkedList:
         return Pair(fn(self._car), self._cdr.map(fn))
@@ -740,6 +754,20 @@ class Pair(LinkedList):
                 return analyse_recursive(pair.cdr())
 
         return analyse_recursive(self)
+
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        car = self.car().compile_internal(env)
+        cdr = self.cdr().compile_internal(env)
+        if result is None:
+            result = anf.Temp()
+        return anf.Seq(
+            car,
+            cdr,
+            anf.Rec(result, 2),
+            anf.SetRec(result, 0, car.result()),
+            anf.SetRec(result, 1, cdr.result())
+        )
+
 
     def __eq__(self, other: LinkedList) -> bool:
         if type(other) is Pair:
@@ -810,11 +838,16 @@ class Null(LinkedList, metaclass=Singleton):
 
     def match(self, other: 'Expr', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if self == other:
             return lambda: ret(self, amb)
         else:
             return lambda: amb()
+
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        if result is None:
+            return anf.Int(0)
+        else:
+            return anf.Assign(result, anf.Int(0))
 
     def __len__(self) -> int:
         return 0
@@ -858,9 +891,7 @@ class Conditional(Expr):
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         # noinspection PyShadowingNames
-        verify(amb)
         def test_continuation(result: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             if result.is_true():
                 return lambda: self._consequent.eval(env, ret, amb)
             else:
@@ -876,6 +907,30 @@ class Conditional(Expr):
         consequent_type = self._consequent.analyse_internal(env, non_generic)
         consequent_type.unify(self._alternative.analyse_internal(env, non_generic))
         return consequent_type
+
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        if_true = anf.Label('if_true')
+        if_false = anf.Label('if_false')
+        after = anf.Label('after')
+        test = self._test.compile_internal(env)
+        if result is None:
+            result = anf.Temp()
+        consequent = self._consequent.compile_internal(env, result)
+        alternative = self._alternative.compile_internal(env, result)
+        return anf.Seq(
+            test,
+            anf.Cjmp(
+                test.result(),
+                if_true,
+                if_false
+            ),
+            if_true,
+            consequent,
+            anf.Jmp(after),
+            if_false,
+            alternative,
+            after
+        )
 
     def __str__(self) -> str:
         return "if (" + str(self._test) + \
@@ -898,7 +953,6 @@ class Lambda(Expr):
         self.name = name
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if len(self._args) == 0:
             return lambda: self._body.eval(env, ret, amb)  # conform to type-checker's expectations
         else:
@@ -942,9 +996,7 @@ class Application(Expr):
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
 
         # noinspection PyShadowingNames
-        verify(amb)
         def evaluated_op_continuation(evaluated_op: 'Op', amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             return lambda: evaluated_op.apply(self._operands, env, ret, amb)
 
         return self._operation.eval(env, evaluated_op_continuation, amb)
@@ -972,8 +1024,8 @@ class Application(Expr):
 
     __repr__ = __str__
 
-    def compile(self, env: CompileTimeEnvironment):
-        return self._operation.compile_with_operands(self._operands, env)
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        return self._operation.compile_with_operands(self._operands, env, result)
 
 
 class Sequence(Expr):
@@ -981,11 +1033,9 @@ class Sequence(Expr):
         self._exprs = self.hoist_loads(exprs)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if len(self._exprs) > 0:
             # noinspection PyShadowingNames
             def take_last_continuation(expr: LinkedList, amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 return lambda: ret(expr.last(), amb)
 
             return self._exprs.eval(env, take_last_continuation, amb)
@@ -1030,6 +1080,26 @@ class Sequence(Expr):
     def get_exprs(self):
         return self._exprs
 
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        self._exprs.prepare_compilation(env)
+        if result is None:
+            result = anf.Temp()
+        statements = []
+        count = len(self._exprs)
+        for s in self._exprs:
+            count -= 1
+            if count == 0:
+                statements += [s.compile_internal(env, result)]
+            else:
+                statements += [s.compile_internal(env)]
+
+        if len(statements) > 1:
+            return anf.Seq(*statements)
+        elif len(statements) == 1:
+            return statements[0]
+        else:
+            return Nothing().compile_internal(env)
+
     def __str__(self) -> str:
         return self._exprs.qualified_str('{ ', ' ; ', ' }')
 
@@ -1041,7 +1111,6 @@ class Nest(Expr):
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         """Evaluate the body in an extended environment
         """
-        verify(amb)
         return self._body.eval(env.extend(), ret, amb)
 
     @trace
@@ -1055,6 +1124,10 @@ class Nest(Expr):
     def __str__(self):
         return str(self._body)
 
+    def compile_internal(self, env: CompileTimeEnvironment, result=None):
+        new_env = env.extend({})
+        self._body.prepare_compilation(new_env)
+        return self._body.compile_internal(new_env, result)
 
 class EnvironmentWrapper(Expr):
     """Wrapper for Environments to make them Exprs
@@ -1086,7 +1159,6 @@ class Env(Expr):
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         """evaluate the body in an extended env then return the extended env as the result
         """
-        verify(amb)
         new_env = None
 
         def lookup_package(
@@ -1095,22 +1167,18 @@ class Env(Expr):
                 ret: types.Continuation,
                 amb: ambivalence.Amb
         ) -> types.Promise:
-            verify(amb)
             if isinstance(package, Null):
                 return lambda: ret(env, amb)
             else:
                 def next_step(env: EnvironmentWrapper, amb: ambivalence.Amb) -> types.Promise:
-                    verify(amb)
                     return lookup_package(package.cdr(), env.env(), ret, amb)
                 return lambda: env.lookup(package.car(), next_step, amb)
 
         def after_eval(_: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             nonlocal new_env
             return ret(EnvironmentWrapper(new_env), amb)
 
         def after_lookup(env: 'environment.Environment', amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             nonlocal new_env
             new_env = env.extend()
             return self._body.eval(new_env, after_eval, amb)
@@ -1146,11 +1214,8 @@ class Definition(Expr):
         self._value = value
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def define_continuation(value: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             def ret_nothing(_: Expr, amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 return lambda: ret(Nothing(), amb)
 
             return lambda: env.define(self._symbol, value, ret_nothing, amb, True)
@@ -1170,6 +1235,19 @@ class Definition(Expr):
         env[self._symbol].unify(defn_type)
         return Nothing.type()
 
+    def prepare_compilation(self, env: CompileTimeEnvironment):
+        env.install(self._symbol, None)
+
+    def compile_internal(self, env: CompileTimeEnvironment, result: anf.Temp=None):
+        location = env.lookup(self._symbol)
+        if result is None:
+            result = anf.Temp()
+        value = self._value.compile_internal(env, result)
+        return anf.Seq(
+            value,
+            anf.SetEnv(location[0], location[1], result)
+        )
+
     def __str__(self):
         return "define " + str(self._symbol) + " = " + str(self._value)
 
@@ -1184,9 +1262,7 @@ class EnvContext(Expr):
         self._expr = expr
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def env_continuation(new_env: EnvironmentWrapper, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             return lambda: self._expr.eval(new_env.env(), ret, amb)
 
         return self._env.eval(env, env_continuation, amb)
@@ -1219,9 +1295,7 @@ class Primitive(Op):
 
     def apply(self, args: LinkedList, env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def deferred_apply(evaluated_args: LinkedList, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             return lambda: self.apply_evaluated_args(evaluated_args, ret, amb)
 
         return args.eval(env, deferred_apply, amb)
@@ -1250,7 +1324,6 @@ class Closure(Primitive):
         self.name = name
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         hlDebug(self.name, args)
         formal_args = self._args
         actual_args = args
@@ -1268,7 +1341,6 @@ class Closure(Primitive):
         elif type(actual_args) is not Null:  # over-complete function application
 
             def re_apply_continuation(closure: Closure, amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 return lambda: closure.apply_evaluated_args(actual_args, ret, amb)
 
             return lambda: self._body.eval(self._env.extend(dictionary), re_apply_continuation, amb)
@@ -1282,7 +1354,24 @@ class Closure(Primitive):
         return self.__class__.__name__ + "(" + str(self._args) + ": " + str(self._body) + ")"
 
 
-class BinaryArithmetic(Primitive):
+class BinOp:
+    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment, result=None):
+        left = operands[0].compile_internal(env)
+        right = operands[1].compile_internal(env)
+        if result is None:
+            result = anf.Temp()
+        return anf.Seq(
+            left,
+            right,
+            self.tree(result, left.result(), right.result())
+        )
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp) -> anf.Tree:
+        raise PySchemeInternalError(str(type(self)) + " does not implement tree()")
+
+
+
+class BinaryArithmetic(BinOp, Primitive):
     """common base class for binary arithmetic operators.
     type is always `int -> int -> int`
     """
@@ -1297,60 +1386,62 @@ class BinaryArithmetic(Primitive):
     def static_type(self) -> bool:
         return True
 
-    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment):
-        return self.tree(operands[0].compile(env), operands[1].compile(env))
-
-
-    def tree(self, left: ir.Tree, right: ir.Tree) -> ir.Tree:
-        raise PySchemeInternalError(str(type(self)) + " does not implement tree()")
-
 
 class Addition(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb):
-        verify(amb)
         return lambda: ret(args[0] + args[1], amb)
 
-    def tree(self, left: ir.Tree, right: ir.Tree):
-        return ir.Add(left, right)
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Add(target, left, right)
 
 
 class Subtraction(BinaryArithmetic, metaclass=Singleton):
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         # noinspection PyUnresolvedReferences
         return lambda: ret(args[0] - args[1], amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Sub(target, left, right)
 
 
 class Multiplication(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         # noinspection PyUnresolvedReferences
-        verify(amb)
         return lambda: ret(args[0] * args[1], amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Mul(target, left, right)
 
 
 class Division(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         # noinspection PyUnresolvedReferences
-        verify(amb)
         return lambda: ret(args[0] // args[1], amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Div(target, left, right)
 
 
 class Modulus(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         # noinspection PyUnresolvedReferences
-        verify(amb)
         return lambda: ret(args[0] % args[1], amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Mod(target, left, right)
 
 
 class Exponentiation(BinaryArithmetic, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         # noinspection PyUnresolvedReferences
-        verify(amb)
         return lambda: ret(args[0] ** args[1], amb)
 
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Pow(target, left, right)
 
-class BinaryComparison(Primitive):
+
+class BinaryComparison(BinOp, Primitive):
     """base class for binary comparison operators.
     type is always `t -> t -> bool`
     """
@@ -1369,40 +1460,53 @@ class BinaryComparison(Primitive):
 
 class Equality(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].eq(args[1]), amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Eq(target, left, right)
 
 
 class GT(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].gt(args[1]), amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Gt(target, left, right)
 
 
 class LT(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
         return lambda: ret(args[0].lt(args[1]), amb)
 
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Lt(target, left, right)
+
 
 class GE(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].ge(args[1]), amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Ge(target, left, right)
 
 
 class LE(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].le(args[1]), amb)
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Le(target, left, right)
 
 
 class NE(BinaryComparison, metaclass=Singleton):
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].ne(args[1]), amb)
 
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Ne(target, left, right)
 
-class BinaryLogic(SpecialForm):
+
+class BinaryLogic(BinOp, SpecialForm):
     """base class for binary boolean operators.
     type is always `bool -> bool -> bool`
     """
@@ -1424,17 +1528,14 @@ class And(BinaryLogic, metaclass=Singleton):
               env: 'environment.Environment',
               ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
 
         def cont(lhs: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             if lhs.is_true():
                 return lambda: args[1].eval(env, ret, amb)
             elif lhs.is_false():
                 return lambda: ret(lhs, amb)
             else:
                 def cont2(rhs: Expr, amb: types.Continuation) -> types.Promise:
-                    verify(amb)
                     if rhs.is_false():
                         return lambda: ret(rhs, amb)
                     else:
@@ -1444,6 +1545,9 @@ class And(BinaryLogic, metaclass=Singleton):
 
         return lambda: args[0].eval(env, cont, amb)
 
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.And(target, left, right)
+
 
 class Or(BinaryLogic, metaclass=Singleton):
 
@@ -1451,17 +1555,14 @@ class Or(BinaryLogic, metaclass=Singleton):
               env: 'environment.Environment',
               ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
 
         def cont(lhs: Expr, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             if lhs.is_true():
                 return lambda: ret(lhs, amb)
             elif lhs.is_false():
                 return lambda: args[1].eval(env, ret, amb)
             else:
                 def cont2(rhs: Expr, amb: types.Continuation) -> types.Promise:
-                    verify(amb)
                     if rhs.is_true():
                         return lambda: ret(rhs, amb)
                     else:
@@ -1471,18 +1572,23 @@ class Or(BinaryLogic, metaclass=Singleton):
 
         return lambda: args[0].eval(env, cont, amb)
 
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Or(target, left, right)
 
-class Xor(Primitive, metaclass=Singleton):
+
+class Xor(BinOp, Primitive, metaclass=Singleton):
     @classmethod
     def type(cls):
         return BinaryLogic.type()
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0] ^ args[1], amb)
 
     def static_type(self):
         return True
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        return anf.Xor(target, left, right)
 
 
 class Not(Primitive, metaclass=Singleton):
@@ -1491,11 +1597,19 @@ class Not(Primitive, metaclass=Singleton):
         return inference.Function(Boolean.type(), Boolean.type())
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(~(args[0]), amb)
 
     def static_type(self) -> bool:
         return True
+
+    def compile_with_operands(self, operands: 'LinkedList', env: CompileTimeEnvironment, result=None):
+        expr = operands[0].compile_internal(env, result)
+        if result is None:
+            result = anf.Temp()
+        return anf.Seq(
+            expr,
+            anf.Not(result, expr.result())
+        )
 
 
 class Then(SpecialForm, metaclass=Singleton):
@@ -1514,7 +1628,6 @@ class Then(SpecialForm, metaclass=Singleton):
               env: 'environment.Environment',
               ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def amb2() -> types.Promise:
             return lambda: args[1].eval(env, ret, amb)
 
@@ -1538,14 +1651,13 @@ class Back(SpecialForm, metaclass=Singleton):
               ret: types.Continuation,
               amb: ambivalence.Amb
     ) -> types.Promise:
-        verify(amb)
         return amb
 
     def static_type(self) -> bool:
         return True
 
 
-class Cons(Primitive, metaclass=Singleton):
+class Cons(BinOp, Primitive, metaclass=Singleton):
     @classmethod
     def type(cls):
         '#t -> list(#t) -> list(#t)'
@@ -1554,11 +1666,18 @@ class Cons(Primitive, metaclass=Singleton):
         return inference.Function(t, inference.Function(list_t, list_t))
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(Pair(args[0], args[1]), amb)
 
     def static_type(self) -> bool:
         return True
+
+    def tree(self, target: anf.Temp, left: anf.Temp, right: anf.Temp):
+        result = anf.Temp()
+        return anf.Seq(
+            anf.Rec(result, 2),
+            anf.SetRec(result, 0, left),
+            anf.SetRec(result, 1, right)
+        )
 
 
 class Append(Primitive, metaclass=Singleton):
@@ -1569,7 +1688,6 @@ class Append(Primitive, metaclass=Singleton):
         return inference.Function(list_t, inference.Function(list_t, list_t))
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].append(args[1]), amb)
 
     def static_type(self) -> bool:
@@ -1585,7 +1703,6 @@ class Head(Primitive, metaclass=Singleton):
         return inference.Function(list_t, t)
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].car(), amb)
 
     def static_type(self) -> bool:
@@ -1600,7 +1717,6 @@ class Tail(Primitive, metaclass=Singleton):
         return inference.Function(list_t, list_t)
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(args[0].cdr(), amb)
 
     def static_type(self) -> bool:
@@ -1614,8 +1730,43 @@ class Length(Primitive, metaclass=Singleton):
         return inference.Function(Null.type(), Number.type())
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: ret(Number(len(args[0])), amb)
+
+    def static_type(self) -> bool:
+        return True
+
+
+class GenStr(Primitive, metaclass=Singleton):
+    counter = 0
+    @classmethod
+    def type(cls):
+        'list(char) -> list(char)'
+        return inference.Function(Pair.type(Char.type()), Pair.type(Char.type()))
+
+    def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb):
+        suffix = str(GenStr.counter)
+        GenStr.counter += 1
+        return lambda: ret(args[0].append(LinkedList.list([Char(c) for c in suffix])), amb)
+
+    @classmethod
+    def reset(cls):
+        """
+        for testing
+        """
+        GenStr.counter = 0
+
+    def static_type(self) -> bool:
+        return True
+
+
+class Str(Primitive, metaclass=Singleton):
+    @classmethod
+    def type(cls):
+        '#t -> list(char)'
+        return inference.Function(inference.TypeVariable(), Pair.type(Char.type()))
+
+    def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb):
+        return lambda: ret(LinkedList.list(([Char(c) for c in str(args[0])])), amb)
 
     def static_type(self) -> bool:
         return True
@@ -1634,7 +1785,6 @@ class Print(Primitive):
         self._output = output
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         self._output.write(str(args[0]))
         self._output.write("\n")
         return lambda: ret(args, amb)
@@ -1656,7 +1806,6 @@ class Cont(Primitive):
         self._ret = ret
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: self._ret(args[0], amb)
 
     def static_type(self) -> bool:
@@ -1682,9 +1831,7 @@ class CallCC(SpecialForm, metaclass=Singleton):
               env: 'environment.Environment',
               ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def do_apply(closure: Closure, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             return lambda: closure.apply(LinkedList.list([Cont(ret)]), env, ret, amb)
 
         return args[0].eval(env, do_apply, amb)
@@ -1700,7 +1847,6 @@ class Exit(Primitive):
         return inference.TypeVariable()
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return None
 
     def static_type(self) -> bool:
@@ -1713,7 +1859,6 @@ class Spawn(Primitive):
         return Boolean.type()
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return [lambda: ret(T(), amb), lambda: ret(F(), amb)]
 
     def static_type(self) -> bool:
@@ -1734,9 +1879,7 @@ class Error(SpecialForm):
               env: 'environment.Environment',
               ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         def print_continuation(printer: Print, amb: ambivalence.Amb) -> types.Promise:
-            verify(amb)
             return lambda: printer.apply(args, env, self.cont, amb)
 
         return env.lookup(Symbol("print"), print_continuation, amb)
@@ -1794,6 +1937,10 @@ class TypeDef(TypeSystem):
         env[self.flat_type.symbol] = inference.TypeVariable()
         self.constructors.prepare_analysis(env)
 
+    def prepare_compilation(self, env: CompileTimeEnvironment):
+        env.install(self.flat_type.symbol, None)
+        self.constructors.prepare_compilation(env)
+
     @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):
         new_env = env.extend()
@@ -1808,7 +1955,6 @@ class TypeDef(TypeSystem):
         return return_type
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return self.constructors.eval(env, lambda _, amb: ret(Nothing(), amb), amb)
 
     def __str__(self):
@@ -1831,6 +1977,9 @@ class TypeConstructor(TypeSystem):
         debug("pre-installing", self.name, "in", env)
         env[self.name] = inference.TypeVariable()
 
+    def prepare_compilation(self, env: CompileTimeEnvironment):
+        env.install(self.name, None)
+
     def make_type(self, env: inference.TypeEnvironment, return_type: inference.Type,
                   non_generic: set) -> inference.Type:
         """
@@ -1849,7 +1998,6 @@ class TypeConstructor(TypeSystem):
         return make_type_recursive(self.arg_types)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if len(self.arg_types) == 0:
             return lambda: env.define(self.name, NamedTuple(self.name, Null()), ret, amb)
         else:
@@ -1904,7 +2052,6 @@ class Prototype(TypeSystem):
         return "prototype " + str(self.name) + ' ' + str(self.components)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb):
-        verify(amb)
         return lambda: ret(Nothing(), amb)
 
     __repr__ = __str__
@@ -1990,7 +2137,6 @@ class TupleConstructor(Primitive):
         self.num_args = num_args
 
     def apply_evaluated_args(self, args, ret: types.Continuation, amb: ambivalence.Amb):
-        verify(amb)
         return lambda: ret(NamedTuple(self.name, args), amb)
 
     def __str__(self):
@@ -2020,7 +2166,6 @@ class NamedTuple(Expr):
 
     def match(self, other: 'NamedTuple', env: 'environment.Environment', ret: types.Continuation,
               amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if self.name == other.name:
             return lambda: self.values.match(other.values, env, ret, amb)
         else:
@@ -2067,12 +2212,10 @@ class Composite(Primitive):
         return last_type
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         if self.has_no_args():
             return lambda: self.default_body().eval(env, ret, amb)
 
         def post_eval_continuation(evaluated_components, amb) -> types.Promise:
-            verify(amb)
             closure = CompositeClosure(evaluated_components)
             closure.set_name(self.name)
             return lambda: ret(closure, amb)
@@ -2088,6 +2231,17 @@ class Composite(Primitive):
         else:
             return self.components[0]._body
 
+    def compile_internal(self, env: CompileTimeEnvironment, result: anf.Temp=None):
+        if self.has_no_args():
+            extended_env = env.extend({})
+            body = self.default_body().compile(extended_env, result)
+            return anf.Seq(
+                anf.ExtendEnv(extended_env.count()),
+                body,
+                anf.PopEnv()
+            )
+        else:
+            pass
 
 class ComponentLambda(Lambda):
     """
@@ -2114,7 +2268,6 @@ class CompositeClosure(Closure):
         self.name = name
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb):
-        verify(amb)
         hlDebug(self.name, args)
         if len(args) < self.num_args():
 
@@ -2123,7 +2276,6 @@ class CompositeClosure(Closure):
                     result: LinkedList,
                     ret: types.Continuation,
                     amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 if type(components) is Null:
                     return lambda: ret(result, amb)
                 else:
@@ -2131,13 +2283,11 @@ class CompositeClosure(Closure):
                         return lambda: try_recursive(components.cdr(), result, ret, amb)
 
                     def ret2(val, amb: ambivalence.Amb) -> types.Promise:
-                        verify(amb)
                         return lambda: try_recursive(components.cdr(), Pair(val, result), ret, amb)
 
                     return lambda: components.car().apply_evaluated_args(args, ret2, ambivalence.Amb(amb2, amb.cut()))
 
             def collect_successes(successes: LinkedList, amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 if isinstance(successes, Null):
                     return amb
                 else:
@@ -2147,7 +2297,6 @@ class CompositeClosure(Closure):
 
         else:
             def try_recursive(components: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-                verify(amb)
                 if type(components) is Null:
                     return amb
                 else:
@@ -2174,7 +2323,6 @@ class ComponentClosure(Closure):
     """
 
     def apply_evaluated_args(self, args: LinkedList, ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         new_env = self._env.extend()
 
         def apply_evaluated_recursive(
@@ -2183,7 +2331,6 @@ class ComponentClosure(Closure):
                 ret: types.Continuation,
                 amb: ambivalence.Amb
         ) -> types.Promise:
-            verify(amb)
             if type(fargs) is Null and type(aargs) is Null:
                 return lambda: self._body.eval(new_env, ret, ambivalence.Amb(amb.cut()))
             elif type(fargs) is Null:  # over-application
@@ -2294,7 +2441,6 @@ class Load(Expr):
         merge_recursive(self.current, other.current)
 
     def eval(self, env: 'environment.Environment', ret: types.Continuation, amb: ambivalence.Amb) -> types.Promise:
-        verify(amb)
         return lambda: self.make_wrapper().eval(env, ret, amb)
 
     def note_current_load(self, package: LinkedList):
@@ -2411,6 +2557,9 @@ class Load(Expr):
 
     def prepare_analysis(self, env: inference.TypeEnvironment):
         self.make_wrapper().prepare_analysis(env)
+
+    def prepare_compilation(self, env: CompileTimeEnvironment):
+        self.make_wrapper().prepare_compilation(env)
 
     @trace
     def analyse_internal(self, env: inference.TypeEnvironment, non_generic: set):

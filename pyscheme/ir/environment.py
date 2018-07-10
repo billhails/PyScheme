@@ -19,7 +19,8 @@ from pyscheme.singleton import Singleton
 from pyscheme.exceptions import PySchemeInternalError
 
 
-class Environment(metaclass=Singleton):
+class Environment:
+
     def extend(self, names: dict):
         return Frame(self, names)
 
@@ -28,6 +29,9 @@ class Environment(metaclass=Singleton):
 
     def install(self, name, value):
         raise PySchemeInternalError("install " + str(name) + " called on root compile-time environment")
+
+    def count(self):
+        return 0
 
 
 class Frame(Environment):
@@ -47,3 +51,6 @@ class Frame(Environment):
             return frame_number, self.dictionary[name][0], self.dictionary[name][1]
         else:
             return self.parent.lookup(name, frame_number + 1)
+
+    def count(self):
+        return len(self.dictionary)

@@ -1,0 +1,134 @@
+// PyScheme lambda language written in Python
+//
+// Copyright (C) 2018  Bill Hails
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+load utils.lists as lst;
+
+typedef pair(#t) { tuple(#t, #t) }
+
+typedef in_exp {
+    in_defun(in_exp, list(in_exp), in_exp) |
+    in_define(in_exp, in_exp) |
+    in_let(list(pair(in_exp)), in_exp) |
+    in_if(in_exp, in_exp, in_exp) |
+    in_set(in_exp, in_exp) |
+    in_lambda(list(in_exp), in_exp) |
+    in_number(int) |
+    in_boolean(bool) |
+    in_string(string) |
+    in_char(char) |
+    in_var(string) |
+    in_quote(in_exp) |
+    in_apply(in_exp, list(in_exp))
+}
+
+typedef out_exp {
+    out_define(out_exp, out_exp) |
+    out_begin(list(out_exp)) |
+    out_lambda(list(out_exp), out_exp) |
+    out_number(int) |
+    out_boolean(bool) |
+    out_string(string) |
+    out_var(string) |
+    out_void |
+    out_let(tuple(out_exp, out_exp), out_exp)
+}
+
+fn atomic {
+    (in_quote(_)) { true }
+    (in_number(_)) { true }
+    (in_boolean(_)) { true }
+    (in_string(_)) { true }
+    (in_char(_)) { true }
+    (in_var(_)) { true }
+    (_) { false }
+}
+
+fn normalize_term(exp) {
+    normalize(exp, fn (x) { x })
+}
+
+fn normalize (exp, k) {
+    switch (exp) {
+
+        (in_lambda(params, body)) {
+            out_lambda(
+                lst.map(normalize_term, params),
+                normalize_term(body)
+            )
+        }
+
+        (in_let([], exp)) {
+            normalize(exp, k)
+        }
+
+        (in_let(tuple(x, exp1) @ clause, exp2)) {
+            normalize(
+                exp1,
+                fn (aexp1) {
+                    out_let(tuple(normalize_term(x), aexp),
+                            normalize(in_let(clause, exp2), k))
+                }
+            )
+        }
+
+        (in_if(exp1, exp2, exp3)) {
+            normalize_name(
+                exp1,
+                fn (t) {
+                    k(out_if(t, normalize_term(exp2), normalize_term(exp3))
+                }
+            )
+        }
+
+        (in_set(v, exp)) {
+            normalize_name(
+                exp,
+                fn (t) {
+                    out_let(
+                        tuple(
+                            out_var(genstr("_")),
+                            out_set(normalize_term(v), t)
+                        ),
+                        k(out_void)
+                    )
+                }
+            )
+        }
+
+        (in_apply(f, e)) {
+            normalize_name(
+                f,
+                fn (t) {
+                    normalize_names(
+                        e,
+                        fn (ts) {
+                            k(t @ ts)
+                        }
+                    )
+                }
+            )
+        }
+
+        (exp) {
+            if (atomic(exp)) {
+                normalize_atom(exp)
+            } else {
+                error("cannot normalize " @@ str(exp))
+            }
+        }
+    }
+}

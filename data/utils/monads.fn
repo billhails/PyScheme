@@ -1,0 +1,66 @@
+// PyScheme lambda language written in Python
+//
+// Copyright (C) 2018  Bill Hails
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+typedef Maybe(#t) { Just(#t) | Nothing }
+
+// we can treat Maybe as a monad by defining a bind function
+
+fn bind {
+    (Just(t), f) { f(t) }
+    (Nothing, _) { Nothing }
+}
+
+// and a unit function
+fn unit(a) { Just(a) }
+
+// but this is a "poor man's monad", ideally the type definition of Maybe would define bind for us as
+// a binary operator >>=, and also define a unary return operator that does a -> Just(a) ???
+
+fn safe_div(x, y) {
+    bind(
+        x,
+        fn (a) {
+            bind(
+                y,
+                fn (b) {
+                    if (b == 0) {
+                        Nothing
+                    } else {
+                        unit(a / b)
+                    }
+                }
+            )
+        }
+    )
+}
+
+fn pipeline {
+    (e, [])     { e }
+    (e, fh @ t) { pipeline(bind(e, fh), t) }
+}
+
+fn add(a, b) {
+    if (a == 0 or b == 0) {
+        Nothing
+    } else {
+        Just(a + b)
+    }
+}
+
+fn safe_add(a, b, c) {
+    pipeline(unit(a), [add(b), add(c)])
+}

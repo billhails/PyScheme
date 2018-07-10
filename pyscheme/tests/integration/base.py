@@ -30,6 +30,7 @@ class Base(TestCase):
         in_file = io.StringIO(text)
         out_file = io.StringIO()
         expr.Symbol.reset()
+        expr.GenStr.reset()
         repl = Repl(in_file, out_file, error_file)
         repl.run()
         return out_file.getvalue(), error_file.getvalue()

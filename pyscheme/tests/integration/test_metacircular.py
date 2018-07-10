@@ -107,46 +107,46 @@ class TestMetacircular(Base):
         )
 
 
-    def dont_test_metacircular_compiler_it_takes_too_long(self):
+    def test_metacircular_compiler_it_takes_too_long(self):
         self.assertEval(
             '''
             sequence[
                 [envt, argl],
                 [envt, continue, argl, proc, val1, val2, val],
                 [
-                    assign[proc, value_procedure[label[entry], envt]],
-                    goto[address_label[label[after-lambda]]],
-                    tag[label[entry]],
+                    assign[proc, value_procedure[label[entry-0], envt]],
+                    goto[address_label[label[after-lambda-1]]],
+                tag[label[entry-0]],
                     assign[envt, value_procedure_env[proc]],
                     assign[envt, value_extend_env[x, argl, envt]],
                     assign[val, value_lookup[x]],
-                    test[location_register[val], value_const[0], label[false-branch]],
-                    tag[label[true-branch]],
+                    test[location_register[val], value_const[0], label[false-branch-3]],
+                tag[label[true-branch-2]],
                     assign[val1, value_lookup[x]],
                     assign[val2, value_const[2]],
                     assign[val, value_binop[add, value_register[val1], value_register[val2]]],
                     goto[address_register[continue]],
-                    tag[label[false-branch]],
+                tag[label[false-branch-3]],
                     assign[val, value_lookup[x]],
                     goto[address_register[continue]],
-                    tag[label[after-if]],
-                    tag[label[after-lambda]],
+                tag[label[after-if-4]],
+                tag[label[after-lambda-1]],
                     assign[val, value_const[3]],
-                    test[location_register[proc], value_isprimitive, label[primitive-branch]],
-                    tag[label[compiled-branch]],
-                    assign[continue, value_label[label[after-call]]],
+                    test[location_register[proc], value_isprimitive, label[primitive-branch-5]],
+                tag[label[compiled-branch-6]],
+                    assign[continue, value_label[label[after-call-7]]],
                     assign[val, value_compiled_procedure_entry[proc]],
-                    tag[label[primitive-branch]],
+                tag[label[primitive-branch-5]],
                     assign[val, value_apply_primitive[proc, argl]],
-                    tag[label[after-call]]
+                tag[label[after-call-7]]
                 ]
             ]
             ''',
             '''
             
-            load utils.compiler as compiler;
+            load compiler.sicp_compiler as comp;
             
-            env t extends compiler {
+            env t extends comp {
                 // try it out: ((lambda (x) (if x (+ x 2) x)) 3)
                 result = compile(
                     application(

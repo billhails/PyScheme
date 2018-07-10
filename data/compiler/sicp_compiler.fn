@@ -219,9 +219,9 @@ fn compile_definition(v, expr, target, linkage) {
 }
 
 fn compile_conditional(t3st, consequent, alternative, target, linkage) {
-    t_branch = label("true-branch");
-    f_branch = label("false-branch");
-    after_if = label("after-if");
+    t_branch = label(genstr("true-branch-"));
+    f_branch = label(genstr("false-branch-"));
+    after_if = label(genstr("after-if-"));
     consequent_linkage =
         if (linkage == next) {
             jump(after_if)
@@ -263,8 +263,8 @@ fn label_instruction_sequence {
 }
 
 fn compile_lambda (arg, body, target, linkage) {
-    proc_entry = label("entry");
-    after_lambda = label("after-lambda");
+    proc_entry = label(genstr("entry-"));
+    after_lambda = label(genstr("after-lambda-"));
     lambda_linkage =
         if (linkage == next) {
             jump(after_lambda)
@@ -321,9 +321,9 @@ fn compile_application(func, arg, target, linkage) {
 }
 
 fn compile_procedure_call(target, linkage) {
-    primitive_branch = label("primitive-branch");
-    compiled_branch = label("compiled-branch");
-    after_call = label("after-call");
+    primitive_branch = label(genstr("primitive-branch-"));
+    compiled_branch = label(genstr("compiled-branch-"));
+    after_call = label(genstr("after-call-"));
     compiled_linkage =
         if (linkage == next) {
             jump(after_call)
@@ -383,7 +383,7 @@ fn compile_proc_appl {
         error("MCC - return linkage, but target is not val")
     }
     (target, linkage) {
-        proc_return = label("proc-return");
+        proc_return = label(genstr("proc-return-"));
         sequence(
             [proc],
             all_regs,
